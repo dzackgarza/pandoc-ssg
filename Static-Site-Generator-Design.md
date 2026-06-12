@@ -14,7 +14,6 @@ Derived from:
 
 https://github.com/dzackgarza/dzackgarza.comv2018/tree/master/_pages
 
-
 So note in particular that one expects to be able to drop in completely standalone websites, like
 https://github.com/dzackgarza/dzackgarza.comv2018/tree/master/_pages/MakeMeAQual
 And have them served up as-is. Another example being
@@ -27,7 +26,7 @@ https://github.com/dzackgarza/dzackgarza.comv2018/blob/master/_pages/GOATS_2020.
 
 One also wants a very principled way of being able to modularly develop and insert components in the website. This may typically involve defining a custom div in pandoc, with a custom filter, which transforms data to populate live components. Examples would include photo galleries backed by e.g. some kind of custom pandoc block or yaml metadata that contains all image data and tells the filter which component to populate with what. Another example would be a component that defines an (independently constructed and debugged) scrolling gallery of cards, each of which houses a note, e.g. https://dzackgarza.com/writing/
 
-Ultimately, the goal must be that trivial expository content (which includes extensive mathematics -- so note that you must be very careful about how you integrate mathjax and expose a config that can be easily updated to include custom macros and definitions) should be trivial to create and edit, e.g. using the entrypoint CLI (or even justfile recipes that abstract or chain some such commands). Changing e.g. site layout might be a bit more complicated, but still mostly involve editing templates, which can be handled narrowly by a web-designer agent, meaning that this part of the app can own whatever visual/UI framework is enforced. New dynamic components, e.g. a newly defined image gallery, should be doable mostly with filter and template work, again not touching the core SSG code. And finally, the pipeline itself should be mostly locked in, and ongoing content work should almost never have to modify the core itself. 
+Ultimately, the goal must be that trivial expository content (which includes extensive mathematics -- so note that you must be very careful about how you integrate mathjax and expose a config that can be easily updated to include custom macros and definitions) should be trivial to create and edit, e.g. using the entrypoint CLI (or even justfile recipes that abstract or chain some such commands). Changing e.g. site layout might be a bit more complicated, but still mostly involve editing templates, which can be handled narrowly by a web-designer agent, meaning that this part of the app can own whatever visual/UI framework is enforced. New dynamic components, e.g. a newly defined image gallery, should be doable mostly with filter and template work, again not touching the core SSG code. And finally, the pipeline itself should be mostly locked in, and ongoing content work should almost never have to modify the core itself.
 
 So we need a design model that incorporates all of these invariants, making this app own as little surface as possible by delegating to larger depenencies, tools, and frameworks and gluing them together. An alternate approach might also be simple taking an existing solution and forking it to repurpose it for this pandoc-specific design. Research various solutions and approaches and deliver a plan forward.
 
@@ -175,7 +174,7 @@ Example blog post:
 site:
   page: true
   schema: blog-post.v1
-title: "Example post"
+title: 'Example post'
 date: 2026-06-12
 tags: [algebraic-geometry, teaching]
 ---
@@ -288,11 +287,11 @@ Example schema registry:
 
 ```ts
 export const pageSchemas = {
-  "page.v1": PageSchema,
-  "blog-post.v1": BlogPostSchema,
-  "seminar.v1": SeminarSchema,
-  "collection-page.v1": CollectionPageSchema,
-  "passthrough.v1": PassthroughSchema
+  'page.v1': PageSchema,
+  'blog-post.v1': BlogPostSchema,
+  'seminar.v1': SeminarSchema,
+  'collection-page.v1': CollectionPageSchema,
+  'passthrough.v1': PassthroughSchema,
 } as const;
 ```
 
@@ -350,10 +349,7 @@ Example collection component:
 The component filter should either produce static HTML or an island placeholder:
 
 ```html
-<div
-  data-island="card-scroller"
-  data-props-id="island-17">
-</div>
+<div data-island="card-scroller" data-props-id="island-17"></div>
 <script type="application/json" id="island-17">
   ...
 </script>
@@ -407,16 +403,16 @@ The compiler generates a template fragment:
 
 ```html
 <script>
-window.MathJax = {
-  tex: {
-    macros: {
-      AA: "\\mathbb{A}",
-      PP: "\\mathbb{P}",
-      Spec: "\\operatorname{Spec}",
-      Hom: "\\operatorname{Hom}"
-    }
-  }
-};
+  window.MathJax = {
+    tex: {
+      macros: {
+        AA: '\\mathbb{A}',
+        PP: '\\mathbb{P}',
+        Spec: '\\operatorname{Spec}',
+        Hom: '\\operatorname{Hom}',
+      },
+    },
+  };
 </script>
 ```
 
@@ -641,6 +637,7 @@ Sixth, migrate standalone apps such as `MakeMeAQual` and `persistent_homology` a
 Seventh, migrate blog posts and teaching pages. Use CLI scaffolds so each new post has the page marker and schema version but no repetitive boilerplate.
 
 Eighth, add redirects for legacy URLs. Every old route should be classified as:
+
 ```text
 same route
 new route with redirect

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { BuildError } from "./errors.ts";
 import type { Manifest, NavItem } from "./types.ts";
 
-const navShape = z.object({
+let navShape = z.object({
   main: z
     .array(
       z
@@ -25,36 +25,40 @@ const navShape = z.object({
  * an empty nav. Malformed entries throw BuildError(kind="nav").
  */
 export async function loadNavigation(contentDir: string): Promise<NavItem[]> {
-  const navPath = join(contentDir, "_data", "navigation.toml");
-  let raw: string;
-  try {
-    raw = await readFile(navPath, "utf8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
-    }
-    throw err;
+  let navPath = join(contentDir, "_data", "navigation.toml");
+  if (!(await Bun.file(navPath).exists())) {
+    return [];
   }
+  let raw = await readFile(navPath, "utf8");
 
   let table: unknown;
   try {
     table = parse(raw);
   } catch (err) {
-    throw new BuildError("nav", ["_data/navigation.toml"], `malformed navigation.toml: ${String(err)}`);
+    let detail = err instanceof Error ? err.message : String(err);
+    throw new BuildError(
+      "nav",
+      ["_data/navigation.toml"],
+      `malformed navigation.toml: ${detail}`,
+      err,
+    );
   }
 
-  const parsed = navShape.safeParse(table);
+  let parsed = navShape.safeParse(table);
   if (!parsed.success) {
     throw new BuildError("nav", ["_data/navigation.toml"], parsed.error.message);
   }
 
-  const items = parsed.data.main ?? [];
+  let items = parsed.data.main === undefined ? [] : parsed.data.main;
   return [...items].sort((a, b) => a.weight - b.weight);
 }
 
 /** True for nav entries that are not internal site routes. */
 function isExternal(item: NavItem): boolean {
-  return item.external === true || /^https?:\/\//.test(item.href);
+  if (item.external === true) {
+    return true;
+  }
+  return /^https?:\/\//.test(item.href);
 }
 
 /**
@@ -62,7 +66,7 @@ function isExternal(item: NavItem): boolean {
  * BuildError(kind="nav").
  */
 export function assertNavTargets(nav: NavItem[], manifest: Manifest): void {
-  const urls = new Set(manifest.routes.map((r) => r.url));
+  let urls = new Set(manifest.routes.map((r) => r.url));
   for (const item of nav) {
     if (isExternal(item)) {
       continue;

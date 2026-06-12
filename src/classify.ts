@@ -15,7 +15,7 @@ export async function classifyFiles(
   relPaths: string[],
   config: SiteConfig,
 ): Promise<ClassifiedFile[]> {
-  const result: ClassifiedFile[] = [];
+  let result: ClassifiedFile[] = [];
   for (const relPath of relPaths) {
     result.push({ relPath, class: await classifyOne(contentDir, relPath, config) });
   }
@@ -27,7 +27,8 @@ async function classifyOne(
   relPath: string,
   config: SiteConfig,
 ): Promise<FileClass> {
-  const firstSegment = relPath.split("/")[0] ?? "";
+  let segment = relPath.split("/")[0];
+  let firstSegment = segment === undefined ? "" : segment;
   if (firstSegment.startsWith("_")) {
     return "reserved";
   }
@@ -41,12 +42,15 @@ async function classifyOne(
 }
 
 function isInSubtree(relPath: string, subtree: string): boolean {
-  return relPath === subtree || relPath.startsWith(`${subtree}/`);
+  if (relPath === subtree) {
+    return true;
+  }
+  return relPath.startsWith(`${subtree}/`);
 }
 
 async function isOptInPage(contentDir: string, relPath: string): Promise<boolean> {
-  const raw = await readFile(join(contentDir, relPath), "utf8");
-  const parsed = matter(raw);
-  const site = (parsed.data as { site?: { page?: unknown } }).site;
+  let raw = await readFile(join(contentDir, relPath), "utf8");
+  let parsed = matter(raw);
+  let site = (parsed.data as { site?: { page?: unknown } }).site;
   return site?.page === true;
 }

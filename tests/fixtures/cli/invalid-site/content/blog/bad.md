@@ -2,7 +2,7 @@
 site:
   page: true
   schema: blog-post.v1
-title: "Missing Date Post"
+title: 'Missing Date Post'
 ---
 
 # Missing Date Post

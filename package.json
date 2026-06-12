@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "bun test --coverage --coverage-reporter=lcov --coverage-dir=.",
-    "typecheck": "tsc --noEmit",
+    "types": "tsc --noEmit",
     "build": "bun src/cli.ts build"
   },
   "dependencies": {

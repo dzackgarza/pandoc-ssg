@@ -4,3 +4,4 @@ dist/
 lcov.info
 coverage/
 *.log
+.lcov.info.*.tmp

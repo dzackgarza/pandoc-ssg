@@ -6,16 +6,21 @@ import type { PageMeta, PageType } from "./types.ts";
  * Page type registry (O8): name → schema id + pandoc template file.
  * "page" is the default type for pages in unmapped directories.
  */
-export const pageTypes: Record<string, PageType> = {
+export let pageTypes: Record<string, PageType> = {
   page: { name: "page", schema: "page.v1", template: "page.html" },
   "blog-post": { name: "blog-post", schema: "blog-post.v1", template: "blog.html" },
 };
 
-const routeShape = z
-  .string()
-  .refine((s) => s === "/" || (s.startsWith("/") && s.endsWith("/")));
+function isRootOrBounded(s: string): boolean {
+  if (s === "/") {
+    return true;
+  }
+  return s.startsWith("/") && s.endsWith("/");
+}
 
-const siteShape = z
+let routeShape = z.string().refine(isRootOrBounded);
+
+let siteShape = z
   .object({
     page: z.literal(true),
     schema: z.string().optional(),
@@ -24,14 +29,14 @@ const siteShape = z
   })
   .strict();
 
-const pageV1 = z
+let pageV1 = z
   .object({
     title: z.string(),
     site: siteShape,
   })
   .strict();
 
-const blogPostV1 = z
+let blogPostV1 = z
   .object({
     title: z.string(),
     site: siteShape,
@@ -40,7 +45,7 @@ const blogPostV1 = z
   })
   .strict();
 
-const schemaRegistry: Record<string, z.ZodType<PageMeta>> = {
+let schemaRegistry: Record<string, z.ZodType<PageMeta>> = {
   "page.v1": pageV1,
   "blog-post.v1": blogPostV1,
 };
@@ -59,16 +64,12 @@ export function knownSchemas(): string[] {
  * blog-post.v1: requires title and date (YYYY-MM-DD); optional tags: string[].
  * All schemas:  optional site.route ("/" or "/…/" shaped), site.type, site.schema.
  */
-export function validatePageMeta(
-  relPath: string,
-  rawMeta: unknown,
-  schemaId: string,
-): PageMeta {
-  const schema = schemaRegistry[schemaId];
+export function validatePageMeta(relPath: string, rawMeta: unknown, schemaId: string): PageMeta {
+  let schema = schemaRegistry[schemaId];
   if (schema === undefined) {
     throw new BuildError("schema", [relPath], `unknown schema id ${schemaId}`);
   }
-  const parsed = schema.safeParse(rawMeta);
+  let parsed = schema.safeParse(rawMeta);
   if (!parsed.success) {
     throw new BuildError("schema", [relPath], parsed.error.message);
   }
@@ -86,24 +87,22 @@ export function resolvePageType(
   rawMeta: unknown,
   dirTypes: { dir: string; type: string }[],
 ): PageType {
-  const explicitType = (rawMeta as { site?: { type?: unknown } }).site?.type;
-  const typeName =
+  let explicitType = (rawMeta as { site?: { type?: unknown } }).site?.type;
+  let typeName =
     typeof explicitType === "string" ? explicitType : inferTypeFromDir(relPath, dirTypes);
-  const pageType = pageTypes[typeName];
+  let pageType = pageTypes[typeName];
   if (pageType === undefined) {
     throw new BuildError("schema", [relPath], `unknown page type ${typeName}`);
   }
   return pageType;
 }
 
-function inferTypeFromDir(
-  relPath: string,
-  dirTypes: { dir: string; type: string }[],
-): string {
+function inferTypeFromDir(relPath: string, dirTypes: { dir: string; type: string }[]): string {
   let bestDir = "";
   let bestType = "page";
   for (const { dir, type } of dirTypes) {
-    if ((relPath === dir || relPath.startsWith(`${dir}/`)) && dir.length >= bestDir.length) {
+    let underDir = relPath === dir ? true : relPath.startsWith(`${dir}/`);
+    if (underDir && dir.length >= bestDir.length) {
       bestDir = dir;
       bestType = type;
     }

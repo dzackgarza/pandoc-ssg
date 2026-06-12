@@ -23,10 +23,10 @@ export interface RenderInput {
  * site-wide macros. Emitted verbatim into the page head exactly once.
  */
 function mathjaxConfig(macros: Record<string, string>): string {
-  const entries = Object.entries(macros).map(
+  let entries = Object.entries(macros).map(
     ([name, tex]) => `      ${JSON.stringify(name)}: ${JSON.stringify(tex)}`,
   );
-  const macroBlock = entries.join(",\n");
+  let macroBlock = entries.join(",\n");
   return [
     "<script>",
     "window.MathJax = {",
@@ -46,34 +46,27 @@ function mathjaxConfig(macros: Record<string, string>): string {
  * BuildError(kind="pandoc").
  */
 export async function renderPage(input: RenderInput): Promise<string> {
-  const defaultsName = `${basename(input.pageType.template, ".html")}.yaml`;
-  const defaultsPath = join(input.pandocDir, "defaults", defaultsName);
+  let defaultsName = `${basename(input.pageType.template, ".html")}.yaml`;
+  let defaultsPath = join(input.pandocDir, "defaults", defaultsName);
 
-  const metadata: Record<string, unknown> = {
+  let metadata: Record<string, unknown> = {
     nav: input.nav.map((item) => ({ title: item.title, href: item.href })),
   };
   if (Object.keys(input.mathMacros).length > 0) {
     metadata.mathjax_config = mathjaxConfig(input.mathMacros);
   }
 
-  const metaDir = await mkdtemp(join(tmpdir(), "ssg-meta-"));
-  const metaFile = join(metaDir, "meta.yaml");
+  let metaDir = await mkdtemp(join(tmpdir(), "ssg-meta-"));
+  let metaFile = join(metaDir, "meta.yaml");
   await writeFile(metaFile, YAML.stringify(metadata), "utf8");
 
   try {
-    const proc = Bun.spawn(
-      [
-        "pandoc",
-        "--defaults",
-        defaultsPath,
-        "--metadata-file",
-        metaFile,
-        input.sourcePath,
-      ],
+    let proc = Bun.spawn(
+      ["pandoc", "--defaults", defaultsPath, "--metadata-file", metaFile, input.sourcePath],
       { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
     );
 
-    const [stdout, stderr, exitCode] = await Promise.all([
+    let [stdout, stderr, exitCode] = await Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),
       proc.exited,

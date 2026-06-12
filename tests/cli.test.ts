@@ -5,8 +5,8 @@
  */
 import { describe, expect, test } from "bun:test";
 import { promises as fs } from "node:fs";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 import matter from "gray-matter";
 
 const REPO = path.resolve(import.meta.dir, "..");
@@ -35,8 +35,8 @@ async function runCli(args: string[]): Promise<RunResult> {
 }
 
 /** Fresh temp directory unique to each test. */
-async function freshTmp(label: string): Promise<string> {
-  return await fs.mkdtemp(path.join(os.tmpdir(), `pandoc-ssg-${label}-`));
+function freshTmp(label: string): Promise<string> {
+  return fs.mkdtemp(path.join(os.tmpdir(), `pandoc-ssg-${label}-`));
 }
 
 /** Copy a committed fixture's content/ tree into a fresh temp content dir. */
@@ -112,22 +112,12 @@ describe("CLI new post (O9)", () => {
   test("scaffolds a dated, slugified blog post with valid frontmatter, exit 0", async () => {
     const contentDir = await stageContent("roundtrip-site");
 
-    const r = await runCli([
-      "new",
-      "post",
-      "My First Post",
-      "--content",
-      contentDir,
-    ]);
+    const r = await runCli(["new", "post", "My First Post", "--content", contentDir]);
 
     expect(r.exitCode).toBe(0);
 
     const prefix = todayPrefix();
-    const expected = path.join(
-      contentDir,
-      "blog",
-      `${prefix}-my-first-post.md`,
-    );
+    const expected = path.join(contentDir, "blog", `${prefix}-my-first-post.md`);
     expect(await Bun.file(expected).exists()).toBe(true);
 
     const parsed = matter(await Bun.file(expected).text());
@@ -166,13 +156,7 @@ describe("CLI scaffold-then-build round trip (O9)", () => {
     const contentDir = await stageContent("roundtrip-site");
     const outDir = await freshTmp("roundtrip-out");
 
-    const scaffold = await runCli([
-      "new",
-      "post",
-      "My First Post",
-      "--content",
-      contentDir,
-    ]);
+    const scaffold = await runCli(["new", "post", "My First Post", "--content", contentDir]);
     expect(scaffold.exitCode).toBe(0);
 
     const prefix = todayPrefix();

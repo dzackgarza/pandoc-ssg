@@ -1,28 +1,18 @@
-import { test, expect } from "bun:test";
-import { validatePageMeta, resolvePageType } from "../src/schemas.ts";
+import { expect, test } from "bun:test";
 import { BuildError } from "../src/errors.ts";
-
-// Wraps a synchronous throwing call so error properties can be inspected via
-// `.rejects.toMatchObject` without using try/catch in the test body.
-async function calling(fn: () => unknown): Promise<unknown> {
-  return fn();
-}
+import { resolvePageType, validatePageMeta } from "../src/schemas.ts";
 
 // O3: validatePageMeta — page.v1.
 
 test("validatePageMeta accepts a minimal page.v1 and returns the typed meta", () => {
-  const meta = validatePageMeta(
-    "about.md",
-    { title: "About", site: { page: true } },
-    "page.v1",
-  );
+  const meta = validatePageMeta("about.md", { title: "About", site: { page: true } }, "page.v1");
   expect(meta.title).toBe("About");
   expect(meta.site.page).toBe(true);
 });
 
 test("validatePageMeta rejects page.v1 missing title with schema error naming the file", async () => {
   await expect(
-    calling(() => validatePageMeta("about.md", { site: { page: true } }, "page.v1")),
+    Promise.resolve().then(() => validatePageMeta("about.md", { site: { page: true } }, "page.v1")),
   ).rejects.toMatchObject({
     name: "BuildError",
     kind: "schema",
@@ -32,7 +22,7 @@ test("validatePageMeta rejects page.v1 missing title with schema error naming th
 
 test("validatePageMeta rejects an unknown top-level key with a schema error", async () => {
   await expect(
-    calling(() =>
+    Promise.resolve().then(() =>
       validatePageMeta(
         "about.md",
         { title: "About", site: { page: true }, banner: "x" },
@@ -48,7 +38,7 @@ test("validatePageMeta rejects an unknown top-level key with a schema error", as
 
 test("validatePageMeta rejects an unknown schema id with a schema error", async () => {
   await expect(
-    calling(() =>
+    Promise.resolve().then(() =>
       validatePageMeta("about.md", { title: "About", site: { page: true } }, "page.v999"),
     ),
   ).rejects.toMatchObject({
@@ -78,7 +68,7 @@ test("validatePageMeta accepts a blog-post.v1 with ISO date and string tags", ()
 
 test("validatePageMeta rejects blog-post.v1 with a non-ISO date string", async () => {
   await expect(
-    calling(() =>
+    Promise.resolve().then(() =>
       validatePageMeta(
         "blog/foo.md",
         { title: "Example post", site: { page: true }, date: "June 12, 2026" },
@@ -94,7 +84,7 @@ test("validatePageMeta rejects blog-post.v1 with a non-ISO date string", async (
 
 test("validatePageMeta rejects blog-post.v1 missing the required date", async () => {
   await expect(
-    calling(() =>
+    Promise.resolve().then(() =>
       validatePageMeta(
         "blog/foo.md",
         { title: "Example post", site: { page: true } },
@@ -130,7 +120,7 @@ test("validatePageMeta accepts a site.route bounded by leading and trailing slas
 
 test("validatePageMeta rejects a site.route missing its leading slash", async () => {
   await expect(
-    calling(() =>
+    Promise.resolve().then(() =>
       validatePageMeta(
         "about.md",
         { title: "About", site: { page: true, route: "about/" } },
@@ -146,7 +136,7 @@ test("validatePageMeta rejects a site.route missing its leading slash", async ()
 
 test("validatePageMeta rejects a site.route missing its trailing slash", async () => {
   await expect(
-    calling(() =>
+    Promise.resolve().then(() =>
       validatePageMeta(
         "about.md",
         { title: "About", site: { page: true, route: "/about" } },
@@ -163,11 +153,9 @@ test("validatePageMeta rejects a site.route missing its trailing slash", async (
 // O8: resolvePageType.
 
 test("resolvePageType infers blog-post for a mapped directory with no explicit type", () => {
-  const t = resolvePageType(
-    "blog/foo.md",
-    { title: "Example post", site: { page: true } },
-    [{ dir: "blog", type: "blog-post" }],
-  );
+  const t = resolvePageType("blog/foo.md", { title: "Example post", site: { page: true } }, [
+    { dir: "blog", type: "blog-post" },
+  ]);
   expect(t).toEqual({ name: "blog-post", schema: "blog-post.v1", template: "blog.html" });
 });
 
@@ -181,34 +169,26 @@ test("resolvePageType lets an explicit site.type beat directory inference", () =
 });
 
 test("resolvePageType falls back to the default page type in an unmapped directory", () => {
-  const t = resolvePageType(
-    "about.md",
-    { title: "About", site: { page: true } },
-    [{ dir: "blog", type: "blog-post" }],
-  );
+  const t = resolvePageType("about.md", { title: "About", site: { page: true } }, [
+    { dir: "blog", type: "blog-post" },
+  ]);
   expect(t).toEqual({ name: "page", schema: "page.v1", template: "page.html" });
 });
 
 test("resolvePageType picks the longest matching directory prefix", () => {
-  const t = resolvePageType(
-    "blog/drafts/foo.md",
-    { title: "Draft post", site: { page: true } },
-    [
-      { dir: "blog", type: "page" },
-      { dir: "blog/drafts", type: "blog-post" },
-    ],
-  );
+  const t = resolvePageType("blog/drafts/foo.md", { title: "Draft post", site: { page: true } }, [
+    { dir: "blog", type: "page" },
+    { dir: "blog/drafts", type: "blog-post" },
+  ]);
   expect(t).toEqual({ name: "blog-post", schema: "blog-post.v1", template: "blog.html" });
 });
 
 test("resolvePageType rejects an unknown explicit site.type with a schema error", async () => {
   await expect(
-    calling(() =>
-      resolvePageType(
-        "about.md",
-        { title: "About", site: { page: true, type: "no-such-type" } },
-        [{ dir: "blog", type: "blog-post" }],
-      ),
+    Promise.resolve().then(() =>
+      resolvePageType("about.md", { title: "About", site: { page: true, type: "no-such-type" } }, [
+        { dir: "blog", type: "blog-post" },
+      ]),
     ),
   ).rejects.toMatchObject({
     name: "BuildError",

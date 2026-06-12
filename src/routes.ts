@@ -13,7 +13,7 @@ export function routeForPage(relPath: string, routeOverride?: string): string {
   if (routeOverride !== undefined) {
     return routeOverride;
   }
-  const withoutExt = relPath.replace(/\.md$/, "");
+  let withoutExt = relPath.replace(/\.md$/, "");
   if (withoutExt === "index") {
     return "/";
   }
@@ -25,7 +25,7 @@ export function routeForPage(relPath: string, routeOverride?: string): string {
 
 /** "/" → "index.html"; "/a/b/" → "a/b/index.html" (outDir-relative). */
 export function outputPathForRoute(url: string): string {
-  const inner = url.slice(1, -1);
+  let inner = url.slice(1, -1);
   return inner === "" ? "index.html" : `${inner}/index.html`;
 }
 
@@ -34,17 +34,14 @@ export function outputPathForRoute(url: string): string {
  * copies) sharing one output path throw BuildError(kind="route-collision")
  * with both sources in `files`.
  */
-export function assertNoCollisions(
-  routes: RouteEntry[],
-  passthrough: PassthroughEntry[],
-): void {
-  const seen = new Map<string, string>();
-  const entries: { output: string; source: string }[] = [
+export function assertNoCollisions(routes: RouteEntry[], passthrough: PassthroughEntry[]): void {
+  let seen = new Map<string, string>();
+  let entries: { output: string; source: string }[] = [
     ...routes.map((r) => ({ output: r.output, source: r.source })),
     ...passthrough.map((p) => ({ output: p.output, source: p.source })),
   ];
   for (const { output, source } of entries) {
-    const prior = seen.get(output);
+    let prior = seen.get(output);
     if (prior !== undefined) {
       throw new BuildError(
         "route-collision",

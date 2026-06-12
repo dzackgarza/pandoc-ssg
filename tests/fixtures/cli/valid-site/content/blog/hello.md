@@ -2,7 +2,7 @@
 site:
   page: true
   schema: blog-post.v1
-title: "Hello World"
+title: 'Hello World'
 date: 2026-06-12
 tags: [intro]
 ---

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
@@ -12,8 +12,8 @@ const DEMO_CONTENT = join(FIXTURES, "demo", "content");
 const BAD_NAV_CONTENT = join(FIXTURES, "bad-nav", "content");
 const BAD_SCHEMA_CONTENT = join(FIXTURES, "bad-schema", "content");
 
-async function freshOutDir(): Promise<string> {
-  return await mkdtemp(join(tmpdir(), "ssg-out-"));
+function freshOutDir(): Promise<string> {
+  return mkdtemp(join(tmpdir(), "ssg-out-"));
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -70,24 +70,14 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
   });
 
   test("O4: copied syllabus.md is literal source markdown, not HTML", async () => {
-    const dst = await readFile(
-      join(outDir, "2026", "spring", "math2250", "syllabus.md"),
-      "utf8",
-    );
+    const dst = await readFile(join(outDir, "2026", "spring", "math2250", "syllabus.md"), "utf8");
     expect(dst.startsWith("# Syllabus (personal notes)")).toBe(true);
     expect(dst.includes("<html")).toBe(false);
     expect(dst.includes("<!DOCTYPE")).toBe(false);
   });
 
   test("O4: non-opt-in syllabus.md is NOT compiled to syllabus/index.html", async () => {
-    const compiled = join(
-      outDir,
-      "2026",
-      "spring",
-      "math2250",
-      "syllabus",
-      "index.html",
-    );
+    const compiled = join(outDir, "2026", "spring", "math2250", "syllabus", "index.html");
     expect(await exists(compiled)).toBe(false);
   });
 

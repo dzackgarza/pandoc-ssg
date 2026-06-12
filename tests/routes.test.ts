@@ -1,13 +1,7 @@
-import { test, expect } from "bun:test";
-import { routeForPage, outputPathForRoute, assertNoCollisions } from "../src/routes.ts";
+import { expect, test } from "bun:test";
 import { BuildError } from "../src/errors.ts";
-import type { RouteEntry, PassthroughEntry } from "../src/types.ts";
-
-// Wraps a synchronous throwing call so error properties can be inspected via
-// `.rejects.toMatchObject` without using try/catch in the test body.
-async function calling(fn: () => unknown): Promise<unknown> {
-  return fn();
-}
+import { assertNoCollisions, outputPathForRoute, routeForPage } from "../src/routes.ts";
+import type { PassthroughEntry, RouteEntry } from "../src/types.ts";
 
 function route(source: string, url: string, output: string): RouteEntry {
   return { source, url, output, type: "page", schema: "page.v1" };
@@ -65,7 +59,7 @@ test("assertNoCollisions throws route-collision naming both page sources on a pa
     route("content/about.md", "/about/", "about/index.html"),
     route("content/about/index.md", "/about/", "about/index.html"),
   ];
-  await expect(calling(() => assertNoCollisions(routes, []))).rejects.toMatchObject({
+  await expect(Promise.resolve().then(() => assertNoCollisions(routes, []))).rejects.toMatchObject({
     name: "BuildError",
     kind: "route-collision",
     files: ["content/about.md", "content/about/index.md"],
@@ -83,7 +77,9 @@ test("assertNoCollisions throws BuildError on a page/page clash", () => {
 test("assertNoCollisions throws route-collision naming both sources on a page/passthrough clash", async () => {
   const routes = [route("content/app.md", "/app/", "app/index.html")];
   const pass = [passthrough("content/app/index.html", "app/index.html")];
-  await expect(calling(() => assertNoCollisions(routes, pass))).rejects.toMatchObject({
+  await expect(
+    Promise.resolve().then(() => assertNoCollisions(routes, pass)),
+  ).rejects.toMatchObject({
     name: "BuildError",
     kind: "route-collision",
     files: ["content/app.md", "content/app/index.html"],

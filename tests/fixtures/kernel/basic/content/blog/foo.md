@@ -2,7 +2,7 @@
 site:
   page: true
   schema: blog-post.v1
-title: "Example post"
+title: 'Example post'
 date: 2026-06-12
 tags: [algebraic-geometry, teaching]
 ---

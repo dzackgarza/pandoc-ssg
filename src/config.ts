@@ -22,29 +22,33 @@ const configShape = z.object({
  */
 export async function loadSiteConfig(contentDir: string): Promise<SiteConfig> {
   const configPath = join(contentDir, "_site.toml");
-  let raw: string;
-  try {
-    raw = await readFile(configPath, "utf8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return defaultConfig;
-    }
-    throw err;
+  if (!(await Bun.file(configPath).exists())) {
+    return defaultConfig;
   }
+  const raw = await readFile(configPath, "utf8");
+  return parseSiteConfig(raw);
+}
 
+/**
+ * Parse and validate the `_site.toml` body. Malformed TOML or a shape
+ * mismatch throws BuildError(kind="config"). Missing optional keys fall back
+ * to the documented defaults (no passthrough, `blog` → `blog-post`).
+ */
+function parseSiteConfig(raw: string): SiteConfig {
   let table: unknown;
   try {
     table = parse(raw);
   } catch (err) {
-    throw new BuildError("config", ["_site.toml"], `malformed _site.toml: ${String(err)}`);
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new BuildError("config", ["_site.toml"], `malformed _site.toml: ${detail}`, err);
   }
 
   const parsed = configShape.safeParse(table);
   if (!parsed.success) {
     throw new BuildError("config", ["_site.toml"], parsed.error.message);
   }
-  return {
-    passthrough: parsed.data.passthrough ?? [],
-    dirTypes: parsed.data.dirTypes ?? defaultConfig.dirTypes,
-  };
+  const passthrough = parsed.data.passthrough === undefined ? [] : parsed.data.passthrough;
+  const dirTypes =
+    parsed.data.dirTypes === undefined ? defaultConfig.dirTypes : parsed.data.dirTypes;
+  return { passthrough, dirTypes };
 }

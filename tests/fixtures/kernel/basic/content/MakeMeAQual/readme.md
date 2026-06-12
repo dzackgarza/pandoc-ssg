@@ -2,7 +2,7 @@
 site:
   page: true
   schema: page.v1
-title: "Embedded readme that still must not compile"
+title: 'Embedded readme that still must not compile'
 ---
 
 # Inside an opaque subtree
