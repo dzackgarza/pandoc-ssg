@@ -1,4 +1,7 @@
-import type { ClassifiedFile, SiteConfig } from "./types.ts";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import matter from "gray-matter";
+import type { ClassifiedFile, FileClass, SiteConfig } from "./types.ts";
 
 /**
  * Classify every scanned file into exactly one FileClass (O1):
@@ -12,8 +15,38 @@ export async function classifyFiles(
   relPaths: string[],
   config: SiteConfig,
 ): Promise<ClassifiedFile[]> {
-  void contentDir;
-  void relPaths;
-  void config;
-  throw new Error("not implemented");
+  const result: ClassifiedFile[] = [];
+  for (const relPath of relPaths) {
+    result.push({ relPath, class: await classifyOne(contentDir, relPath, config) });
+  }
+  return result;
+}
+
+async function classifyOne(
+  contentDir: string,
+  relPath: string,
+  config: SiteConfig,
+): Promise<FileClass> {
+  const firstSegment = relPath.split("/")[0] ?? "";
+  if (firstSegment.startsWith("_")) {
+    return "reserved";
+  }
+  if (config.passthrough.some((p) => isInSubtree(relPath, p.path))) {
+    return "opaque";
+  }
+  if (relPath.endsWith(".md") && (await isOptInPage(contentDir, relPath))) {
+    return "page";
+  }
+  return "asset";
+}
+
+function isInSubtree(relPath: string, subtree: string): boolean {
+  return relPath === subtree || relPath.startsWith(`${subtree}/`);
+}
+
+async function isOptInPage(contentDir: string, relPath: string): Promise<boolean> {
+  const raw = await readFile(join(contentDir, relPath), "utf8");
+  const parsed = matter(raw);
+  const site = (parsed.data as { site?: { page?: unknown } }).site;
+  return site?.page === true;
 }

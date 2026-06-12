@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { BuildError } from "./errors.ts";
 import type { PageMeta, PageType } from "./types.ts";
 
 /**
@@ -9,9 +11,43 @@ export const pageTypes: Record<string, PageType> = {
   "blog-post": { name: "blog-post", schema: "blog-post.v1", template: "blog.html" },
 };
 
+const routeShape = z
+  .string()
+  .refine((s) => s === "/" || (s.startsWith("/") && s.endsWith("/")));
+
+const siteShape = z
+  .object({
+    page: z.literal(true),
+    schema: z.string().optional(),
+    type: z.string().optional(),
+    route: routeShape.optional(),
+  })
+  .strict();
+
+const pageV1 = z
+  .object({
+    title: z.string(),
+    site: siteShape,
+  })
+  .strict();
+
+const blogPostV1 = z
+  .object({
+    title: z.string(),
+    site: siteShape,
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    tags: z.array(z.string()).optional(),
+  })
+  .strict();
+
+const schemaRegistry: Record<string, z.ZodType<PageMeta>> = {
+  "page.v1": pageV1,
+  "blog-post.v1": blogPostV1,
+};
+
 /** Schema ids known to the registry. */
 export function knownSchemas(): string[] {
-  throw new Error("not implemented");
+  return Object.keys(schemaRegistry);
 }
 
 /**
@@ -28,10 +64,15 @@ export function validatePageMeta(
   rawMeta: unknown,
   schemaId: string,
 ): PageMeta {
-  void relPath;
-  void rawMeta;
-  void schemaId;
-  throw new Error("not implemented");
+  const schema = schemaRegistry[schemaId];
+  if (schema === undefined) {
+    throw new BuildError("schema", [relPath], `unknown schema id ${schemaId}`);
+  }
+  const parsed = schema.safeParse(rawMeta);
+  if (!parsed.success) {
+    throw new BuildError("schema", [relPath], parsed.error.message);
+  }
+  return parsed.data;
 }
 
 /**
@@ -45,8 +86,27 @@ export function resolvePageType(
   rawMeta: unknown,
   dirTypes: { dir: string; type: string }[],
 ): PageType {
-  void relPath;
-  void rawMeta;
-  void dirTypes;
-  throw new Error("not implemented");
+  const explicitType = (rawMeta as { site?: { type?: unknown } }).site?.type;
+  const typeName =
+    typeof explicitType === "string" ? explicitType : inferTypeFromDir(relPath, dirTypes);
+  const pageType = pageTypes[typeName];
+  if (pageType === undefined) {
+    throw new BuildError("schema", [relPath], `unknown page type ${typeName}`);
+  }
+  return pageType;
+}
+
+function inferTypeFromDir(
+  relPath: string,
+  dirTypes: { dir: string; type: string }[],
+): string {
+  let bestDir = "";
+  let bestType = "page";
+  for (const { dir, type } of dirTypes) {
+    if ((relPath === dir || relPath.startsWith(`${dir}/`)) && dir.length >= bestDir.length) {
+      bestDir = dir;
+      bestType = type;
+    }
+  }
+  return bestType;
 }

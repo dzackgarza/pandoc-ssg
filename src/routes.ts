@@ -1,3 +1,4 @@
+import { BuildError } from "./errors.ts";
 import type { PassthroughEntry, RouteEntry } from "./types.ts";
 
 /**
@@ -9,15 +10,23 @@ import type { PassthroughEntry, RouteEntry } from "./types.ts";
  * A validated `site.route` override replaces the inferred URL.
  */
 export function routeForPage(relPath: string, routeOverride?: string): string {
-  void relPath;
-  void routeOverride;
-  throw new Error("not implemented");
+  if (routeOverride !== undefined) {
+    return routeOverride;
+  }
+  const withoutExt = relPath.replace(/\.md$/, "");
+  if (withoutExt === "index") {
+    return "/";
+  }
+  if (withoutExt.endsWith("/index")) {
+    return `/${withoutExt.slice(0, -"/index".length)}/`;
+  }
+  return `/${withoutExt}/`;
 }
 
 /** "/" → "index.html"; "/a/b/" → "a/b/index.html" (outDir-relative). */
 export function outputPathForRoute(url: string): string {
-  void url;
-  throw new Error("not implemented");
+  const inner = url.slice(1, -1);
+  return inner === "" ? "index.html" : `${inner}/index.html`;
 }
 
 /**
@@ -29,7 +38,20 @@ export function assertNoCollisions(
   routes: RouteEntry[],
   passthrough: PassthroughEntry[],
 ): void {
-  void routes;
-  void passthrough;
-  throw new Error("not implemented");
+  const seen = new Map<string, string>();
+  const entries: { output: string; source: string }[] = [
+    ...routes.map((r) => ({ output: r.output, source: r.source })),
+    ...passthrough.map((p) => ({ output: p.output, source: p.source })),
+  ];
+  for (const { output, source } of entries) {
+    const prior = seen.get(output);
+    if (prior !== undefined) {
+      throw new BuildError(
+        "route-collision",
+        [prior, source],
+        `output path collision at ${output}: ${prior} and ${source}`,
+      );
+    }
+    seen.set(output, source);
+  }
 }
