@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.generated/
+lcov.info
+coverage/
+*.log
