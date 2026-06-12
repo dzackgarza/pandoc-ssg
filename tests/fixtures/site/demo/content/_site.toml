@@ -1,0 +1,6 @@
+[[passthrough]]
+path = "standalone-app"
+
+[[dirTypes]]
+dir = "blog"
+type = "blog-post"

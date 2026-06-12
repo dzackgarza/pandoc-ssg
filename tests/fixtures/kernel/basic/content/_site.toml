@@ -1,0 +1,7 @@
+[[passthrough]]
+path = "MakeMeAQual"
+mode = "opaque"
+
+[[dirTypes]]
+dir = "blog"
+type = "blog-post"

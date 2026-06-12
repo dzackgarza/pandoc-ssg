@@ -1,0 +1,3 @@
+macros:
+  AA: "\\mathbb{A}"
+  Spec: "\\operatorname{Spec}"

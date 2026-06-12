@@ -1,0 +1,15 @@
+[[main]]
+title = "Home"
+href = "/"
+weight = 10
+
+[[main]]
+title = "About"
+href = "/about/"
+weight = 20
+
+[[main]]
+title = "Example"
+href = "https://example.com/"
+weight = 30
+external = true
