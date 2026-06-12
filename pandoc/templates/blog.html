@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>$title$</title>
+$if(mathjax_config)$
+$mathjax_config$
+$endif$
+$if(math)$
+$math$
+$endif$
+</head>
+<body>
+<nav>
+$for(nav)$
+<a href="$nav.href$">$nav.title$</a>
+$endfor$
+</nav>
+<main>
+<article>
+<h1>$title$</h1>
+$if(date)$<p class="post-date">$date$</p>$endif$
+$body$
+</article>
+</main>
+</body>
+</html>

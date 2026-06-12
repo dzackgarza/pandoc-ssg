@@ -1,0 +1,7 @@
+from: markdown+yaml_metadata_block+fenced_divs+tex_math_dollars
+to: html5
+wrap: none
+standalone: true
+html-math-method:
+  method: mathjax
+template: ${.}/../templates/blog.html

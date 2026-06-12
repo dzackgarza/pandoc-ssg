@@ -1,12 +1,60 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { parse } from "smol-toml";
+import { z } from "zod";
+import { BuildError } from "./errors.ts";
 import type { Manifest, NavItem } from "./types.ts";
+
+const navShape = z.object({
+  main: z
+    .array(
+      z
+        .object({
+          title: z.string(),
+          href: z.string(),
+          weight: z.number(),
+          external: z.boolean().optional(),
+        })
+        .strict(),
+    )
+    .optional(),
+});
 
 /**
  * Load content/_data/navigation.toml ([[main]] entries). Missing file means
  * an empty nav. Malformed entries throw BuildError(kind="nav").
  */
 export async function loadNavigation(contentDir: string): Promise<NavItem[]> {
-  void contentDir;
-  throw new Error("not implemented");
+  const navPath = join(contentDir, "_data", "navigation.toml");
+  let raw: string;
+  try {
+    raw = await readFile(navPath, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw err;
+  }
+
+  let table: unknown;
+  try {
+    table = parse(raw);
+  } catch (err) {
+    throw new BuildError("nav", ["_data/navigation.toml"], `malformed navigation.toml: ${String(err)}`);
+  }
+
+  const parsed = navShape.safeParse(table);
+  if (!parsed.success) {
+    throw new BuildError("nav", ["_data/navigation.toml"], parsed.error.message);
+  }
+
+  const items = parsed.data.main ?? [];
+  return [...items].sort((a, b) => a.weight - b.weight);
+}
+
+/** True for nav entries that are not internal site routes. */
+function isExternal(item: NavItem): boolean {
+  return item.external === true || /^https?:\/\//.test(item.href);
 }
 
 /**
@@ -14,7 +62,17 @@ export async function loadNavigation(contentDir: string): Promise<NavItem[]> {
  * BuildError(kind="nav").
  */
 export function assertNavTargets(nav: NavItem[], manifest: Manifest): void {
-  void nav;
-  void manifest;
-  throw new Error("not implemented");
+  const urls = new Set(manifest.routes.map((r) => r.url));
+  for (const item of nav) {
+    if (isExternal(item)) {
+      continue;
+    }
+    if (!urls.has(item.href)) {
+      throw new BuildError(
+        "nav",
+        ["_data/navigation.toml"],
+        `nav target ${item.href} (${item.title}) matches no route`,
+      );
+    }
+  }
 }

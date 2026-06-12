@@ -1,8 +1,15 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
+import * as YAML from "yaml";
+import { BuildError } from "./errors.ts";
 import type { NavItem, PageType } from "./types.ts";
 
 export interface RenderInput {
   /** absolute path of the source markdown file */
   sourcePath: string;
+  /** content-relative path of the source, used in BuildError reporting */
+  relPath: string;
   /** absolute path to the pandoc/ design root */
   pandocDir: string;
   pageType: PageType;
@@ -12,11 +19,75 @@ export interface RenderInput {
 }
 
 /**
+ * Build the single MathJax configuration script fragment carrying the
+ * site-wide macros. Emitted verbatim into the page head exactly once.
+ */
+function mathjaxConfig(macros: Record<string, string>): string {
+  const entries = Object.entries(macros).map(
+    ([name, tex]) => `      ${JSON.stringify(name)}: ${JSON.stringify(tex)}`,
+  );
+  const macroBlock = entries.join(",\n");
+  return [
+    "<script>",
+    "window.MathJax = {",
+    "  tex: {",
+    "    macros: {",
+    macroBlock,
+    "    }",
+    "  }",
+    "};",
+    "</script>",
+  ].join("\n");
+}
+
+/**
  * Render one page to standalone HTML (O5) by invoking the system pandoc
  * with the page type's defaults file and template. Pandoc failures throw
  * BuildError(kind="pandoc").
  */
 export async function renderPage(input: RenderInput): Promise<string> {
-  void input;
-  throw new Error("not implemented");
+  const defaultsName = `${basename(input.pageType.template, ".html")}.yaml`;
+  const defaultsPath = join(input.pandocDir, "defaults", defaultsName);
+
+  const metadata: Record<string, unknown> = {
+    nav: input.nav.map((item) => ({ title: item.title, href: item.href })),
+  };
+  if (Object.keys(input.mathMacros).length > 0) {
+    metadata.mathjax_config = mathjaxConfig(input.mathMacros);
+  }
+
+  const metaDir = await mkdtemp(join(tmpdir(), "ssg-meta-"));
+  const metaFile = join(metaDir, "meta.yaml");
+  await writeFile(metaFile, YAML.stringify(metadata), "utf8");
+
+  try {
+    const proc = Bun.spawn(
+      [
+        "pandoc",
+        "--defaults",
+        defaultsPath,
+        "--metadata-file",
+        metaFile,
+        input.sourcePath,
+      ],
+      { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+    );
+
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+
+    if (exitCode !== 0) {
+      throw new BuildError(
+        "pandoc",
+        [input.relPath],
+        `pandoc exited ${exitCode} on ${input.relPath}: ${stderr.trim()}`,
+      );
+    }
+    return stdout;
+  } finally {
+    await rm(metaDir, { recursive: true, force: true });
+  }
 }
