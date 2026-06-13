@@ -7,7 +7,7 @@ import { z } from "zod";
 import { classifyFiles } from "./classify.ts";
 import { loadSiteConfig } from "./config.ts";
 import { BuildError } from "./errors.ts";
-import { buildBlogIndexIsland } from "./islands.ts";
+import { buildIsland } from "./islands.ts";
 import { assertNavTargets, loadNavigation } from "./nav.ts";
 import { renderPage } from "./pandoc.ts";
 import { assertNoCollisions, outputPathForRoute, routeForPage } from "./routes.ts";
@@ -116,6 +116,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let passthrough = passthroughEntries(classified);
   let blogPosts: PostMeta[] = [];
   let usesBlogIndex = false;
+  let collectionKeys = new Set<string>();
 
   for (const file of classified) {
     if (file.class !== "page") {
@@ -155,6 +156,9 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     }
     if (raw.includes('type="blog-index"')) {
       usesBlogIndex = true;
+    }
+    for (const key of collectionKeysIn(raw)) {
+      collectionKeys.add(key);
     }
   }
 
@@ -225,8 +229,28 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     await writeFile(postsDest, JSON.stringify(sorted, null, 2), "utf8");
     generated.push({ output: postsOutput, kind: "data" });
 
-    let islandOutput = await buildBlogIndexIsland(staging);
-    generated.push({ output: islandOutput, kind: "island" });
+    generated.push({ output: await buildIsland("blog-index", staging), kind: "island" });
+  }
+
+  // Filterable collection islands (O20): emit one JSON per referenced items key,
+  // then bundle the shared collection island. Fail loud on an unknown key.
+  if (collectionKeys.size > 0) {
+    for (const key of collectionKeys) {
+      let data = items[key];
+      if (data === undefined) {
+        throw new BuildError(
+          "config",
+          ["_data/items.yaml"],
+          `collection: unknown items key '${key}'`,
+        );
+      }
+      let output = `_collections/${key}.json`;
+      let dest = join(staging, output);
+      await mkdir(dirname(dest), { recursive: true });
+      await writeFile(dest, JSON.stringify(data, null, 2), "utf8");
+      generated.push({ output, kind: "data" });
+    }
+    generated.push({ output: await buildIsland("collection", staging), kind: "island" });
   }
 
   await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
@@ -235,6 +259,29 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   await rename(staging, outDir);
 
   return manifest;
+}
+
+/**
+ * The items.yaml keys referenced by `type="collection"` component fences in a
+ * page's raw markdown (O20). Tolerant of attribute order within the fence.
+ */
+function collectionKeysIn(raw: string): string[] {
+  let keys: string[] = [];
+  let fences = raw.match(/\{[^}]*\.component[^}]*\}/g);
+  if (fences === null) {
+    return keys;
+  }
+  for (const fence of fences) {
+    if (!fence.includes('type="collection"')) {
+      continue;
+    }
+    let m = /\bitems="([^"]+)"/.exec(fence);
+    if (m === null) {
+      continue;
+    }
+    keys.push(m[1] as string);
+  }
+  return keys;
 }
 
 /** POSIX paths of every file under `root`, recursively (relative to `root`). */

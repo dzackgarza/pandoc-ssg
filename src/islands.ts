@@ -27,19 +27,20 @@ async function loadVite(): Promise<ViteApi> {
     throw new BuildError(
       "config",
       [],
-      "the blog-index component needs 'vite' and '@sveltejs/vite-plugin-svelte' installed (optional peer deps) to bundle the interactive island",
+      "interactive island components need 'vite' and '@sveltejs/vite-plugin-svelte' installed (optional peer deps) to bundle",
       err,
     );
   }
 }
 
 /**
- * Bundle the SSG-owned blog-index Svelte island into a stable, self-contained
- * ES module at `<stagingDir>/assets/islands/blog-index.js` (no content hash, so
- * the Lua filter can emit a fixed script src). Returns the dist-relative output
- * path for the manifest's generated entry (O16).
+ * Bundle the SSG-owned Svelte island named `name` (source at
+ * `islands/<name>/main.ts`) into a stable, self-contained ES module at
+ * `<stagingDir>/assets/islands/<name>.js` (no content hash, so a Lua filter can
+ * emit a fixed script src). Returns the dist-relative output path for the
+ * manifest's generated entry (O16/O20). vite + svelte are optional peer deps.
  */
-export async function buildBlogIndexIsland(stagingDir: string): Promise<string> {
+export async function buildIsland(name: string, stagingDir: string): Promise<string> {
   let { viteBuild, svelte } = await loadVite();
   let outDir = join(stagingDir, "assets", "islands");
   await viteBuild({
@@ -48,14 +49,14 @@ export async function buildBlogIndexIsland(stagingDir: string): Promise<string> 
     plugins: [svelte()],
     build: {
       lib: {
-        entry: join(ISLANDS_SRC, "blog-index", "main.ts"),
+        entry: join(ISLANDS_SRC, name, "main.ts"),
         formats: ["es"],
-        fileName: () => "blog-index.js",
+        fileName: () => `${name}.js`,
       },
       outDir,
       emptyOutDir: false,
       minify: true,
     },
   });
-  return "assets/islands/blog-index.js";
+  return `assets/islands/${name}.js`;
 }

@@ -156,4 +156,17 @@ DNS (the user owns those). rsync is a required external dependency; a missing
 rsync or a nonzero rsync exit fails loudly (`BuildError kind=deploy`), never a
 partial or silent copy.
 
+## O20 — Filterable collection island
+
+`::: {.component type="collection" items="KEY"}` is an interactive island that
+renders the `items.yaml` array under `KEY` as a **quiet filterable list** (the
+Notes index that folds Writing+Talks): client-side search + category facet + tag
+facet, rendered as a restrained list (title link + muted category + description),
+NOT cards/badges/tag-pills (per AESTHETIC-GUIDELINES). The build emits
+`dist/_collections/KEY.json` for each referenced key (unknown key →
+`BuildError kind=config`), bundles the shared `collection` Svelte island to
+`assets/islands/collection.js` (the generalized `buildIsland`, optional vite/svelte
+peer deps), and records both in `manifest.generated`. The Lua filter emits the
+mount + module script. Shares the island machinery with the blog-index (O16).
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).

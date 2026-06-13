@@ -155,6 +155,19 @@ local function expand_div(el)
     -- pandoc maps `id="x"` to the element identifier, not attributes.id
     return pandoc.RawBlock("html", render_video(el.attributes.provider, el.identifier))
   end
+  if ctype == "collection" then
+    -- Interactive filterable collection island (O20): mount + module script.
+    -- The client fetches the per-key JSON the build emitted from items.yaml.
+    local key = el.attributes.items
+    if key == nil or key == "" then
+      error("component collection: missing required items=\"KEY\" attribute")
+    end
+    return pandoc.RawBlock(
+      "html",
+      '<div class="collection" data-collection="/_collections/' .. key .. '.json"></div>\n'
+        .. '<script type="module" src="/assets/islands/collection.js"></script>'
+    )
+  end
   if ctype == "blog-index" then
     -- Interactive island (O16): emit only the hydration mount + module script.
     -- The build emits blog/posts.json and bundles the Svelte island; the
