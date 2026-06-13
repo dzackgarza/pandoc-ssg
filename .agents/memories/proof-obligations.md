@@ -131,4 +131,18 @@ expands (in `components.lua`) to a responsive iframe embed:
 the build (`BuildError kind=pandoc`) — fail loud, no silent skip. This is the
 migration target for Jekyll's `{% include video id=… provider=… %}`.
 
+## O18 — Theme asset emission
+
+The site's visual identity lives in the generator's design layer, not content.
+Every build copies the design layer's static theme tree (`<pandocDir>/assets/**`
+— the stylesheet `theme/site.css` and its self-hosted woff2 fonts) byte-identical
+into `dist/assets/**`, and records each emitted file in `manifest.generated`
+(kind `theme`) so O6's bijection still holds. Every rendered page links the
+stylesheet (`<link rel="stylesheet" href="/assets/theme/site.css">`) via its
+template. Emission is unconditional (every page needs the stylesheet), unlike the
+blog-index island (O16) which emits only when used. The theme is grounded in
+measured computed styles from a reference mathematical-research site (serif body,
+geometric-sans headings, near-monochrome with one deep-navy link color, wide
+reading measure, whitespace over rules) — not in guessed values.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).
