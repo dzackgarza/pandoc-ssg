@@ -74,15 +74,20 @@ Writing+Talks into a filterable **Notes** collection.
   inline-markdown title + optional detail span). Empty date / unknown key abort the
   build. Engine only; no CSS yet (add with rendered evidence at content-wiring step,
   per O20 precedent); not wired into content.
+- **DONE — O22 papers component** (generator green commit after `b7429dd`):
+  `:::{.component type="papers" items="KEY"}` → static `<ul class="papers">` of
+  `<li class="paper">` (doctrine §6 class names: `paper-title`/`paper-meta`/
+  `abstract-toggle`/`abstract`). Inline-md title (required), `paper-meta` joins
+  present authors·year·venue·arXiv (bare id→abs URL), native `<details>` abstract
+  emitted only when present. Engine only; no CSS yet; not wired into content.
 
 **Remaining sequence (each a TDD increment, then applied to content):**
-1. `papers` → research-program prose + bibliographic list w/ expandable abstracts (NOT cards).
-2. generalize `gallery`→`media-gallery` (filterable) + `link-group`.
-3. navbar → `CV · Papers · Notes · Teaching · Blog · About`; home stays prose-first;
+1. generalize `gallery`→`media-gallery` (filterable) + `link-group`.
+2. navbar → `CV · Papers · Notes · Teaching · Blog · About`; home stays prose-first;
    **About** absorbs the contact/social metadata (the demoted spike `profile.toml` data); **NO profile card**.
-4. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
+3. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
    (derived-AG, infinity-categories — render pandoc-native; drop `/pandoc/*.html` iframes + `content/pandoc/`).
-5. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
+4. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
    author timeline/papers data, add `papers`/`notes`/`teaching`/`activities`/`about` pages, refactor nav,
    then rebuild → full `verify` → `ssg deploy /var/www/html`.
 
