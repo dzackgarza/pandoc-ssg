@@ -86,33 +86,6 @@ local function render_feature_row(key)
   return table.concat(parts, "\n")
 end
 
-local function render_gallery(key)
-  local images = items[key]
-  if images == nil then
-    error("component gallery: unknown items key '" .. tostring(key) .. "'")
-  end
-  local parts = { '<div class="gallery">' }
-  for _, image in ipairs(images) do
-    local src = image.image_path or image.url or ""
-    local href = image.url or image.image_path or ""
-    local alt = image.alt or ""
-    local title = image.title or ""
-    parts[#parts + 1] = '<figure class="gallery__item">'
-    local img = '<img class="gallery__image" src="' .. esc_attr(src) .. '" alt="' .. esc_attr(alt) .. '">'
-    if href ~= "" then
-      parts[#parts + 1] = '<a class="gallery__link" href="' .. esc_attr(href) .. '">' .. img .. "</a>"
-    else
-      parts[#parts + 1] = img
-    end
-    if title ~= "" then
-      parts[#parts + 1] = '<figcaption class="gallery__caption">' .. md_inline_html(title) .. "</figcaption>"
-    end
-    parts[#parts + 1] = "</figure>"
-  end
-  parts[#parts + 1] = "</div>"
-  return table.concat(parts, "\n")
-end
-
 -- Restrained dated list for teaching/activities (O21). Author-ordered (no
 -- re-sort); each entry's `date` is the defining field (plain text) and a missing
 -- date aborts the build. `title` and optional `detail` render as inline markdown.
@@ -227,6 +200,51 @@ local function render_video(provider, id)
     .. "</div>"
 end
 
+-- Static media grid (O23, supersedes gallery). Author-ordered figures; each item's
+-- `type` is "image" (src + optional href/alt) or "video" (reuses the O17 youtube
+-- embed via provider+id). Optional `tags` are emitted only as a space-joined
+-- `data-tags` attribute — carried as data, never an interactive filter. An optional
+-- `caption` renders as inline markdown. Unknown/missing item type aborts the build.
+local function render_media_gallery(key)
+  local media = items[key]
+  if media == nil then
+    error("component media-gallery: unknown items key '" .. tostring(key) .. "'")
+  end
+  local parts = { '<div class="media-gallery">' }
+  for _, item in ipairs(media) do
+    local data_tags = ""
+    if type(item.tags) == "table" and #item.tags > 0 then
+      data_tags = ' data-tags="' .. esc_attr(table.concat(item.tags, " ")) .. '"'
+    end
+    parts[#parts + 1] = '<figure class="media-gallery__item"' .. data_tags .. ">"
+
+    local mtype = item.type
+    if mtype == "image" then
+      local src = item.src or ""
+      local alt = item.alt or ""
+      local href = item.href or ""
+      local img = '<img class="media-gallery__image" src="' .. esc_attr(src) .. '" alt="' .. esc_attr(alt) .. '">'
+      if href ~= "" then
+        parts[#parts + 1] = '<a class="media-gallery__link" href="' .. esc_attr(href) .. '">' .. img .. "</a>"
+      else
+        parts[#parts + 1] = img
+      end
+    elseif mtype == "video" then
+      parts[#parts + 1] = render_video(item.provider, item.id)
+    else
+      error("component media-gallery: unknown item type '" .. tostring(mtype) .. "'")
+    end
+
+    local caption = item.caption or ""
+    if caption ~= "" then
+      parts[#parts + 1] = '<figcaption class="media-gallery__caption">' .. md_inline_html(caption) .. "</figcaption>"
+    end
+    parts[#parts + 1] = "</figure>"
+  end
+  parts[#parts + 1] = "</div>"
+  return table.concat(parts, "\n")
+end
+
 local function expand_div(el)
   local is_component = false
   for _, c in ipairs(el.classes) do
@@ -243,8 +261,8 @@ local function expand_div(el)
   if ctype == "feature-row" then
     return pandoc.RawBlock("html", render_feature_row(el.attributes.items))
   end
-  if ctype == "gallery" then
-    return pandoc.RawBlock("html", render_gallery(el.attributes.items))
+  if ctype == "media-gallery" then
+    return pandoc.RawBlock("html", render_media_gallery(el.attributes.items))
   end
   if ctype == "timeline" then
     return pandoc.RawBlock("html", render_timeline(el.attributes.items))

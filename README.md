@@ -45,7 +45,7 @@ content/
   _data/
     navigation.toml        # nav (targets must resolve to routes)
     math-macros.yaml        # site-wide MathJax macros
-    items.yaml             # data backing components (feature-row, gallery)
+    items.yaml             # data backing components (feature-row, media-gallery, timeline, papers)
   _site.toml               # passthrough subtrees, directory→type inference
   some-app/                # opaque passthrough: copied verbatim
 ```
@@ -62,7 +62,7 @@ Fenced-div components expand from `_data/items.yaml`:
 ::: {.component type="feature-row" items="my-cards"}
 :::
 
-::: {.component type="gallery" items="my-photos"}
+::: {.component type="media-gallery" items="my-media"}
 :::
 
 ::: {.include path="./_partials/abstract.md"}

@@ -266,22 +266,22 @@ mjx-container[display="true"] {
   font-size: 0.85rem;
 }
 
-/* gallery */
-.gallery {
+/* media-gallery (O23, supersedes gallery) */
+.media-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 1.2rem;
   margin: 2rem 0;
 }
-.gallery__item {
+.media-gallery__item {
   margin: 0;
 }
-.gallery__image {
+.media-gallery__image {
   width: 100%;
   height: auto;
   display: block;
 }
-.gallery__caption {
+.media-gallery__caption {
   margin-top: 0.4rem;
   font-size: 0.8rem;
   color: var(--muted);

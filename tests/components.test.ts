@@ -80,7 +80,7 @@ describe("component filter: media-gallery renders a static media grid from _data
   test("renders one figure per item in authored order", () => {
     const items = html.split('class="media-gallery__item"').length - 1;
     expect(items).toBe(3);
-    expect(html.indexOf("/img/sphere.png")).toBeLessThan(html.indexOf("/img/full-klein.png"));
+    expect(html.indexOf("/img/sphere.png")).toBeLessThan(html.indexOf("/img/klein.png"));
   });
 
   test("an image item renders an img with its src and alt", () => {
