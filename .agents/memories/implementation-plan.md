@@ -24,6 +24,19 @@ TDD against [proof-obligations](proof-obligations.md). Red tests committed befor
 
 - `just test` (delegates to global bun QC chain) green where reasonable; bootstrap/red commits use `--no-verify` (user-authorized) since global hooks gate on QC.
 
-## Later (not this session)
+## Phase 4 — done 2026-06-13 (component stress test + outstanding features)
 
-- O10 transclusion filter, component filter + islands, content migration from dzackgarza.comv2018, link checking, preview server.
+- O11 data-backed component filter (`pandoc/filters/components.lua`): `feature-row` cards from `_data/items.yaml` via JSON sidecar.
+- `/writing/` migrated from v2018 Jekyll as the stress test (11 card collections / 30 cards, math macros, notice fenced div); `tests/writing.test.ts` guards it.
+- O10 transclusion filter (`pandoc/filters/transclude.lua`): `:::{.include path=...}`, content-root containment enforced.
+- O12 link checker (`src/links.ts`) + `ssg check`; O13 preview server (`src/serve.ts`) + `ssg serve`. (O12/O13 implemented by Opus subagents, CLI wired by coordinator.)
+
+Filter order in defaults: transclude → components.
+
+## Still remaining
+
+- **Asset migration**: `ssg check` on the real `/writing/` page reports unresolved `/assets/...` links (PDFs, slides, images) that live on the production site but are not yet under `content/`. Migrating that asset tree (or wiring passthrough to it) is the next content task.
+- Islands (typed interactive components / hydration) — not yet needed by migrated content.
+- Remaining v2018 pages (teaching, talks, GOATS, standalone apps as opaque passthrough, blog/teaching).
+- GitHub remote + code scanning for the installed review workflows.
+- Manifest dependency tracking for incremental rebuilds (transclusion deps).
