@@ -188,4 +188,30 @@ content error, fail loud. An unknown items key aborts the build the same way, as
 with every data-backed component (O11). Shares the `_data/items.yaml` JSON-sidecar
 machinery with feature-row/gallery (O11).
 
+## O22 — Papers component (bibliographic list, expandable abstracts)
+
+`::: {.component type="papers" items="KEY"}` is a static (Lua-rendered) data-backed
+component for the publications page: it renders the `items.yaml` array under `KEY`
+as a **restrained bibliographic list, NOT cover-image cards** (per
+AESTHETIC-GUIDELINES §6 "program first, bibliography second", which wins on conflict
+— class names `paper`/`paper-title`/`paper-meta`/`abstract-toggle`/`abstract` come
+from that doctrine). The placeholder expands to a `<ul class="papers">` of
+`<li class="paper">` items, one per entry **in authored order**. Each entry:
+
+- `<span class="paper-title">` — the entry's `title`, rendered as **inline
+  markdown** (math/emphasis capable). An empty/missing `title` aborts the build
+  (`BuildError kind=pandoc`); a paper without a title is a content error.
+- `<div class="paper-meta">` — the bibliographic line: the present fields among
+  `authors`, `year`, `venue`, and the arXiv link, joined by `·`. Absent fields are
+  skipped (no leading, trailing, or doubled separators). `arxiv` may be a bare id
+  (`2312.03638` → link `https://arxiv.org/abs/2312.03638`, text `arXiv:2312.03638`)
+  or a full URL (linked verbatim, text `arXiv`).
+- `<details class="paper-abstract">` with a `<summary class="abstract-toggle">`
+  and the `abstract` rendered as **block markdown** inside `<div class="abstract">`
+  — a native JS-free expandable abstract, emitted **only when** `abstract` is
+  present (an entry without one emits no `<details>`).
+
+An unknown items key aborts the build the same way (O11). Shares the
+`_data/items.yaml` JSON-sidecar machinery with feature-row/gallery/timeline.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).

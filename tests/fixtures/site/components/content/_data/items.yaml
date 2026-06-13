@@ -29,3 +29,17 @@ demo-timeline:
     detail: 'UCSD — [syllabus](https://example.com/syllabus.pdf)'
   - date: Spring 2024
     title: 'Organizer, *Number Theory* Seminar'
+
+demo-papers:
+  - title: 'Compact moduli of *Enriques* surfaces'
+    year: 2025
+    authors: 'Alexeev, Engel, Garza, Schaffler'
+    venue: 'Nagoya Math. J. 259'
+    arxiv: '2312.03638'
+    abstract: |
+      We describe a *stable pair* compactification and identify it with a
+      semitoroidal compactification of the period space.
+  - title: 'A preprint with no abstract'
+    year: 2024
+    authors: 'Garza'
+    arxiv: 'https://arxiv.org/abs/2401.00000'

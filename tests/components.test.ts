@@ -160,6 +160,89 @@ describe("component filter: a timeline entry with no date fails the build", () =
   });
 });
 
+describe("component filter: papers expands to a bibliographic list from _data/items.yaml", () => {
+  let html: string;
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    await build({ contentDir: COMPONENTS_CONTENT, pandocDir: PANDOC_DIR, outDir });
+    html = await readFile(join(outDir, "papers", "index.html"), "utf8");
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("emits a papers list, not an empty component div", () => {
+    expect(html).toContain('class="papers"');
+    // the placeholder div must have been consumed, not passed through verbatim
+    expect(html).not.toContain('type="papers"');
+  });
+
+  test("renders one entry per paper in authored order", () => {
+    const entries = html.split('class="paper"').length - 1;
+    expect(entries).toBe(2);
+    expect(html.indexOf("Enriques")).toBeLessThan(html.indexOf("A preprint with no abstract"));
+  });
+
+  test("title is rendered as inline markdown (emphasis/math capable)", () => {
+    expect(html).toContain("<em>Enriques</em>");
+    expect(html).not.toContain("*Enriques*");
+  });
+
+  test("meta line joins present fields with a middot in authors·year·venue order", () => {
+    expect(html).toContain("Alexeev, Engel, Garza, Schaffler · 2025 · Nagoya Math. J. 259");
+    // absent fields must not produce empty or doubled separators
+    expect(html).not.toContain(" ·  · ");
+  });
+
+  test("a bare arxiv id becomes an abs link labeled arXiv:<id>", () => {
+    expect(html).toContain('href="https://arxiv.org/abs/2312.03638"');
+    expect(html).toContain("arXiv:2312.03638");
+  });
+
+  test("a full arxiv url is linked verbatim", () => {
+    expect(html).toContain('href="https://arxiv.org/abs/2401.00000"');
+  });
+
+  test("an abstract is an expandable details with block-markdown body", () => {
+    expect(html).toContain('class="abstract-toggle"');
+    expect(html).toContain("<details");
+    expect(html).toContain("<summary");
+    // abstract markdown is rendered, not emitted verbatim
+    expect(html).toContain("<em>stable pair</em>");
+  });
+
+  test("a paper with no abstract emits no details element", () => {
+    // only the first paper has an abstract; the second must not add a <details>
+    const details = html.split("<details").length - 1;
+    expect(details).toBe(1);
+  });
+});
+
+describe("component filter: a papers list with an unknown items key fails the build", () => {
+  test("rejects with BuildError kind=pandoc", async () => {
+    const outDir = await freshOutDir();
+    const badPapers = join(FIXTURES, "components", "bad-papers");
+    await expect(
+      build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }),
+    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
+
+describe("component filter: a paper entry with no title fails the build", () => {
+  test("rejects with BuildError kind=pandoc", async () => {
+    const outDir = await freshOutDir();
+    const badPapers = join(FIXTURES, "components", "bad-papers-notitle");
+    await expect(
+      build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }),
+    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
+
 describe("component filter: video embeds a provider iframe", () => {
   let html: string;
   let outDir: string;
