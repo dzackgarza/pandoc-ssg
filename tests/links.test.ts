@@ -11,6 +11,7 @@ const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 
 const LINKS_CONTENT = join(FIXTURES, "links", "content");
 const DEMO_CONTENT = join(FIXTURES, "demo", "content");
+const ENCODED_CONTENT = join(FIXTURES, "links-encoded", "content");
 
 function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-links-"));
@@ -57,6 +58,30 @@ describe("O12: fully-valid site reports no broken links", () => {
   });
 
   test("demo site has no broken internal links", async () => {
+    let broken = await checkLinks(outDir, manifest);
+    expect(broken).toEqual([]);
+  });
+});
+
+describe("O12: percent-encoded paths resolve against the real file", () => {
+  let outDir: string;
+  let manifest: Manifest;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    manifest = await build({
+      contentDir: ENCODED_CONTENT,
+      pandocDir: PANDOC_DIR,
+      outDir,
+    });
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("a link with %20 to a file named with a space is not reported broken", async () => {
+    // /assets/My%20File.html must resolve to dist/assets/My File.html, which exists
     let broken = await checkLinks(outDir, manifest);
     expect(broken).toEqual([]);
   });
