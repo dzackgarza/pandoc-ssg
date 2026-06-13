@@ -33,10 +33,12 @@ TDD against [proof-obligations](proof-obligations.md). Red tests committed befor
 
 Filter order in defaults: transclude → components.
 
+Also done: `/talks/` migrated (gallery component, 9 galleries / 27 images, 16 notice divs); `gallery` component type added (O11). Standalone apps `persistent_homology` + `square_topologies` migrated as opaque passthrough via `content/_site.toml` (design step 6); real-content O4 guards in `tests/writing.test.ts`.
+
 ## Still remaining
 
-- **Asset migration**: `ssg check` on the real `/writing/` page reports unresolved `/assets/...` links (PDFs, slides, images) that live on the production site but are not yet under `content/`. Migrating that asset tree (or wiring passthrough to it) is the next content task.
+- **DECISION — asset migration**: `ssg check` reports the writing/talks pages' unresolved `/assets/*` links. The source `assets/` tree is **385M** and `_pages/math_journal` is **32M** — deliberately NOT vendored into this generator repo. Options for the user: (a) keep generator repo lean, treat content/ as a curated showcase; (b) vendor the full site; (c) point the SSG at an external content root (the website tree) instead of vendoring. `ssg check` is the ledger of what's unresolved.
+- Remaining simple v2018 pages (teaching, advice, tutoring, GOATS [splash header], activities, grad_resources, etc.) + a homepage — bulk content migration, no new kernel features; available on request.
 - Islands (typed interactive components / hydration) — not yet needed by migrated content.
-- Remaining v2018 pages (teaching, talks, GOATS, standalone apps as opaque passthrough, blog/teaching).
-- GitHub remote + code scanning for the installed review workflows.
+- GitHub remote + code scanning for the installed review workflows — outward-facing; needs user go-ahead.
 - Manifest dependency tracking for incremental rebuilds (transclusion deps).
