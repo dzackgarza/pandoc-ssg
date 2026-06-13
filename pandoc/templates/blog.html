@@ -22,6 +22,11 @@ $endfor$
 <article>
 <h1>$title$</h1>
 $if(date)$<p class="post-date">$date$</p>$endif$
+$if(toc)$
+<nav class="post-toc" role="doc-toc">
+$table-of-contents$
+</nav>
+$endif$
 $body$
 </article>
 </main>
