@@ -83,8 +83,12 @@ describe("O16: blog-index island build output", () => {
     expect(indexHtml).not.toContain('type="blog-index"');
   });
 
-  test("records both generated files in the manifest", () => {
-    const outputs = manifest.generated.map((g) => g.output).sort();
+  test("records both generated island files in the manifest", () => {
+    // theme assets (O18) are also in generated; scope to the island's own outputs
+    const outputs = manifest.generated
+      .filter((g) => g.kind === "island" || g.kind === "data")
+      .map((g) => g.output)
+      .sort();
     expect(outputs).toEqual(["assets/islands/blog-index.js", "blog/posts.json"]);
   });
 

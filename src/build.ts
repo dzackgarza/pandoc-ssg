@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import matter from "gray-matter";
 import type { Tags } from "yaml";
@@ -204,6 +204,18 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     await copyFile(src, dest);
   }
 
+  // Theme assets (O18): the design layer's stylesheet + self-hosted fonts ship
+  // with the generator, so the build emits them into dist/assets/ (pandoc/ is
+  // not otherwise copied). Unconditional — every page links the stylesheet.
+  for (const rel of await walkRel(join(pandocDir, "assets"))) {
+    let src = join(pandocDir, "assets", rel);
+    let output = `assets/${rel}`;
+    let dest = join(staging, output);
+    await mkdir(dirname(dest), { recursive: true });
+    await copyFile(src, dest);
+    generated.push({ output, kind: "theme" });
+  }
+
   // Interactive blog-index island (O16): only when a page uses the component.
   if (usesBlogIndex) {
     let postsOutput = "blog/posts.json";
@@ -223,6 +235,21 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   await rename(staging, outDir);
 
   return manifest;
+}
+
+/** POSIX paths of every file under `root`, recursively (relative to `root`). */
+async function walkRel(root: string, prefix = ""): Promise<string[]> {
+  let out: string[] = [];
+  let entries = await readdir(root, { withFileTypes: true });
+  for (const e of entries) {
+    let rel = prefix === "" ? e.name : `${prefix}/${e.name}`;
+    if (e.isDirectory()) {
+      out.push(...(await walkRel(join(root, e.name), rel)));
+    } else {
+      out.push(rel);
+    }
+  }
+  return out;
 }
 
 /** True for the file classes copied verbatim into dist ("asset" or "opaque"). */

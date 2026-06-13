@@ -56,7 +56,7 @@ export interface PassthroughEntry {
  */
 export interface GeneratedEntry {
   output: string;
-  kind: "data" | "island";
+  kind: "data" | "island" | "theme";
 }
 
 export interface Manifest {

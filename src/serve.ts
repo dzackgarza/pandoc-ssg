@@ -16,6 +16,8 @@ let CONTENT_TYPES: Record<string, string> = {
   css: "text/css",
   js: "text/javascript",
   json: "application/json",
+  woff2: "font/woff2",
+  woff: "font/woff",
   svg: "image/svg+xml",
   png: "image/png",
   jpg: "image/jpeg",

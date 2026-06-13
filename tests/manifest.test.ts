@@ -110,13 +110,14 @@ describe("O6: manifest is the single contract", () => {
     }
   });
 
-  test("bijection: dist contents == {manifest} ∪ route outputs ∪ passthrough outputs", async () => {
+  test("bijection: dist contents == {manifest} ∪ routes ∪ passthrough ∪ generated", async () => {
     const onDisk = (await walk(outDir)).sort();
 
     const expected = [
       "site-manifest.json",
       ...returned.routes.map((r) => r.output),
       ...returned.passthrough.map((p) => p.output),
+      ...returned.generated.map((g) => g.output),
     ].sort();
 
     expect(onDisk).toEqual(expected);
