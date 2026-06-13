@@ -80,14 +80,22 @@ Writing+Talks into a filterable **Notes** collection.
   `abstract-toggle`/`abstract`). Inline-md title (required), `paper-meta` joins
   present authors·year·venue·arXiv (bare id→abs URL), native `<details>` abstract
   emitted only when present. Engine only; no CSS yet; not wired into content.
+- **DONE — O23 media-gallery + O24 link-group** (generator green commits after the
+  O22 record). **Binding decision (user, this session): media-gallery is a STATIC
+  grid, NO client-side filter** — filters are the wrong atmosphere per
+  AESTHETIC-GUIDELINES (wins on conflict); tags ride only as a `data-tags` attribute.
+  media-gallery (O23) **replaced** the old `gallery` entirely (render_gallery + branch
+  + `.gallery*` CSS renamed to `.media-gallery*` + README + O11 text all updated);
+  image items use src/href, video items reuse the O17 youtube embed (OSOT). link-group
+  (O24) renders a restrained titled `<section>` of external links (href required per
+  link). `/talks/` migrates `gallery`→`media-gallery` at the content step.
 
 **Remaining sequence (each a TDD increment, then applied to content):**
-1. generalize `gallery`→`media-gallery` (filterable) + `link-group`.
-2. navbar → `CV · Papers · Notes · Teaching · Blog · About`; home stays prose-first;
+1. navbar → `CV · Papers · Notes · Teaching · Blog · About`; home stays prose-first;
    **About** absorbs the contact/social metadata (the demoted spike `profile.toml` data); **NO profile card**.
-3. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
+2. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
    (derived-AG, infinity-categories — render pandoc-native; drop `/pandoc/*.html` iframes + `content/pandoc/`).
-4. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
+3. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
    author timeline/papers data, add `papers`/`notes`/`teaching`/`activities`/`about` pages, refactor nav,
    then rebuild → full `verify` → `ssg deploy /var/www/html`.
 
