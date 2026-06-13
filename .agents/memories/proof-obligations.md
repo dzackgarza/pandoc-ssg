@@ -50,4 +50,24 @@ Nav comes from `content/_data/navigation.toml`. Every internal nav target must r
 
 A `::: {.component type="T" ...}` fenced div is expanded by a pandoc Lua filter into HTML built from `content/_data/items.yaml` (passed to the filter as a JSON sidecar referenced by the `items_path` metadata field, so embedded card markdown is not mangled by pandoc's metadata parser). `type="feature-row" items="KEY"` renders the named card collection as a `.feature-row` grid of `.feature-card`s; each card's `excerpt` is rendered as markdown and `title` as inline markdown (so card titles may carry math). A card with empty `url` emits no link. An unknown component type or a missing data key aborts the build (`BuildError kind=pandoc`). Implemented in `pandoc/filters/components.lua`; the writing-page migration is its stress test.
 
+## O12 — Internal link integrity (manifest-consuming)
+
+A link checker consumes the built `dist/` plus the manifest and reports every
+broken site-internal link: any `href`/`src` beginning with `/` in rendered
+HTML that resolves to neither a manifest route url, a passthrough output, nor
+an existing file under `dist/`. External links (`http(s):`, `mailto:`,
+protocol-relative `//`), in-page fragments (`#…`), and empty hrefs are out of
+scope. Reporting is non-fatal to `build`; `ssg check` exits nonzero when any
+internal link is broken (CI gate). Each broken link is reported with its
+source page and target.
+
+## O13 — Preview server
+
+`ssg serve --out DIR [--port N]` serves a built `dist/` over HTTP: a request
+for `/p/` returns the bytes of `dir/p/index.html` with a `text/html`
+content-type, `/` returns `dir/index.html`, a real asset path returns its
+bytes with a sensible content-type, and an unknown path returns 404. The
+server is a thin static file server over the already-built tree; it neither
+compiles nor mutates `dist/`.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).

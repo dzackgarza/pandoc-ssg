@@ -1,7 +1,11 @@
 /**
- * CLI entrypoint (O9). Subcommands:
- *   build [--content DIR] [--pandoc DIR] [--out DIR]
- *   new post "Title" [--content DIR]   — scaffold a valid blog post
+ * CLI entrypoint. Subcommands:
+ *   build --content DIR --pandoc DIR --out DIR        — full pipeline (O9)
+ *   new post "Title" --content DIR                    — scaffold a blog post (O9)
+ *   check --content DIR --pandoc DIR --out DIR        — build, then report
+ *                                                       broken internal links;
+ *                                                       exit 1 if any (O12)
+ *   serve --out DIR [--port N]                         — preview the built tree (O13)
  * Exits 0 on success; nonzero with the BuildError report on stderr.
  */
 import { mkdir, writeFile } from "node:fs/promises";
@@ -9,7 +13,9 @@ import { join } from "node:path";
 import matter from "gray-matter";
 import { build } from "./build.ts";
 import { BuildError } from "./errors.ts";
+import { checkLinks } from "./links.ts";
 import { validatePageMeta } from "./schemas.ts";
+import { startServer } from "./serve.ts";
 
 /** Collect repeated `--flag value` pairs from argv into a flag map. */
 function parseFlags(args: string[]): { flags: Map<string, string>; positionals: string[] } {
@@ -72,6 +78,33 @@ async function runBuild(flags: Map<string, string>): Promise<number> {
   return 0;
 }
 
+async function runCheck(flags: Map<string, string>): Promise<number> {
+  let outDir = requireFlag(flags, "out");
+  let manifest = await build({
+    contentDir: requireFlag(flags, "content"),
+    pandocDir: requireFlag(flags, "pandoc"),
+    outDir,
+  });
+  let broken = await checkLinks(outDir, manifest);
+  if (broken.length === 0) {
+    return 0;
+  }
+  for (const link of broken) {
+    process.stderr.write(`broken link: ${link.target} (in ${link.sourcePage})\n`);
+  }
+  return 1;
+}
+
+async function runServe(flags: Map<string, string>): Promise<number> {
+  let outDir = requireFlag(flags, "out");
+  let portFlag = flags.get("port");
+  let port = portFlag === undefined ? undefined : Number(portFlag);
+  let server = startServer({ outDir, port });
+  process.stdout.write(`serving ${outDir} at http://localhost:${server.port}/\n`);
+  // Block until the process is terminated; the server keeps handling requests.
+  return new Promise<number>(() => {});
+}
+
 async function runNewPost(positionals: string[], flags: Map<string, string>): Promise<number> {
   let title = positionals[0];
   if (title === undefined) {
@@ -103,6 +136,14 @@ async function dispatch(argv: string[]): Promise<number> {
 
   if (subcommand === "build") {
     return await runBuild(parseFlags(rest).flags);
+  }
+
+  if (subcommand === "check") {
+    return await runCheck(parseFlags(rest).flags);
+  }
+
+  if (subcommand === "serve") {
+    return await runServe(parseFlags(rest).flags);
   }
 
   if (subcommand === "new") {

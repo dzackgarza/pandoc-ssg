@@ -144,6 +144,51 @@ describe("CLI new post (O9)", () => {
   });
 });
 
+describe("CLI check (O12)", () => {
+  test("check on a site with a broken internal link exits nonzero and names the target", async () => {
+    const contentDir = await stageContent("broken-links-site");
+    const outDir = await freshTmp("check-broken-out");
+
+    const r = await runCli([
+      "check",
+      "--content",
+      contentDir,
+      "--pandoc",
+      PANDOC_DIR,
+      "--out",
+      outDir,
+    ]);
+
+    expect(r.exitCode).not.toBe(0);
+    // The broken target is structured contract data (O12), like O3's filename.
+    expect(r.stdout + r.stderr).toContain("/missing/page/");
+  });
+
+  test("check on a clean site exits 0", async () => {
+    const contentDir = await stageContent("valid-site");
+    const outDir = await freshTmp("check-clean-out");
+
+    const r = await runCli([
+      "check",
+      "--content",
+      contentDir,
+      "--pandoc",
+      PANDOC_DIR,
+      "--out",
+      outDir,
+    ]);
+
+    expect(r.exitCode).toBe(0);
+  });
+});
+
+describe("CLI serve (O13)", () => {
+  test("serve with no --out exits nonzero", async () => {
+    const r = await runCli(["serve"]);
+    expect(r.exitCode).not.toBe(0);
+  });
+});
+
 describe("CLI argument errors (O9)", () => {
   test("unknown subcommand exits nonzero", async () => {
     const r = await runCli(["frobnicate"]);
