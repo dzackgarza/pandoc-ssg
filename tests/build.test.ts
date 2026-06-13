@@ -9,6 +9,7 @@ const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 
 const DEMO_CONTENT = join(FIXTURES, "demo", "content");
 const BAD_SCHEMA_CONTENT = join(FIXTURES, "bad-schema", "content");
+const BLOG_TOC_CONTENT = join(FIXTURES, "blog-toc", "content");
 
 function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-out-"));
@@ -144,6 +145,42 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     expect(html).toContain("Home");
     expect(html).toContain("About");
     expect(html).toContain("Example");
+  });
+});
+
+describe("O25: blog posts render a depth-3 table of contents; ordinary pages do not", () => {
+  let postHtml: string;
+  let pageHtml: string;
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    await build({ contentDir: BLOG_TOC_CONTENT, pandocDir: PANDOC_DIR, outDir });
+    postHtml = await readFile(join(outDir, "blog", "2026-06-14-toc-post", "index.html"), "utf8");
+    pageHtml = await readFile(join(outDir, "regular", "index.html"), "utf8");
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("the post emits a post-toc nav linking its headings to in-page anchors", () => {
+    expect(postHtml).toContain('class="post-toc"');
+    expect(postHtml).toContain('href="#first-section"');
+    expect(postHtml).toContain('href="#subsection-a"');
+    expect(postHtml).toContain('href="#second-section"');
+  });
+
+  test("a level-4 heading renders in the body but is excluded from the depth-3 TOC", () => {
+    // the only thing that would link to #too-deep is the TOC; pandoc does not
+    // self-link body headings, so its absence proves the depth-3 cutoff
+    expect(postHtml).toContain('id="too-deep"');
+    expect(postHtml).not.toContain('href="#too-deep"');
+  });
+
+  test("an ordinary page carries no table of contents", () => {
+    expect(pageHtml).not.toContain('class="post-toc"');
+    expect(pageHtml).not.toContain('href="#a-heading-in-a-regular-page"');
   });
 });
 

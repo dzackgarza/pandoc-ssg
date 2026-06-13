@@ -34,6 +34,17 @@ Build emits `site-manifest.json` enumerating every route (source, url, output, t
 
 Nav is pure config: `content/_data/navigation.toml` declares an ordered list of `[[main]]` entries (`title`, `href`, `weight`). The SSG's only job is to validate that config's *shape* (malformed TOML or an unknown/missing field → `BuildError kind=nav`, fail loud) and expose it as the pandoc `nav` template variable, ordered by `weight`; the template's `$for(nav)$` populates the navbar. The build does **not** gate nav *targets* — an `href` may point at an on-site route, a passthrough asset (e.g. a CV PDF), or an off-site URL. Nav-link **integrity** is not special-cased: it is covered by the general link checker (O12), which resolves every rendered link (nav included) against routes + passthrough + on-disk files and is surfaced by `ssg check`. Rendered pages contain the nav links.
 
+## O25 — Blog-post table of contents
+
+A blog post (`blog-post.v1`, rendered via `blog.html`) emits an in-page **table of
+contents** built by pandoc's own `--toc` (`toc: true`, `toc-depth: 3` in
+`blog.yaml`), wrapped by the template in a `<nav class="post-toc">`. The TOC lists
+the post's body headings down to **level 3** with links to their auto-generated
+in-page anchors (`href="#heading-slug"`); a level-4+ heading still renders in the
+body (with its id) but is **not** listed in the TOC. Only blog posts get a TOC —
+ordinary pages (`page.html`) carry no `post-toc`. This is pandoc templating, not SSG
+logic: the generator only sets the defaults and the template variable.
+
 ## O8 — Directory-inferred defaults
 
 `content/_site.toml` maps directory globs to page types (template + schema). A page in a mapped directory needs only `site.page: true` plus the schema's required fields; type/template are inferred. Explicit frontmatter beats inference.
