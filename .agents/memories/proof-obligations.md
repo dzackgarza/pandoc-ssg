@@ -169,4 +169,23 @@ NOT cards/badges/tag-pills (per AESTHETIC-GUIDELINES). The build emits
 peer deps), and records both in `manifest.generated`. The Lua filter emits the
 mount + module script. Shares the island machinery with the blog-index (O16).
 
+## O21 — Timeline component (restrained dated list)
+
+`::: {.component type="timeline" items="KEY"}` is a static (Lua-rendered)
+data-backed component for **teaching and activities**: it renders the `items.yaml`
+array under `KEY` as a **clean dated list**, NOT an icon/card visual timeline (per
+AESTHETIC-GUIDELINES and [[redesign-spike-reconciliation]]). The placeholder
+expands to a `<ul class="timeline">` of `<li class="timeline__entry">` items, one
+per data entry **in authored order** (the data is already ordered; the filter does
+not re-sort — the author owns chronology). Each entry carries a
+`<span class="timeline__date">` (the entry's `date`, escaped plain text — the
+defining field) and a `<span class="timeline__title">` rendered as **inline
+markdown** (so titles may carry emphasis/math/links). An optional `detail` renders
+as inline markdown in a `<span class="timeline__detail">`, emitted only when
+present (no empty span, no broken empty link). An entry with an empty/missing
+`date` aborts the build (`BuildError kind=pandoc`) — a timeline without dates is a
+content error, fail loud. An unknown items key aborts the build the same way, as
+with every data-backed component (O11). Shares the `_data/items.yaml` JSON-sidecar
+machinery with feature-row/gallery (O11).
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).

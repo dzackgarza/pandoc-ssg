@@ -90,6 +90,76 @@ describe("component filter: gallery expands from _data/items.yaml", () => {
   });
 });
 
+describe("component filter: timeline expands to a dated list from _data/items.yaml", () => {
+  let html: string;
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    await build({ contentDir: COMPONENTS_CONTENT, pandocDir: PANDOC_DIR, outDir });
+    html = await readFile(join(outDir, "timeline", "index.html"), "utf8");
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("emits a timeline container, not an empty component div", () => {
+    expect(html).toContain('class="timeline"');
+    // the placeholder div must have been consumed, not passed through verbatim
+    expect(html).not.toContain('type="timeline"');
+  });
+
+  test("renders one entry per data item in authored (not re-sorted) order", () => {
+    const entries = html.split('class="timeline__entry"').length - 1;
+    expect(entries).toBe(2);
+    // demo-timeline lists Fall 2024 before Spring 2024; order is preserved
+    expect(html.indexOf("Fall 2024")).toBeLessThan(html.indexOf("Spring 2024"));
+  });
+
+  test("each entry carries its date text", () => {
+    expect(html).toContain("Fall 2024");
+    expect(html).toContain("Spring 2024");
+  });
+
+  test("entry title is rendered as inline markdown (emphasis/math capable)", () => {
+    expect(html).toContain("<em>Abstract Algebra</em>");
+    expect(html).not.toContain("*Abstract Algebra*");
+  });
+
+  test("entry detail is rendered as inline markdown, not emitted verbatim", () => {
+    expect(html).toContain('href="https://example.com/syllabus.pdf"');
+  });
+
+  test("an entry without a detail still renders its title and no broken empty link", () => {
+    // the second entry (Spring 2024) has no detail field
+    expect(html).toContain("<em>Number Theory</em>");
+    expect(html).not.toContain('href=""');
+  });
+});
+
+describe("component filter: a timeline with an unknown items key fails the build", () => {
+  test("rejects with BuildError kind=pandoc", async () => {
+    const outDir = await freshOutDir();
+    const badTimeline = join(FIXTURES, "components", "bad-timeline");
+    await expect(
+      build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }),
+    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
+
+describe("component filter: a timeline entry with no date fails the build", () => {
+  test("rejects with BuildError kind=pandoc", async () => {
+    const outDir = await freshOutDir();
+    const badTimeline = join(FIXTURES, "components", "bad-timeline-nodate");
+    await expect(
+      build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }),
+    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
+
 describe("component filter: video embeds a provider iframe", () => {
   let html: string;
   let outDir: string;

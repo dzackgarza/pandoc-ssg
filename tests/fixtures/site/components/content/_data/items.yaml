@@ -22,3 +22,10 @@ demo-gallery:
     title: Slide A
   - url: /img/full-b.png
     image_path: /img/thumb-b.png
+
+demo-timeline:
+  - date: Fall 2024
+    title: 'MATH 100A: *Abstract Algebra*'
+    detail: 'UCSD — [syllabus](https://example.com/syllabus.pdf)'
+  - date: Spring 2024
+    title: 'Organizer, *Number Theory* Seminar'
