@@ -1,0 +1,4 @@
+targetless:
+  title: Broken
+  links:
+    - label: A link with no target

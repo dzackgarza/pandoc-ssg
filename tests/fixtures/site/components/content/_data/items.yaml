@@ -33,6 +33,16 @@ demo-media:
     caption: Talk recording.
     tags: [talk]
 
+demo-links:
+  title: Notes by Others
+  description: If you share *LaTeX* notes, let me know.
+  links:
+    - label: Arun Debray
+      href: https://example.com/debray
+      note: Lecture notes.
+    - label: Gilles Castel
+      href: https://example.com/castel
+
 demo-timeline:
   - date: Fall 2024
     title: 'MATH 100A: *Abstract Algebra*'

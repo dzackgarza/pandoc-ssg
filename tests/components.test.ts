@@ -120,6 +120,69 @@ describe("component filter: a media-gallery item with an unknown type fails the 
   });
 });
 
+describe("component filter: link-group renders a curated external link list", () => {
+  let html: string;
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    await build({ contentDir: COMPONENTS_CONTENT, pandocDir: PANDOC_DIR, outDir });
+    html = await readFile(join(outDir, "link-group", "index.html"), "utf8");
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("emits a link-group section, not an empty component div", () => {
+    expect(html).toContain('class="link-group"');
+    // the placeholder div must have been consumed, not passed through verbatim
+    expect(html).not.toContain('type="link-group"');
+  });
+
+  test("renders the group title and its markdown description", () => {
+    expect(html).toContain('class="link-group__title"');
+    expect(html).toContain("Notes by Others");
+    expect(html).toContain("<em>LaTeX</em>");
+  });
+
+  test("renders one link per entry, each an anchor to its href, in authored order", () => {
+    const links = html.split('class="link-group__link"').length - 1;
+    expect(links).toBe(2);
+    expect(html).toContain('href="https://example.com/debray"');
+    expect(html).toContain("Arun Debray");
+    expect(html).toContain('href="https://example.com/castel"');
+    expect(html.indexOf("Arun Debray")).toBeLessThan(html.indexOf("Gilles Castel"));
+  });
+
+  test("a link's note is rendered; a link without a note has no dangling separator", () => {
+    expect(html).toContain("Lecture notes.");
+    expect(html).not.toContain('href=""');
+  });
+});
+
+describe("component filter: a link-group with an unknown items key fails the build", () => {
+  test("rejects with BuildError kind=pandoc", async () => {
+    const outDir = await freshOutDir();
+    const badLinks = join(FIXTURES, "components", "bad-linkgroup");
+    await expect(
+      build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }),
+    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
+
+describe("component filter: a link-group link with no href fails the build", () => {
+  test("rejects with BuildError kind=pandoc", async () => {
+    const outDir = await freshOutDir();
+    const badLinks = join(FIXTURES, "components", "bad-linkgroup-nohref");
+    await expect(
+      build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }),
+    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
+
 describe("component filter: timeline expands to a dated list from _data/items.yaml", () => {
   let html: string;
   let outDir: string;

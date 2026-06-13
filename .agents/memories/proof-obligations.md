@@ -237,4 +237,21 @@ An optional `caption` renders as inline markdown in a
 or an unknown items key, aborts the build (`BuildError kind=pandoc`). `/talks/`
 migrates from `gallery` to `media-gallery` at the content-wiring step.
 
+## O24 — Link-group component (curated external links)
+
+`::: {.component type="link-group" items="KEY"}` is a static (Lua-rendered)
+data-backed component for curated **external** link lists (the Writing/Notes page).
+Unlike the array-shaped data-backed components, `items[KEY]` is a **group object**:
+`{ title?, description?, links: [ { label, href, note? } ] }`. It renders a
+restrained `<section class="link-group">` (understated titled list, NOT cards/icon
+grids, per AESTHETIC-GUIDELINES): an optional `<h2 class="link-group__title">` (when
+`title` present), an optional `<p class="link-group__description">` (inline
+markdown), and a `<ul class="link-group__links">` with one
+`<li class="link-group__link">` per link **in authored order** — an
+`<a href>` around the `label` (inline markdown) and, when present, a
+`<span class="link-group__note">` (inline markdown) after an em-dash separator. A
+link with an empty/missing `href` aborts the build (`BuildError kind=pandoc`) — a
+link group's purpose is working links, so a targetless link is a content error. An
+unknown items key aborts the build the same way.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).
