@@ -90,12 +90,23 @@ Writing+Talks into a filterable **Notes** collection.
   (O24) renders a restrained titled `<section>` of external links (href required per
   link). `/talks/` migrates `gallery`→`media-gallery` at the content step.
 
+- **DONE (generator side) — navbar architecture (O7 reframed)**. **Binding decision
+  (user, this session): the navbar is pure config; the renderer must NOT gate nav
+  targets.** The flat nav already renders `CV · Papers · Notes · Teaching · Blog ·
+  About` from `navigation.toml` via the template `$for(nav)$`, so labels/structure are
+  content. The generator increment was *removing* overreach: deleted the build-fatal
+  `assertNavTargets` (route-only gate) + `isExternal` + the dead `external` field; nav
+  hrefs may now point at routes, passthrough assets (CV PDF), or off-site. Nav-link
+  integrity is delegated to O12 (`ssg check`); burden transferred to a new
+  links.test. **Contact/social → About page only; NO generator footer** (a site-wide
+  social footer would foreground follow-surfaces the doctrine forbids). Remaining
+  navbar work (author `navigation.toml` labels + the About page, no profile card) is
+  content-step.
+
 **Remaining sequence (each a TDD increment, then applied to content):**
-1. navbar → `CV · Papers · Notes · Teaching · Blog · About`; home stays prose-first;
-   **About** absorbs the contact/social metadata (the demoted spike `profile.toml` data); **NO profile card**.
-2. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
+1. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
    (derived-AG, infinity-categories — render pandoc-native; drop `/pandoc/*.html` iframes + `content/pandoc/`).
-3. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
+2. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
    author timeline/papers data, add `papers`/`notes`/`teaching`/`activities`/`about` pages, refactor nav,
    then rebuild → full `verify` → `ssg deploy /var/www/html`.
 
