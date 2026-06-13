@@ -141,6 +141,73 @@ local function render_timeline(key)
   return table.concat(parts, "\n")
 end
 
+-- Restrained bibliographic list for the publications page (O22). Author-ordered;
+-- each entry's `title` (inline markdown) is the defining field and a missing one
+-- aborts the build. The `paper-meta` line joins the present fields among authors,
+-- year, venue, and the arXiv link with a middot (absent fields skipped — no
+-- doubled separators). A bare arXiv id becomes an abs URL; a full URL is linked
+-- verbatim. The `abstract` (block markdown) becomes a native <details>, emitted
+-- only when present. Class names follow AESTHETIC-GUIDELINES §6 (no cards).
+local function render_papers(key)
+  local papers = items[key]
+  if papers == nil then
+    error("component papers: unknown items key '" .. tostring(key) .. "'")
+  end
+  local parts = { '<ul class="papers">' }
+  for _, p in ipairs(papers) do
+    local title = p.title or ""
+    if title == "" then
+      error("component papers: entry under '" .. tostring(key) .. "' is missing a title")
+    end
+    parts[#parts + 1] = '<li class="paper">'
+    parts[#parts + 1] = '<span class="paper-title">' .. md_inline_html(title) .. "</span>"
+
+    local meta = {}
+    if p.authors and p.authors ~= "" then
+      meta[#meta + 1] = esc_text(p.authors)
+    end
+    if p.year ~= nil then
+      -- JSON decodes an integral year as a float (2025.0); render it as 2025.
+      local y = p.year
+      if math.type(y) == "float" and y == math.floor(y) then
+        y = math.tointeger(y)
+      end
+      local ys = tostring(y)
+      if ys ~= "" then
+        meta[#meta + 1] = esc_text(ys)
+      end
+    end
+    if p.venue and p.venue ~= "" then
+      meta[#meta + 1] = esc_text(p.venue)
+    end
+    local arxiv = p.arxiv
+    if arxiv ~= nil and arxiv ~= "" then
+      local href, label
+      if arxiv:find("://", 1, true) then
+        href, label = arxiv, "arXiv"
+      else
+        href, label = "https://arxiv.org/abs/" .. arxiv, "arXiv:" .. arxiv
+      end
+      meta[#meta + 1] = '<a class="paper-arxiv" href="' .. esc_attr(href) .. '">' .. esc_text(label) .. "</a>"
+    end
+    if #meta > 0 then
+      parts[#parts + 1] = '<div class="paper-meta">' .. table.concat(meta, " · ") .. "</div>"
+    end
+
+    local abstract = p.abstract or ""
+    if abstract ~= "" then
+      parts[#parts + 1] = '<details class="paper-abstract">'
+      parts[#parts + 1] = '<summary class="abstract-toggle">Abstract</summary>'
+      parts[#parts + 1] = '<div class="abstract">' .. md_block_html(abstract) .. "</div>"
+      parts[#parts + 1] = "</details>"
+    end
+
+    parts[#parts + 1] = "</li>"
+  end
+  parts[#parts + 1] = "</ul>"
+  return table.concat(parts, "\n")
+end
+
 -- Embed providers (O17): provider name -> iframe src builder. Unknown providers
 -- and missing ids abort the build (fail loud).
 local function render_video(provider, id)
@@ -181,6 +248,9 @@ local function expand_div(el)
   end
   if ctype == "timeline" then
     return pandoc.RawBlock("html", render_timeline(el.attributes.items))
+  end
+  if ctype == "papers" then
+    return pandoc.RawBlock("html", render_papers(el.attributes.items))
   end
   if ctype == "video" then
     -- pandoc maps `id="x"` to the element identifier, not attributes.id
