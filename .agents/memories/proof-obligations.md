@@ -46,4 +46,8 @@ Nav comes from `content/_data/navigation.toml`. Every internal nav target must r
 
 `:::{.include path=...}` splices pandoc-parsed blocks from the referenced file. Paths escaping `content/` are a build failure.
 
+## O11 — Data-backed components
+
+A `::: {.component type="T" ...}` fenced div is expanded by a pandoc Lua filter into HTML built from `content/_data/items.yaml` (passed to the filter as a JSON sidecar referenced by the `items_path` metadata field, so embedded card markdown is not mangled by pandoc's metadata parser). `type="feature-row" items="KEY"` renders the named card collection as a `.feature-row` grid of `.feature-card`s; each card's `excerpt` is rendered as markdown and `title` as inline markdown (so card titles may carry math). A card with empty `url` emits no link. An unknown component type or a missing data key aborts the build (`BuildError kind=pandoc`). Implemented in `pandoc/filters/components.lua`; the writing-page migration is its stress test.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).

@@ -1,0 +1,17 @@
+demo-row:
+  - image_path: /img/a.png
+    alt: Alpha
+    title: Alpha Notes
+    excerpt: |
+      *Prof X, Fall 2020*
+
+      [PDF](https://example.com/a.pdf)
+    url: https://example.com/a.pdf
+    is_project: true
+  - image_path: /img/b.png
+    alt: Beta
+    title: Beta Notes
+    excerpt: |
+      *Prof Y, Spring 2021*
+    url: ''
+    is_project: true

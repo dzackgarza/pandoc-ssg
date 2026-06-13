@@ -16,6 +16,8 @@ export interface RenderInput {
   nav: NavItem[];
   /** site-wide MathJax macro map (name → TeX), from _data/math-macros.yaml */
   mathMacros: Record<string, string>;
+  /** data backing components (e.g. feature-row collections), from _data/items.yaml */
+  items: Record<string, unknown>;
 }
 
 /**
@@ -58,6 +60,17 @@ export async function renderPage(input: RenderInput): Promise<string> {
 
   let metaDir = await mkdtemp(join(tmpdir(), "ssg-meta-"));
   let metaFile = join(metaDir, "meta.yaml");
+
+  // Component data flows to the Lua filter as a JSON sidecar, referenced by a
+  // plain filesystem path. Passing it through pandoc metadata directly would
+  // let pandoc parse embedded markdown (card excerpts) prematurely; the path
+  // string survives metadata round-tripping intact, the JSON does not.
+  if (Object.keys(input.items).length > 0) {
+    let itemsFile = join(metaDir, "items.json");
+    await writeFile(itemsFile, JSON.stringify(input.items), "utf8");
+    metadata.items_path = itemsFile;
+  }
+
   await writeFile(metaFile, YAML.stringify(metadata), "utf8");
 
   try {

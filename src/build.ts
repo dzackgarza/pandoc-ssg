@@ -38,6 +38,25 @@ let macrosShape = z.object({
   macros: z.record(z.string(), z.string()).optional(),
 });
 
+/**
+ * Load content/_data/items.yaml: the data backing data-driven components
+ * (e.g. feature-row card collections). Missing file → no items. The shape is
+ * intentionally open (component filters own their own field contracts); this
+ * only guarantees a top-level mapping of collection-name → value.
+ */
+async function loadItems(contentDir: string): Promise<Record<string, unknown>> {
+  let itemsPath = join(contentDir, "_data", "items.yaml");
+  if (!(await Bun.file(itemsPath).exists())) {
+    return {};
+  }
+  let raw = await readFile(itemsPath, "utf8");
+  let parsed = z.record(z.string(), z.unknown()).safeParse(YAML.parse(raw));
+  if (!parsed.success) {
+    throw new BuildError("config", ["_data/items.yaml"], parsed.error.message);
+  }
+  return parsed.data;
+}
+
 /** Load content/_data/math-macros.yaml. Missing file → no macros. */
 async function loadMathMacros(contentDir: string): Promise<Record<string, string>> {
   let macrosPath = join(contentDir, "_data", "math-macros.yaml");
@@ -112,6 +131,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   assertNavTargets(nav, manifest);
 
   let mathMacros = await loadMathMacros(contentDir);
+  let items = await loadItems(contentDir);
 
   // Render every page (pandoc) before any write so a failure aborts cleanly.
   let rendered = new Map<string, string>();
@@ -123,6 +143,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
       pageType: page.pageType,
       nav,
       mathMacros,
+      items,
     });
     rendered.set(page.route.output, html);
   }

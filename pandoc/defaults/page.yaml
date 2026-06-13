@@ -5,3 +5,5 @@ standalone: true
 html-math-method:
   method: mathjax
 template: ${.}/../templates/page.html
+filters:
+  - ${.}/../filters/components.lua
