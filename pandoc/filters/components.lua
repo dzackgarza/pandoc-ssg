@@ -113,6 +113,25 @@ local function render_gallery(key)
   return table.concat(parts, "\n")
 end
 
+-- Embed providers (O17): provider name -> iframe src builder. Unknown providers
+-- and missing ids abort the build (fail loud).
+local function render_video(provider, id)
+  if id == nil or id == "" then
+    error("component video: missing required 'id' attribute")
+  end
+  local src
+  if provider == "youtube" then
+    src = "https://www.youtube.com/embed/" .. id
+  else
+    error("component video: unknown provider '" .. tostring(provider) .. "'")
+  end
+  return '<div class="responsive-embed">'
+    .. '<iframe src="'
+    .. esc_attr(src)
+    .. '" frameborder="0" allowfullscreen></iframe>'
+    .. "</div>"
+end
+
 local function expand_div(el)
   local is_component = false
   for _, c in ipairs(el.classes) do
@@ -131,6 +150,10 @@ local function expand_div(el)
   end
   if ctype == "gallery" then
     return pandoc.RawBlock("html", render_gallery(el.attributes.items))
+  end
+  if ctype == "video" then
+    -- pandoc maps `id="x"` to the element identifier, not attributes.id
+    return pandoc.RawBlock("html", render_video(el.attributes.provider, el.identifier))
   end
   if ctype == "blog-index" then
     -- Interactive island (O16): emit only the hydration mount + module script.
