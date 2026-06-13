@@ -48,7 +48,7 @@ Nav comes from `content/_data/navigation.toml`. Every internal nav target must r
 
 ## O11 — Data-backed components
 
-A `::: {.component type="T" ...}` fenced div is expanded by a pandoc Lua filter into HTML built from `content/_data/items.yaml` (passed to the filter as a JSON sidecar referenced by the `items_path` metadata field, so embedded card markdown is not mangled by pandoc's metadata parser). All data-backed components reference their collection via a uniform `items="KEY"` attribute. `type="feature-row"` renders a `.feature-row` grid of `.feature-card`s; each card's `excerpt` is rendered as markdown and `title` as inline markdown (so card titles may carry math); a card with empty `url` emits no link. `type="gallery"` renders a `.gallery` of `.gallery__item` figures, each an `image_path` thumbnail linking to its full `url`, with an optional `title` figcaption. An unknown component type or a missing data key aborts the build (`BuildError kind=pandoc`). Implemented in `pandoc/filters/components.lua`; the `/writing/` (feature-row) and `/talks/` (gallery) migrations are its stress tests.
+A `::: {.component type="T" ...}` fenced div is expanded by a pandoc Lua filter into HTML built from `content/_data/items.yaml` (passed to the filter as a JSON sidecar referenced by the `items_path` metadata field, so embedded card markdown is not mangled by pandoc's metadata parser). All data-backed components reference their collection via a uniform `items="KEY"` attribute. `type="feature-row"` renders a `.feature-row` grid of `.feature-card`s; each card's `excerpt` is rendered as markdown and `title` as inline markdown (so card titles may carry math); a card with empty `url` emits no link. An unknown component type or a missing data key aborts the build (`BuildError kind=pandoc`). Implemented in `pandoc/filters/components.lua`; the `/writing/` (feature-row) migration is its stress test. (Media grids are O23 `media-gallery`, which superseded the original `gallery`.)
 
 ## O12 — Internal link integrity (manifest-consuming)
 
@@ -212,6 +212,29 @@ from that doctrine). The placeholder expands to a `<ul class="papers">` of
   present (an entry without one emits no `<details>`).
 
 An unknown items key aborts the build the same way (O11). Shares the
-`_data/items.yaml` JSON-sidecar machinery with feature-row/gallery/timeline.
+`_data/items.yaml` JSON-sidecar machinery with feature-row/timeline.
+
+## O23 — Media-gallery component (static media grid; supersedes gallery)
+
+`::: {.component type="media-gallery" items="KEY"}` is a static (Lua-rendered)
+data-backed component that **replaces the original `gallery`** (O11). It renders the
+`items.yaml` array under `KEY` as a restrained `<div class="media-gallery">` grid of
+`<figure class="media-gallery__item">`, one per item **in authored order**. Per the
+binding decision, it is a **static grid with no client-side filter** (filters are the
+wrong atmosphere for a math-research site, per AESTHETIC-GUIDELINES, which wins on
+conflict); each item's optional `tags` are emitted only as a `data-tags` attribute
+(space-joined) — carried as data, never an interactive filter, and no island bundle is
+referenced. Each item has a `type`:
+
+- `type="image"` → `<img class="media-gallery__image" src=… alt=…>`; an optional
+  `href` wraps the image in a `<a class="media-gallery__link">` (no empty link when
+  absent).
+- `type="video"` → reuses the O17 YouTube embed (`provider` + `id` → a
+  `.responsive-embed` iframe) inside the figure — one embedding path (OSOT).
+
+An optional `caption` renders as inline markdown in a
+`<figcaption class="media-gallery__caption">`. An unknown (or missing) item `type`,
+or an unknown items key, aborts the build (`BuildError kind=pandoc`). `/talks/`
+migrates from `gallery` to `media-gallery` at the content-wiring step.
 
 Linked: [requirements](requirements.md), [architecture](architecture.md).

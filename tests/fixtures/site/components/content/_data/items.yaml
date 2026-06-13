@@ -16,12 +16,22 @@ demo-row:
     url: ''
     is_project: true
 
-demo-gallery:
-  - url: /img/full-a.png
-    image_path: /img/thumb-a.png
-    title: Slide A
-  - url: /img/full-b.png
-    image_path: /img/thumb-b.png
+demo-media:
+  - type: image
+    src: /img/sphere.png
+    alt: Sphere
+    caption: A *2-sphere*.
+    tags: [hand-drawn, topology]
+  - type: image
+    src: /img/klein.png
+    href: /img/klein-large.png
+    caption: Klein bottle.
+    tags: [hand-drawn, topology]
+  - type: video
+    provider: youtube
+    id: zRPa-VAvl6Q
+    caption: Talk recording.
+    tags: [talk]
 
 demo-timeline:
   - date: Fall 2024

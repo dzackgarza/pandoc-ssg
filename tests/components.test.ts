@@ -57,36 +57,66 @@ describe("component filter: feature-row expands from _data/items.yaml", () => {
   });
 });
 
-describe("component filter: gallery expands from _data/items.yaml", () => {
+describe("component filter: media-gallery renders a static media grid from _data/items.yaml", () => {
   let html: string;
   let outDir: string;
 
   beforeAll(async () => {
     outDir = await freshOutDir();
     await build({ contentDir: COMPONENTS_CONTENT, pandocDir: PANDOC_DIR, outDir });
-    html = await readFile(join(outDir, "gallery", "index.html"), "utf8");
+    html = await readFile(join(outDir, "media-gallery", "index.html"), "utf8");
   });
 
   afterAll(async () => {
     await rm(outDir, { recursive: true, force: true });
   });
 
-  test("emits a gallery container, not an empty component div", () => {
-    expect(html).toContain('class="gallery"');
-    expect(html).not.toContain('type="gallery"');
+  test("emits a media-gallery container, not an empty component div", () => {
+    expect(html).toContain('class="media-gallery"');
+    // the placeholder div must have been consumed, not passed through verbatim
+    expect(html).not.toContain('type="media-gallery"');
   });
 
-  test("renders one item per image with thumbnail src and full-image link", () => {
-    const items = html.split('class="gallery__item"').length - 1;
-    expect(items).toBe(2);
-    expect(html).toContain('src="/img/thumb-a.png"');
-    expect(html).toContain('href="/img/full-a.png"');
-    expect(html).toContain('src="/img/thumb-b.png"');
-    expect(html).toContain('href="/img/full-b.png"');
+  test("renders one figure per item in authored order", () => {
+    const items = html.split('class="media-gallery__item"').length - 1;
+    expect(items).toBe(3);
+    expect(html.indexOf("/img/sphere.png")).toBeLessThan(html.indexOf("/img/full-klein.png"));
   });
 
-  test("a caption is rendered when an item has a title", () => {
-    expect(html).toContain("Slide A");
+  test("an image item renders an img with its src and alt", () => {
+    expect(html).toContain('src="/img/sphere.png"');
+    expect(html).toContain('alt="Sphere"');
+  });
+
+  test("an image with href links the image; an image without href has no empty link", () => {
+    expect(html).toContain('href="/img/klein-large.png"');
+    expect(html).not.toContain('href=""');
+  });
+
+  test("a video item embeds the provider iframe inside the gallery", () => {
+    expect(html).toContain('src="https://www.youtube.com/embed/zRPa-VAvl6Q"');
+    expect(html).toContain('class="responsive-embed"');
+  });
+
+  test("item tags are carried as a data attribute, not as an interactive filter", () => {
+    expect(html).toContain('data-tags="hand-drawn topology"');
+    // static component: no island bundle is referenced (no client-side filter)
+    expect(html).not.toContain("assets/islands");
+  });
+
+  test("a caption is rendered as inline markdown", () => {
+    expect(html).toContain("<em>2-sphere</em>");
+  });
+});
+
+describe("component filter: a media-gallery item with an unknown type fails the build", () => {
+  test("rejects with BuildError kind=pandoc", async () => {
+    const outDir = await freshOutDir();
+    const badMedia = join(FIXTURES, "components", "bad-media");
+    await expect(
+      build({ contentDir: badMedia, pandocDir: PANDOC_DIR, outDir }),
+    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await rm(outDir, { recursive: true, force: true });
   });
 });
 
