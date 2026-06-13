@@ -4,7 +4,8 @@ export type BuildErrorKind =
   | "route-collision"
   | "nav"
   | "pandoc"
-  | "scaffold";
+  | "scaffold"
+  | "verify";
 
 /**
  * Structured build failure. Tests and callers discriminate on `kind` and the

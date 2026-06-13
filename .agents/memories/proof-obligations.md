@@ -79,4 +79,18 @@ migration), `leftover-kramdown` (`{: … }` survived). `ssg check` runs this
 alongside the O12 link check and exits nonzero if either reports anything, so a
 content repo's `just check` is a single strong gate before pushing/deploying.
 
+## O15 — Browser-level verification
+
+`ssg verify` builds, starts the preview server, and drives a headless Chromium
+(`src/verify.ts`, Playwright) over every manifest route, reporting runtime
+defects no static check catches: `http-error`, `missing-main`, `missing-nav`,
+`unresolved-markup` (Liquid/kramdown visible in the live DOM), `mathjax-error`
+(`<mjx-merror>` — e.g. an undefined macro), `console-error` (genuine JS errors;
+failed-subresource noise is filtered), `page-error` (uncaught exceptions).
+Navigation uses `domcontentloaded` (real pages embed never-idle iframes) with a
+bounded settle only when math is present. Playwright is an optional peer
+dependency (dynamic import → actionable BuildError if absent), so the lean
+kernel never forces a browser on consumers; a content repo adds playwright to
+use `verify`.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).

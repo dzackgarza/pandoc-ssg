@@ -10,6 +10,13 @@
  *                                                        no un-migrated markup)
  *                                                        and internal links;
  *                                                        exit 1 if any (O12, O14)
+ *   verify [--content DIR] [--pandoc DIR] [--out DIR]  — build, then drive a
+ *                                                        headless browser over
+ *                                                        every route; fail on
+ *                                                        console/page errors,
+ *                                                        missing landmarks, or
+ *                                                        MathJax errors (O15).
+ *                                                        Needs optional playwright.
  *   serve [--out DIR] [--port N]                        — preview the built tree (O13)
  * Defaults: --content ./content, --pandoc the bundled design layer, --out ./dist.
  * Exits 0 on success; nonzero with the BuildError report on stderr.
@@ -23,6 +30,7 @@ import { checkLinks } from "./links.ts";
 import { validatePageMeta } from "./schemas.ts";
 import { startServer } from "./serve.ts";
 import { validateSite } from "./validate.ts";
+import { verifySite } from "./verify.ts";
 
 /** The design layer (defaults, templates, filters) bundled with the generator. */
 let BUNDLED_PANDOC = join(import.meta.dir, "..", "pandoc");
@@ -104,6 +112,28 @@ async function runCheck(flags: Map<string, string>): Promise<number> {
   return issues.length + broken.length === 0 ? 0 : 1;
 }
 
+async function runVerify(flags: Map<string, string>): Promise<number> {
+  let outDir = flagOr(flags, "out", "dist");
+  let manifest = await build({
+    contentDir: flagOr(flags, "content", "content"),
+    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
+    outDir,
+  });
+  let server = startServer({ outDir });
+  let findings: Awaited<ReturnType<typeof verifySite>>;
+  try {
+    findings = await verifySite({ baseUrl: `http://localhost:${server.port}`, manifest });
+  } finally {
+    server.stop();
+  }
+  for (const f of findings) {
+    process.stderr.write(
+      `verify: ${f.issue} on ${f.url}${f.detail === "" ? "" : ` — ${f.detail}`}\n`,
+    );
+  }
+  return findings.length === 0 ? 0 : 1;
+}
+
 async function runServe(flags: Map<string, string>): Promise<number> {
   let outDir = flagOr(flags, "out", "dist");
   let portFlag = flags.get("port");
@@ -149,6 +179,10 @@ async function dispatch(argv: string[]): Promise<number> {
 
   if (subcommand === "check") {
     return await runCheck(parseFlags(rest).flags);
+  }
+
+  if (subcommand === "verify") {
+    return await runVerify(parseFlags(rest).flags);
   }
 
   if (subcommand === "serve") {
