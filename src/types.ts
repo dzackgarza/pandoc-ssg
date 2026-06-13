@@ -33,6 +33,7 @@ export interface PageMeta {
   };
   date?: string;
   tags?: string[];
+  categories?: string[];
 }
 
 export interface RouteEntry {

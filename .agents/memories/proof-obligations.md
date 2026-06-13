@@ -110,8 +110,10 @@ build, when (and only when) a page uses this component:
   `<script type="module" src="/assets/islands/blog-index.js">`.
 
 The island fetches its `data-posts` URL and renders a post list with
-**client-side search and tag filtering** (the replacement for the dropped
-tag/year/category archive pages). Both generated files are recorded in a new
+**client-side search plus tag and category filtering** (two distinct facets —
+the replacement for the dropped tag/year/category archive pages). `blog-post.v1`
+carries optional `tags` and `categories` (string[] each); both flow into
+`posts.json` and become facets in the island. Both generated files are recorded in a new
 manifest dimension `generated[]` so O6's bijection still holds
 (`dist == manifest.json ∪ routes ∪ passthrough ∪ generated`); O12 resolves their
 internal links as on-disk files. Vite + svelte are **optional peer

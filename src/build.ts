@@ -28,6 +28,7 @@ interface PostMeta {
   date: string;
   url: string;
   tags: string[];
+  categories: string[];
 }
 
 /**
@@ -149,6 +150,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
         date: meta.date,
         url,
         tags: meta.tags === undefined ? [] : meta.tags,
+        categories: meta.categories === undefined ? [] : meta.categories,
       });
     }
     if (raw.includes('type="blog-index"')) {

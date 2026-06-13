@@ -7,6 +7,7 @@
     date: string;
     url: string;
     tags: string[];
+    categories: string[];
   }
 
   let { postsUrl }: { postsUrl: string } = $props();
@@ -15,6 +16,7 @@
   let loaded = $state(false);
   let query = $state("");
   let activeTag = $state<string | null>(null);
+  let activeCategory = $state<string | null>(null);
 
   $effect(() => {
     // No catch: a failed fetch rejects and surfaces as an uncaught rejection,
@@ -28,12 +30,14 @@
   });
 
   let allTags = $derived([...new Set(posts.flatMap((p) => p.tags))].sort());
+  let allCategories = $derived([...new Set(posts.flatMap((p) => p.categories))].sort());
 
   let filtered = $derived(
     posts.filter((p) => {
       let matchesTag = activeTag === null || p.tags.includes(activeTag);
+      let matchesCategory = activeCategory === null || p.categories.includes(activeCategory);
       let matchesQuery = query === "" || p.title.toLowerCase().includes(query.toLowerCase());
-      return matchesTag && matchesQuery;
+      return matchesTag && matchesCategory && matchesQuery;
     }),
   );
 </script>
@@ -66,6 +70,28 @@
       </button>
     {/each}
   </div>
+  {#if allCategories.length > 0}
+    <div class="blog-index__categories" role="group" aria-label="Filter by category">
+      <button
+        type="button"
+        class="blog-index__category"
+        class:is-active={activeCategory === null}
+        onclick={() => (activeCategory = null)}
+      >
+        All
+      </button>
+      {#each allCategories as category}
+        <button
+          type="button"
+          class="blog-index__category"
+          class:is-active={activeCategory === category}
+          onclick={() => (activeCategory = category)}
+        >
+          {category}
+        </button>
+      {/each}
+    </div>
+  {/if}
 
   {#if !loaded}
     <p class="blog-index__status">Loading posts…</p>

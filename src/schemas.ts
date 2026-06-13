@@ -42,6 +42,7 @@ let blogPostV1 = z
     site: siteShape,
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     tags: z.array(z.string()).optional(),
+    categories: z.array(z.string()).optional(),
   })
   .strict();
 
@@ -61,7 +62,8 @@ export function knownSchemas(): string[] {
  * BuildError(kind="schema", files=[relPath]).
  *
  * page.v1:      requires title; site.page === true.
- * blog-post.v1: requires title and date (YYYY-MM-DD); optional tags: string[].
+ * blog-post.v1: requires title and date (YYYY-MM-DD); optional tags and
+ *               categories (string[] each), the blog-index island's facets.
  * All schemas:  optional site.route ("/" or "/…/" shaped), site.type, site.schema.
  */
 export function validatePageMeta(relPath: string, rawMeta: unknown, schemaId: string): PageMeta {

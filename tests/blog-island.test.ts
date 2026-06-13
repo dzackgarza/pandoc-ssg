@@ -154,7 +154,10 @@ describe("O16: blog-index island hydrates and filters in the browser", () => {
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 2");
     expect(await visibleTitles()).toEqual(["Second Post", "Old Post"]);
     // reset the tag facet for the next test
-    await page.locator(".blog-index__tags").getByRole("button", { name: "All", exact: true }).click();
+    await page
+      .locator(".blog-index__tags")
+      .getByRole("button", { name: "All", exact: true })
+      .click();
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 3");
   });
 
