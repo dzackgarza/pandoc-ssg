@@ -5,7 +5,8 @@ export type BuildErrorKind =
   | "nav"
   | "pandoc"
   | "scaffold"
-  | "verify";
+  | "verify"
+  | "deploy";
 
 /**
  * Structured build failure. Tests and callers discriminate on `kind` and the

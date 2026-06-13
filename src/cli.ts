@@ -18,6 +18,9 @@
  *                                                        MathJax errors (O15).
  *                                                        Needs optional playwright.
  *   serve [--out DIR] [--port N]                        — preview the built tree (O13)
+ *   deploy DIR [--content DIR] [--pandoc DIR] [--out DIR] — build, then mirror the
+ *                                                        built tree into DIR with
+ *                                                        rsync -a --delete (O19)
  * Defaults: --content ./content, --pandoc the bundled design layer, --out ./dist.
  * Exits 0 on success; nonzero with the BuildError report on stderr.
  */
@@ -25,6 +28,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import matter from "gray-matter";
 import { build } from "./build.ts";
+import { deploySite } from "./deploy.ts";
 import { BuildError } from "./errors.ts";
 import { checkLinks } from "./links.ts";
 import { validatePageMeta } from "./schemas.ts";
@@ -134,6 +138,22 @@ async function runVerify(flags: Map<string, string>): Promise<number> {
   return findings.length === 0 ? 0 : 1;
 }
 
+async function runDeploy(positionals: string[], flags: Map<string, string>): Promise<number> {
+  let deployDir = positionals[0];
+  if (deployDir === undefined) {
+    throw new BuildError("config", [], "missing deploy target directory: ssg deploy DIR");
+  }
+  let outDir = flagOr(flags, "out", "dist");
+  await build({
+    contentDir: flagOr(flags, "content", "content"),
+    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
+    outDir,
+  });
+  await deploySite(outDir, deployDir);
+  process.stdout.write(`deployed ${outDir} -> ${deployDir}\n`);
+  return 0;
+}
+
 async function runServe(flags: Map<string, string>): Promise<number> {
   let outDir = flagOr(flags, "out", "dist");
   let portFlag = flags.get("port");
@@ -187,6 +207,11 @@ async function dispatch(argv: string[]): Promise<number> {
 
   if (subcommand === "serve") {
     return await runServe(parseFlags(rest).flags);
+  }
+
+  if (subcommand === "deploy") {
+    let { flags, positionals } = parseFlags(rest);
+    return await runDeploy(positionals, flags);
   }
 
   if (subcommand === "new") {
