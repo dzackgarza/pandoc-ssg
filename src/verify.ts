@@ -113,8 +113,13 @@ async function verifyPage(
   if ((await page.locator("nav").count()) === 0) {
     findings.push({ url, issue: "missing-nav", detail: "" });
   }
-  let bodyText = await page.locator("body").innerText();
-  if (bodyText.includes("{%") || bodyText.includes("{:")) {
+  // Scan prose only: "{%"/"{:" inside <pre>/<code> is legitimate displayed code
+  // (e.g. LaTeX macros), not un-migrated Liquid/kramdown. String body avoids
+  // node-side DOM typing.
+  let proseText = (await page.evaluate(
+    "(() => { const c = document.body.cloneNode(true); c.querySelectorAll('pre, code').forEach((e) => e.remove()); return c.innerText; })()",
+  )) as string;
+  if (proseText.includes("{%") || proseText.includes("{:")) {
     findings.push({ url, issue: "unresolved-markup", detail: "" });
   }
   // MathJax typesets asynchronously after load; settle only when the page
