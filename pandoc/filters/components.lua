@@ -245,6 +245,43 @@ local function render_media_gallery(key)
   return table.concat(parts, "\n")
 end
 
+-- Curated external link list (O24). `items[key]` is a group object
+-- {title?, description?, links: [{label, href, note?}]}. Restrained titled list
+-- (no cards). A link with an empty/missing href aborts the build (fail loud — a
+-- link group's purpose is working links). label/description/note are inline md.
+local function render_link_group(key)
+  local group = items[key]
+  if group == nil then
+    error("component link-group: unknown items key '" .. tostring(key) .. "'")
+  end
+  local parts = { '<section class="link-group">' }
+  local title = group.title or ""
+  if title ~= "" then
+    parts[#parts + 1] = '<h2 class="link-group__title">' .. md_inline_html(title) .. "</h2>"
+  end
+  local description = group.description or ""
+  if description ~= "" then
+    parts[#parts + 1] = '<p class="link-group__description">' .. md_inline_html(description) .. "</p>"
+  end
+  parts[#parts + 1] = '<ul class="link-group__links">'
+  for _, link in ipairs(group.links or {}) do
+    local href = link.href or ""
+    if href == "" then
+      error("component link-group: a link under '" .. tostring(key) .. "' is missing an href")
+    end
+    local label = link.label or ""
+    local note = link.note or ""
+    local li = '<li class="link-group__link"><a href="' .. esc_attr(href) .. '">' .. md_inline_html(label) .. "</a>"
+    if note ~= "" then
+      li = li .. ' — <span class="link-group__note">' .. md_inline_html(note) .. "</span>"
+    end
+    parts[#parts + 1] = li .. "</li>"
+  end
+  parts[#parts + 1] = "</ul>"
+  parts[#parts + 1] = "</section>"
+  return table.concat(parts, "\n")
+end
+
 local function expand_div(el)
   local is_component = false
   for _, c in ipairs(el.classes) do
@@ -263,6 +300,9 @@ local function expand_div(el)
   end
   if ctype == "media-gallery" then
     return pandoc.RawBlock("html", render_media_gallery(el.attributes.items))
+  end
+  if ctype == "link-group" then
+    return pandoc.RawBlock("html", render_link_group(el.attributes.items))
   end
   if ctype == "timeline" then
     return pandoc.RawBlock("html", render_timeline(el.attributes.items))
