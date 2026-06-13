@@ -16,6 +16,7 @@ interface PostMeta {
   date: string;
   url: string;
   tags: string[];
+  categories: string[];
 }
 
 /** All file paths (POSIX, dir-relative) under `root`, recursively. */
@@ -63,6 +64,7 @@ describe("O16: blog-index island build output", () => {
       date: "2026-03-15",
       url: "/blog/2026-03-15-second/",
       tags: ["algebra", "notes"],
+      categories: ["Notes"],
     });
   });
 
@@ -149,6 +151,25 @@ describe("O16: blog-index island hydrates and filters in the browser", () => {
 
   test("a tag filter shows only posts carrying that tag", async () => {
     await page.getByRole("button", { name: "algebra", exact: true }).click();
+    await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 2");
+    expect(await visibleTitles()).toEqual(["Second Post", "Old Post"]);
+    // reset the tag facet for the next test
+    await page.locator(".blog-index__tags").getByRole("button", { name: "All", exact: true }).click();
+    await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 3");
+  });
+
+  test("a category filter is a distinct facet from tags", async () => {
+    await page
+      .locator(".blog-index__categories")
+      .getByRole("button", { name: "Tutorials", exact: true })
+      .click();
+    await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 1");
+    expect(await visibleTitles()).toEqual(["First Post"]);
+
+    await page
+      .locator(".blog-index__categories")
+      .getByRole("button", { name: "Notes", exact: true })
+      .click();
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 2");
     expect(await visibleTitles()).toEqual(["Second Post", "Old Post"]);
   });
