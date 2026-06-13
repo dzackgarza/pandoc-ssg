@@ -51,6 +51,20 @@ function isInternal(value: string): boolean {
   return value.startsWith("/");
 }
 
+/**
+ * Decode percent-escapes so a link like `/a/My%20File.html` resolves against
+ * the real file `My File.html`. A stray `%` not followed by two hex digits is
+ * not a valid escape; in that case the path is returned unchanged (rather than
+ * letting decodeURIComponent throw), so a malformed link is simply checked
+ * as-authored.
+ */
+function decodePath(path: string): string {
+  if (/%(?![0-9A-Fa-f]{2})/.test(path)) {
+    return path;
+  }
+  return decodeURIComponent(path);
+}
+
 /** Strip `#fragment` and `?query` from a target. */
 function stripFragmentAndQuery(target: string): string {
   let path = target;
@@ -99,7 +113,7 @@ export async function checkLinks(distDir: string, manifest: Manifest): Promise<B
       if (!isInternal(raw)) {
         continue;
       }
-      let path = stripFragmentAndQuery(raw);
+      let path = decodePath(stripFragmentAndQuery(raw));
       if (path === "") {
         continue;
       }
