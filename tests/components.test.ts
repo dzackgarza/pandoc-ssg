@@ -90,6 +90,43 @@ describe("component filter: gallery expands from _data/items.yaml", () => {
   });
 });
 
+describe("component filter: video embeds a provider iframe", () => {
+  let html: string;
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    await build({ contentDir: COMPONENTS_CONTENT, pandocDir: PANDOC_DIR, outDir });
+    html = await readFile(join(outDir, "video", "index.html"), "utf8");
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("expands to a youtube embed iframe carrying the video id", () => {
+    expect(html).toContain('src="https://www.youtube.com/embed/zRPa-VAvl6Q"');
+    expect(html).toContain("<iframe");
+    // the placeholder div must have been consumed, not passed through verbatim
+    expect(html).not.toContain('type="video"');
+  });
+
+  test("wraps the iframe in a responsive container", () => {
+    expect(html).toContain('class="responsive-embed"');
+  });
+});
+
+describe("component filter: an unknown video provider fails the build", () => {
+  test("rejects with BuildError kind=pandoc", async () => {
+    const outDir = await freshOutDir();
+    const badVideo = join(FIXTURES, "components", "bad-video");
+    await expect(
+      build({ contentDir: badVideo, pandocDir: PANDOC_DIR, outDir }),
+    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
+
 describe("component filter: unknown component type fails the build", () => {
   test("an unregistered component type rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();

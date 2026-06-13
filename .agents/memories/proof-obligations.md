@@ -121,4 +121,14 @@ dependencies** (dynamic import, like Playwright for O15): a build that uses the
 component without them installed fails loudly with an actionable BuildError; a
 build that never uses the component never imports them.
 
+## O17 — Embed components (attribute-driven, no data sidecar)
+
+Some components carry their content inline as fenced-div attributes rather than
+keys into `_data/items.yaml`. `type="video"` with `provider` + `id` attributes
+expands (in `components.lua`) to a responsive iframe embed:
+`provider="youtube"` → `https://www.youtube.com/embed/<id>` inside a
+`.responsive-embed` wrapper. An unknown `provider`, or a missing `id`, aborts
+the build (`BuildError kind=pandoc`) — fail loud, no silent skip. This is the
+migration target for Jekyll's `{% include video id=… provider=… %}`.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).
