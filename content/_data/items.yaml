@@ -314,3 +314,69 @@ feature_row_undergrad:
       [<i class="fab fa-html5"></i> HTML](https://dzackgarza.com/rawnotes/Class_Notes/Independent/LeeManifolds/Manifolds.html)
     url: https://dzackgarza.com/rawnotes/Class_Notes/Independent/LeeManifolds/Manifolds.pdf
     is_project: true
+gallery_graph_moduli:
+  - url: /assets/images/graph_moduli_preview.png
+    image_path: /assets/images/graph_moduli_preview.png
+  - url: /assets/images/graph1.png
+    image_path: /assets/images/graph1.png
+  - url: /assets/images/graph2.png
+    image_path: /assets/images/graph2.png
+gallery_derham:
+  - url: /assets/images/derham1.png
+    image_path: /assets/images/derham1.png
+  - url: /assets/images/derham2.png
+    image_path: /assets/images/derham2.png
+  - url: /assets/images/derham3.png
+    image_path: /assets/images/derham3.png
+gallery_jholo:
+  - url: /assets/images/jholo_1.png
+    image_path: /assets/images/jholo_1.png
+  - url: /assets/images/jholo_2.png
+    image_path: /assets/images/jholo_2.png
+  - url: /assets/images/jholo_3.png
+    image_path: /assets/images/jholo_3.png
+gallery_gss_stab_homotopy:
+  - url: /assets/images/gss_stab_homotopy1.png
+    image_path: /assets/images/gss_stab_homotopy1.png
+  - url: /assets/images/gss_stab_homotopy2.png
+    image_path: /assets/images/gss_stab_homotopy2.png
+  - url: /assets/images/gss_stab_homotopy3.png
+    image_path: /assets/images/gss_stab_homotopy3.png
+gallery_sarkar:
+  - url: /assets/images/sarkar_1.png
+    image_path: /assets/images/sarkar_1.png
+  - url: /assets/images/sarkar_2.png
+    image_path: /assets/images/sarkar_2.png
+  - url: /assets/images/sarkar_3.png
+    image_path: /assets/images/sarkar_3.png
+gallery_spaces_in_ag:
+  - url: /assets/images/spaces_in_ag_1.png
+    image_path: /assets/images/spaces_in_ag_1.png
+  - url: /assets/images/spaces_in_ag_2.png
+    image_path: /assets/images/spaces_in_ag_2.png
+  - url: /assets/images/spaces_in_ag_3.png
+    image_path: /assets/images/spaces_in_ag_3.png
+gallery_weil_zeta:
+  - url: /assets/images/weil_zeta_1.png
+    image_path: /assets/images/weil_zeta_1.png
+  - url: /assets/images/weil_zeta_2.png
+    image_path: /assets/images/weil_zeta_2.png
+  - url: /assets/images/weil_zeta_3.png
+    image_path: /assets/images/weil_zeta_3.png
+gallery_homotopy_of_spheres:
+  - url: /assets/images/homotopy_of_spheres1.png
+    image_path: /assets/images/homotopy_of_spheres1.png
+  - url: /assets/images/homotopy_of_spheres2.png
+    image_path: /assets/images/homotopy_of_spheres2.png
+  - url: /assets/images/homotopy_of_spheres2.png
+    image_path: /assets/images/homotopy_of_spheres3.png
+gallery_dg_gss:
+  - url: /assets/images/dg_1.png
+    image_path: /assets/images/dg_1.png
+  - url: /assets/images/dg_2.png
+    image_path: /assets/images/dg_2.png
+  - url: /assets/images/dg_3.png
+    image_path: /assets/images/dg_3.png
+gallery_ex:
+  - url: /assets/images/jholo1.png
+    image_path: /assets/images/jholo1.png

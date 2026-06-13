@@ -2,3 +2,8 @@
 title = "Writing"
 href = "/writing/"
 weight = 10
+
+[[main]]
+title = "Talks"
+href = "/talks/"
+weight = 20

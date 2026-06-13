@@ -15,3 +15,10 @@ demo-row:
       *Prof Y, Spring 2021*
     url: ''
     is_project: true
+
+demo-gallery:
+  - url: /img/full-a.png
+    image_path: /img/thumb-a.png
+    title: Slide A
+  - url: /img/full-b.png
+    image_path: /img/thumb-b.png

@@ -57,6 +57,39 @@ describe("component filter: feature-row expands from _data/items.yaml", () => {
   });
 });
 
+describe("component filter: gallery expands from _data/items.yaml", () => {
+  let html: string;
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    await build({ contentDir: COMPONENTS_CONTENT, pandocDir: PANDOC_DIR, outDir });
+    html = await readFile(join(outDir, "gallery", "index.html"), "utf8");
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("emits a gallery container, not an empty component div", () => {
+    expect(html).toContain('class="gallery"');
+    expect(html).not.toContain('type="gallery"');
+  });
+
+  test("renders one item per image with thumbnail src and full-image link", () => {
+    const items = html.split('class="gallery__item"').length - 1;
+    expect(items).toBe(2);
+    expect(html).toContain('src="/img/thumb-a.png"');
+    expect(html).toContain('href="/img/full-a.png"');
+    expect(html).toContain('src="/img/thumb-b.png"');
+    expect(html).toContain('href="/img/full-b.png"');
+  });
+
+  test("a caption is rendered when an item has a title", () => {
+    expect(html).toContain("Slide A");
+  });
+});
+
 describe("component filter: unknown component type fails the build", () => {
   test("an unregistered component type rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();

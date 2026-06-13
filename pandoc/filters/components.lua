@@ -86,6 +86,33 @@ local function render_feature_row(key)
   return table.concat(parts, "\n")
 end
 
+local function render_gallery(key)
+  local images = items[key]
+  if images == nil then
+    error("component gallery: unknown items key '" .. tostring(key) .. "'")
+  end
+  local parts = { '<div class="gallery">' }
+  for _, image in ipairs(images) do
+    local src = image.image_path or image.url or ""
+    local href = image.url or image.image_path or ""
+    local alt = image.alt or ""
+    local title = image.title or ""
+    parts[#parts + 1] = '<figure class="gallery__item">'
+    local img = '<img class="gallery__image" src="' .. esc_attr(src) .. '" alt="' .. esc_attr(alt) .. '">'
+    if href ~= "" then
+      parts[#parts + 1] = '<a class="gallery__link" href="' .. esc_attr(href) .. '">' .. img .. "</a>"
+    else
+      parts[#parts + 1] = img
+    end
+    if title ~= "" then
+      parts[#parts + 1] = '<figcaption class="gallery__caption">' .. md_inline_html(title) .. "</figcaption>"
+    end
+    parts[#parts + 1] = "</figure>"
+  end
+  parts[#parts + 1] = "</div>"
+  return table.concat(parts, "\n")
+end
+
 local function expand_div(el)
   local is_component = false
   for _, c in ipairs(el.classes) do
@@ -101,6 +128,9 @@ local function expand_div(el)
   local ctype = el.attributes.type
   if ctype == "feature-row" then
     return pandoc.RawBlock("html", render_feature_row(el.attributes.items))
+  end
+  if ctype == "gallery" then
+    return pandoc.RawBlock("html", render_gallery(el.attributes.items))
   end
   error("unknown component type: " .. tostring(ctype))
 end
