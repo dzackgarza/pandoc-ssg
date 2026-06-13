@@ -53,7 +53,7 @@ describe("stress test: real /writing/ page builds and fully expands", () => {
     expect(html).toContain('<span class="math inline">');
     // OO macro (\\mathcal{O}) used in the 'Category O' card title
     expect(html).toContain("\\mathcal{O}");
-    expect((html.split("window.MathJax").length - 1)).toBe(1);
+    expect(html.split("window.MathJax").length - 1).toBe(1);
   });
 
   test("the notice block became a semantic div, not literal text", () => {

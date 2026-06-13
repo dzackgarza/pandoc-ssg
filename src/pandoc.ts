@@ -78,7 +78,14 @@ export async function renderPage(input: RenderInput): Promise<string> {
 
   try {
     let proc = Bun.spawn(
-      ["pandoc", "--defaults", defaultsPath, "--metadata-file", metaFile, resolve(input.sourcePath)],
+      [
+        "pandoc",
+        "--defaults",
+        defaultsPath,
+        "--metadata-file",
+        metaFile,
+        resolve(input.sourcePath),
+      ],
       { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
     );
 

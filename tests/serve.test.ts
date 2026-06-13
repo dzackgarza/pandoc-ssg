@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
-import { startServer, type RunningServer } from "../src/serve.ts";
+import { type RunningServer, startServer } from "../src/serve.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -41,9 +41,7 @@ describe("O13: preview server over a built dist tree", () => {
   });
 
   test("GET a real asset returns its bytes with the right content-type", async () => {
-    let res = await fetch(
-      `http://localhost:${server.port}/2026/spring/math2250/mypic.jpg`,
-    );
+    let res = await fetch(`http://localhost:${server.port}/2026/spring/math2250/mypic.jpg`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/jpeg");
   });
@@ -56,9 +54,7 @@ describe("O13: preview server over a built dist tree", () => {
   test("path traversal attempt returns 404 and leaks nothing", async () => {
     let res = await fetch(`http://localhost:${server.port}/../package.json`);
     expect(res.status).toBe(404);
-    let encoded = await fetch(
-      `http://localhost:${server.port}/%2e%2e/package.json`,
-    );
+    let encoded = await fetch(`http://localhost:${server.port}/%2e%2e/package.json`);
     expect(encoded.status).toBe(404);
   });
 });
