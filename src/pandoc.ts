@@ -1,6 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import * as YAML from "yaml";
 import { BuildError } from "./errors.ts";
 import type { NavItem, PageType } from "./types.ts";
@@ -18,6 +18,8 @@ export interface RenderInput {
   mathMacros: Record<string, string>;
   /** data backing components (e.g. feature-row collections), from _data/items.yaml */
   items: Record<string, unknown>;
+  /** absolute content root; transclusion rejects includes resolving outside it */
+  contentRoot: string;
 }
 
 /**
@@ -53,6 +55,7 @@ export async function renderPage(input: RenderInput): Promise<string> {
 
   let metadata: Record<string, unknown> = {
     nav: input.nav.map((item) => ({ title: item.title, href: item.href })),
+    content_root: resolve(input.contentRoot),
   };
   if (Object.keys(input.mathMacros).length > 0) {
     metadata.mathjax_config = mathjaxConfig(input.mathMacros);
@@ -75,7 +78,7 @@ export async function renderPage(input: RenderInput): Promise<string> {
 
   try {
     let proc = Bun.spawn(
-      ["pandoc", "--defaults", defaultsPath, "--metadata-file", metaFile, input.sourcePath],
+      ["pandoc", "--defaults", defaultsPath, "--metadata-file", metaFile, resolve(input.sourcePath)],
       { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
     );
 

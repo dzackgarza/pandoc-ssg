@@ -6,4 +6,5 @@ html-math-method:
   method: mathjax
 template: ${.}/../templates/page.html
 filters:
+  - ${.}/../filters/transclude.lua
   - ${.}/../filters/components.lua

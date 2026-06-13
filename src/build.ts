@@ -144,6 +144,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
       nav,
       mathMacros,
       items,
+      contentRoot: contentDir,
     });
     rendered.set(page.route.output, html);
   }
