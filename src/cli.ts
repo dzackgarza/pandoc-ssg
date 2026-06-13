@@ -5,9 +5,11 @@
  * the way a content repo depends on this tool. Subcommands:
  *   build [--content DIR] [--pandoc DIR] [--out DIR]   — full pipeline (O9)
  *   new post "Title" [--content DIR]                   — scaffold a blog post (O9)
- *   check [--content DIR] [--pandoc DIR] [--out DIR]   — build, then report
- *                                                        broken internal links;
- *                                                        exit 1 if any (O12)
+ *   check [--content DIR] [--pandoc DIR] [--out DIR]   — build, then validate
+ *                                                        every page (structure,
+ *                                                        no un-migrated markup)
+ *                                                        and internal links;
+ *                                                        exit 1 if any (O12, O14)
  *   serve [--out DIR] [--port N]                        — preview the built tree (O13)
  * Defaults: --content ./content, --pandoc the bundled design layer, --out ./dist.
  * Exits 0 on success; nonzero with the BuildError report on stderr.
@@ -20,6 +22,7 @@ import { BuildError } from "./errors.ts";
 import { checkLinks } from "./links.ts";
 import { validatePageMeta } from "./schemas.ts";
 import { startServer } from "./serve.ts";
+import { validateSite } from "./validate.ts";
 
 /** The design layer (defaults, templates, filters) bundled with the generator. */
 let BUNDLED_PANDOC = join(import.meta.dir, "..", "pandoc");
@@ -90,14 +93,15 @@ async function runCheck(flags: Map<string, string>): Promise<number> {
     pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
     outDir,
   });
-  let broken = await checkLinks(outDir, manifest);
-  if (broken.length === 0) {
-    return 0;
+  let issues = await validateSite(outDir, manifest);
+  for (const issue of issues) {
+    process.stderr.write(`page issue: ${issue.issue} (in ${issue.page})\n`);
   }
+  let broken = await checkLinks(outDir, manifest);
   for (const link of broken) {
     process.stderr.write(`broken link: ${link.target} (in ${link.sourcePage})\n`);
   }
-  return 1;
+  return issues.length + broken.length === 0 ? 0 : 1;
 }
 
 async function runServe(flags: Map<string, string>): Promise<number> {

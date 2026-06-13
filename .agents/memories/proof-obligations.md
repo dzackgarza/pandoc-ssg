@@ -70,4 +70,13 @@ bytes with a sensible content-type, and an unknown path returns 404. The
 server is a thin static file server over the already-built tree; it neither
 compiles nor mutates `dist/`.
 
+## O14 — Structural site validation
+
+A manifest-driven validator (`src/validate.ts`) checks every rendered route's
+output HTML for issues a successful build does not catch: `missing-doctype`,
+`missing-main`, `empty-title`, `leftover-liquid` (`{% … %}` survived
+migration), `leftover-kramdown` (`{: … }` survived). `ssg check` runs this
+alongside the O12 link check and exits nonzero if either reports anything, so a
+content repo's `just check` is a single strong gate before pushing/deploying.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).
