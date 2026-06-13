@@ -132,6 +132,16 @@ local function expand_div(el)
   if ctype == "gallery" then
     return pandoc.RawBlock("html", render_gallery(el.attributes.items))
   end
+  if ctype == "blog-index" then
+    -- Interactive island (O16): emit only the hydration mount + module script.
+    -- The build emits blog/posts.json and bundles the Svelte island; the
+    -- client fetches the data-posts URL and renders the filterable list.
+    return pandoc.RawBlock(
+      "html",
+      '<div id="blog-index" data-posts="/blog/posts.json"></div>\n'
+        .. '<script type="module" src="/assets/islands/blog-index.js"></script>'
+    )
+  end
   error("unknown component type: " .. tostring(ctype))
 end
 

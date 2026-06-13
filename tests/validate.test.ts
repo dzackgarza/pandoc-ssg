@@ -18,6 +18,7 @@ function route(output: string): Manifest {
     schemaVersion: 1,
     routes: [{ source: "x.md", url: "/x/", output, type: "page", schema: "page.v1" }],
     passthrough: [],
+    generated: [],
   };
 }
 

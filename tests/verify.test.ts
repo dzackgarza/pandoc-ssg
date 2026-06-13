@@ -35,6 +35,7 @@ function manifestFor(keys: string[]): Manifest {
       schema: "page.v1",
     })),
     passthrough: [],
+    generated: [],
   };
 }
 

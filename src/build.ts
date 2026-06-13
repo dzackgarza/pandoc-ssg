@@ -7,12 +7,28 @@ import { z } from "zod";
 import { classifyFiles } from "./classify.ts";
 import { loadSiteConfig } from "./config.ts";
 import { BuildError } from "./errors.ts";
+import { buildBlogIndexIsland } from "./islands.ts";
 import { assertNavTargets, loadNavigation } from "./nav.ts";
 import { renderPage } from "./pandoc.ts";
 import { assertNoCollisions, outputPathForRoute, routeForPage } from "./routes.ts";
 import { scanContent } from "./scan.ts";
 import { resolvePageType, validatePageMeta } from "./schemas.ts";
-import type { BuildOptions, ClassifiedFile, Manifest, PageType, RouteEntry } from "./types.ts";
+import type {
+  BuildOptions,
+  ClassifiedFile,
+  GeneratedEntry,
+  Manifest,
+  PageType,
+  RouteEntry,
+} from "./types.ts";
+
+/** Post metadata the blog-index island consumes (emitted as blog/posts.json). */
+interface PostMeta {
+  title: string;
+  date: string;
+  url: string;
+  tags: string[];
+}
 
 /**
  * gray-matter engine that parses YAML with the core schema but keeps
@@ -97,6 +113,8 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
 
   let pages: PlannedPage[] = [];
   let passthrough = passthroughEntries(classified);
+  let blogPosts: PostMeta[] = [];
+  let usesBlogIndex = false;
 
   for (const file of classified) {
     if (file.class !== "page") {
@@ -109,7 +127,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     let pageType = resolvePageType(file.relPath, rawMeta, config.dirTypes);
     let explicit = explicitSchema(rawMeta);
     let schemaId = explicit === undefined ? pageType.schema : explicit;
-    validatePageMeta(file.relPath, rawMeta, schemaId);
+    let meta = validatePageMeta(file.relPath, rawMeta, schemaId);
 
     let url = routeForPage(file.relPath, routeOverride(rawMeta));
     let route: RouteEntry = {
@@ -120,12 +138,29 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
       schema: schemaId,
     };
     pages.push({ relPath: file.relPath, sourcePath, route, pageType });
+
+    if (pageType.name === "blog-post") {
+      // blog-post.v1 requires date; assert existence at this boundary.
+      if (meta.date === undefined) {
+        throw new BuildError("schema", [file.relPath], "blog-post page missing required date");
+      }
+      blogPosts.push({
+        title: meta.title,
+        date: meta.date,
+        url,
+        tags: meta.tags === undefined ? [] : meta.tags,
+      });
+    }
+    if (raw.includes('type="blog-index"')) {
+      usesBlogIndex = true;
+    }
   }
 
   let routes = pages.map((p) => p.route);
   assertNoCollisions(routes, passthrough);
 
-  let manifest: Manifest = { schemaVersion: 1, routes, passthrough };
+  let generated: GeneratedEntry[] = [];
+  let manifest: Manifest = { schemaVersion: 1, routes, passthrough, generated };
 
   let nav = await loadNavigation(contentDir);
   assertNavTargets(nav, manifest);
@@ -165,6 +200,19 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     let dest = join(staging, entry.output);
     await mkdir(dirname(dest), { recursive: true });
     await copyFile(src, dest);
+  }
+
+  // Interactive blog-index island (O16): only when a page uses the component.
+  if (usesBlogIndex) {
+    let postsOutput = "blog/posts.json";
+    let postsDest = join(staging, postsOutput);
+    await mkdir(dirname(postsDest), { recursive: true });
+    let sorted = [...blogPosts].sort((a, b) => b.date.localeCompare(a.date));
+    await writeFile(postsDest, JSON.stringify(sorted, null, 2), "utf8");
+    generated.push({ output: postsOutput, kind: "data" });
+
+    let islandOutput = await buildBlogIndexIsland(staging);
+    generated.push({ output: islandOutput, kind: "island" });
   }
 
   await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest, null, 2), "utf8");

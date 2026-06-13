@@ -48,10 +48,21 @@ export interface PassthroughEntry {
   output: string;
 }
 
+/**
+ * A file the build synthesizes (not copied from content, not a pandoc route):
+ * the blog-index island's data (`blog/posts.json`) and its Svelte bundle
+ * (`assets/islands/blog-index.js`). Tracked so O6's bijection still holds (O16).
+ */
+export interface GeneratedEntry {
+  output: string;
+  kind: "data" | "island";
+}
+
 export interface Manifest {
   schemaVersion: 1;
   routes: RouteEntry[];
   passthrough: PassthroughEntry[];
+  generated: GeneratedEntry[];
 }
 
 export interface NavItem {
