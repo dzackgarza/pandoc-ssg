@@ -111,8 +111,41 @@ Writing+Talks into a filterable **Notes** collection.
   **De-iframe the two math posts** (derived-AG, infinity-categories — render
   pandoc-native; drop `/pandoc/*.html` iframes + `content/pandoc/`) is content-step.
 
-**Remaining work — all generator-side increments (O20–O25) are DONE.** The only
-remaining phase is **content wiring in `dzackgarza-site-v2026`** (a separate repo, not
+## Content phase — IN PROGRESS in `dzackgarza-site-v2026` (2026-06-14)
+
+User decisions this session: **keep Talks as a rich page** (don't fold into a flat
+list); **push through autonomously** (spike `content/.meta/databases/*.toml` = source
+of truth). Verifying each change against the **local** generator (no push needed):
+`cd ~/gitclones/dzackgarza-site-v2026 && bun ~/gitclones/pandoc-ssg/src/cli.ts
+build|check --content content --out /tmp/X`. Commits use `--no-verify` (a global
+pre-commit hook runs `just test`, which a content-only repo lacks; its real gate is
+`ssg check`, which passes). YAML edits: append new top-level keys at EOF + validate
+with `yq` (ruamel round-trip reformats the whole 25KB file even with width/indent
+tuning — avoid for in-place edits).
+
+DONE (committed, build+check clean): **talks** gallery→media-gallery (9 keys, 27
+imgs); **Papers** page (/papers/, O22, from papers.toml — DOI/slides omitted as
+non-doctrine extras); **About** page (/about/, O24 link-group from profile.toml, no
+card/avatar); **Teaching** timeline (/teaching/, O21, this repo's /courses/ links).
+
+REMAINING (next session): **Notes/Writing fold** — writing.md is rich like talks
+(prose: recent courses, talks/seminars, expository, big Resources section; + 11
+feature-row card groups by subject; + a "Links to Notes by Others" section). Same
+rich-vs-fold tension as talks. Planned approach (pending): keep writing.md rich, turn
+the subject card-groups into ONE O20 **collection** island (category facet = subject,
+realizing the "filterable Notes collection"), convert "Links to Notes by Others" → O24
+**link-group**, keep prose sections; label nav "Notes"→/writing/. Then: **Activities**
+timeline (spike timeline.toml, 340 lines); **nav** restructure (CV·Papers·Notes·Talks·
+Teaching·Blog·About — CV only if a CV asset exists, else omit; Talks kept per decision);
+**de-iframe** the 2 math posts (content/pandoc/); **CSS** for timeline/papers/collection/
+post-toc/link-group grounded in **rendered evidence** (Playwright screenshots, not
+guessed); then **re-pin generator** (push pandoc-ssg @845a150+ to GitHub + `bun pm cache
+rm`), full `ssg verify`, `ssg deploy /var/www/html` (push + deploy are outward-facing —
+confirm with user).
+
+(Superseded note) all generator-side increments (O20–O25) are DONE; the original
+remaining-phase description follows:
+The remaining phase is **content wiring in `dzackgarza-site-v2026`** (a separate repo, not
 a generator TDD increment): re-pin the generator dep to the new SHA; recategorize
 `items.yaml` into the Notes collection (+ tags/category); author timeline/papers/links
 data; migrate `/talks/` `gallery`→`media-gallery`; add `papers`/`notes`/`teaching`/
