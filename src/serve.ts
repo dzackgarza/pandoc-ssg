@@ -79,7 +79,10 @@ async function resolveFile(outDir: string, candidates: string[]): Promise<string
 }
 
 export function startServer(opts: ServeOptions): RunningServer {
-  let { outDir } = opts;
+  // Normalize once so the containment guard compares like-for-like: the CLI
+  // passes a relative, "./"-prefixed dir ("dist"), and join() strips the "./",
+  // so an un-normalized outDir would never match its own resolved children.
+  let outDir = normalize(opts.outDir);
   let listenPort = opts.port === undefined ? 0 : opts.port;
 
   let server = Bun.serve({
