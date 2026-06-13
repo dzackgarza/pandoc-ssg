@@ -103,12 +103,24 @@ Writing+Talks into a filterable **Notes** collection.
   navbar work (author `navigation.toml` labels + the About page, no profile card) is
   content-step.
 
-**Remaining sequence (each a TDD increment, then applied to content):**
-1. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
-   (derived-AG, infinity-categories — render pandoc-native; drop `/pandoc/*.html` iframes + `content/pandoc/`).
-2. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
-   author timeline/papers data, add `papers`/`notes`/`teaching`/`activities`/`about` pages, refactor nav,
-   then rebuild → full `verify` → `ssg deploy /var/www/html`.
+- **DONE (generator side) — O25 blog-post TOC** (green commit after the navbar
+  record). `blog.yaml` sets `toc: true`/`toc-depth: 3`; `blog.html` wraps pandoc's
+  `$table-of-contents$` in `<nav class="post-toc">` under `$if(toc)$`. Depth-3 TOC
+  links body headings to in-page anchors; level-4+ excluded; ordinary pages get none.
+  Pure pandoc templating. No CSS yet (nested list is restrained by default).
+  **De-iframe the two math posts** (derived-AG, infinity-categories — render
+  pandoc-native; drop `/pandoc/*.html` iframes + `content/pandoc/`) is content-step.
+
+**Remaining work — all generator-side increments (O20–O25) are DONE.** The only
+remaining phase is **content wiring in `dzackgarza-site-v2026`** (a separate repo, not
+a generator TDD increment): re-pin the generator dep to the new SHA; recategorize
+`items.yaml` into the Notes collection (+ tags/category); author timeline/papers/links
+data; migrate `/talks/` `gallery`→`media-gallery`; add `papers`/`notes`/`teaching`/
+`activities`/`about` pages; author `navigation.toml` (`CV · Papers · Notes · Teaching ·
+Blog · About`, About holds contact/social, no profile card); de-iframe the two math
+posts (derived-AG, infinity-categories); add CSS for the new components
+(`timeline`/`papers`/`collection`/`post-toc`/`link-group`) grounded in **rendered
+evidence**; then rebuild → full `ssg verify` → `ssg deploy /var/www/html`.
 
 Spike spec source (read-only reference): `~/gitclones/garza-academic-hub` —
 `content/.meta/databases/*.toml` (papers/items/teaching/timeline/navigation/profile),
