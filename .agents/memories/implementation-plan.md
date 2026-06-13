@@ -35,10 +35,16 @@ Filter order in defaults: transclude → components.
 
 Also done: `/talks/` migrated (gallery component, 9 galleries / 27 images, 16 notice divs); `gallery` component type added (O11). Standalone apps `persistent_homology` + `square_topologies` migrated as opaque passthrough via `content/_site.toml` (design step 6); real-content O4 guards in `tests/writing.test.ts`.
 
-## Still remaining
+Resolved: generator/content split shipped — generator is content-free (pushed `dzackgarza/pandoc-ssg`), content lives in `dzackgarza-site-v2026` (full 385M assets via Git LFS, pinned generator dep). Homepage `/` migrated. O14 static validation + O15 browser verify added (see proof-obligations).
 
-- **DECISION — asset migration**: `ssg check` reports the writing/talks pages' unresolved `/assets/*` links. The source `assets/` tree is **385M** and `_pages/math_journal` is **32M** — deliberately NOT vendored into this generator repo. Options for the user: (a) keep generator repo lean, treat content/ as a curated showcase; (b) vendor the full site; (c) point the SSG at an external content root (the website tree) instead of vendoring. `ssg check` is the ledger of what's unresolved.
-- Remaining simple v2018 pages (teaching, advice, tutoring, GOATS [splash header], activities, grad_resources, etc.) + a homepage — bulk content migration, no new kernel features; available on request.
-- Islands (typed interactive components / hydration) — not yet needed by migrated content.
-- GitHub remote + code scanning for the installed review workflows — outward-facing; needs user go-ahead.
-- Manifest dependency tracking for incremental rebuilds (transclusion deps).
+## The two real targets (per user, 2026-06-13)
+
+1. **DONE** — Standalone markdown-backed (Jekyll-processed) pages migrated into `dzackgarza-site-v2026`: 15 `_pages` markdown pages (commit `de94911`) + 7 course landing pages declaring permalink routes + full `content/courses/` materials tree (commit `e6c0fd4`). Mechanical migration: Jekyll frontmatter → `site.page`/schema, `{% include %}` → components, `{: .notice}` → fenced divs, math macros, permalink → `site.route`. One residual broken link `/quals` left as a user content decision (create the page or repoint the link); not touched unprompted.
+2. **Blog creation + generation mechanism** (NOT STARTED): `ssg new post` scaffolds (O9, blog-post.v1). Still needed: the blog GENERATION + a single aggregation **component** (likely a collection/island) that lists blog posts and supports client-side search / filter / select by tag & category. Open design decision: hydrated island (interactive client-side filter) vs build-time static list — confirm with user before building.
+
+**Scope corrections (do not reintroduce):**
+- NO generated tag/year/category archive *pages*. The other repos dropped those entirely; the blog aggregation component (search/filter by tag/category) replaces them. Do not build per-tag/per-year static index pages.
+- "Deploy" is NOT this tool's job. The tool produces a static `dist/`; a CLI command / just recipe pointed at that directory is the whole deploy surface. The USER handles web servers, remote hosting, DNS. Do not build deployment infra.
+- Standalone HTML pages (PQ Classification, Semidirect Products, UCSD, Zotero report) and apps (MakeMeAQual, threejs, math_journal) are pure passthrough — `cp` into content/, copied verbatim (O4). Not "work", not migration.
+
+Lower priority: theme/CSS fidelity to minimal-mistakes; `external-embed`/`toc` components; manifest dependency tracking; review CI workflows.
