@@ -12,6 +12,7 @@ const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 const LINKS_CONTENT = join(FIXTURES, "links", "content");
 const DEMO_CONTENT = join(FIXTURES, "demo", "content");
 const ENCODED_CONTENT = join(FIXTURES, "links-encoded", "content");
+const NAV_TARGETS_CONTENT = join(FIXTURES, "nav-targets", "content");
 
 function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-links-"));
@@ -37,6 +38,38 @@ describe("O12: internal link integrity", () => {
   test("reports exactly the broken internal link, ignoring good and external", async () => {
     let broken = await checkLinks(outDir, manifest);
     expect(broken).toEqual([{ sourcePage: "index.html", target: "/nope/" }]);
+  });
+});
+
+describe("nav is config-driven: the build does not gate nav targets; integrity is O12's job", () => {
+  let outDir: string;
+  let manifest: Manifest;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    manifest = await build({
+      contentDir: NAV_TARGETS_CONTENT,
+      pandocDir: PANDOC_DIR,
+      outDir,
+    });
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("a nav target pointing at a passthrough asset (a CV PDF) does not fail the build", async () => {
+    // build() resolving in beforeAll is the proof the nav-target gate is gone;
+    // confirm the asset the nav points at really shipped.
+    expect(await Bun.file(join(outDir, "assets", "cv.pdf")).exists()).toBe(true);
+  });
+
+  test("the link checker flags a genuinely broken nav target but not the asset or route targets", async () => {
+    let broken = await checkLinks(outDir, manifest);
+    let targets = broken.map((b) => b.target);
+    expect(targets).toContain("/nope/");
+    expect(targets).not.toContain("/assets/cv.pdf");
+    expect(targets).not.toContain("/");
   });
 });
 

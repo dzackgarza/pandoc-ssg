@@ -1,0 +1,14 @@
+[[main]]
+title = "CV"
+href = "/assets/cv.pdf"
+weight = 1
+
+[[main]]
+title = "Missing"
+href = "/nope/"
+weight = 2
+
+[[main]]
+title = "Home"
+href = "/"
+weight = 3
