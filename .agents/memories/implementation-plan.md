@@ -68,15 +68,21 @@ Writing+Talks into a filterable **Notes** collection.
   (`buildIsland(name)` generalizes the blog-index bundler). Engine only; not yet
   wired into content.
 
+- **DONE — O21 timeline component** (generator `13dc3b0`): `:::{.component
+  type="timeline" items="KEY"}` → static Lua-rendered `<ul class="timeline">` of
+  author-ordered `<li class="timeline__entry">` rows (plain-text date span +
+  inline-markdown title + optional detail span). Empty date / unknown key abort the
+  build. Engine only; no CSS yet (add with rendered evidence at content-wiring step,
+  per O20 precedent); not wired into content.
+
 **Remaining sequence (each a TDD increment, then applied to content):**
-1. `timeline` component → teaching + activities (restrained dated list, not card/icon timeline).
-2. `papers` → research-program prose + bibliographic list w/ expandable abstracts (NOT cards).
-3. generalize `gallery`→`media-gallery` (filterable) + `link-group`.
-4. navbar → `CV · Papers · Notes · Teaching · Blog · About`; home stays prose-first;
+1. `papers` → research-program prose + bibliographic list w/ expandable abstracts (NOT cards).
+2. generalize `gallery`→`media-gallery` (filterable) + `link-group`.
+3. navbar → `CV · Papers · Notes · Teaching · Blog · About`; home stays prose-first;
    **About** absorbs the contact/social metadata (the demoted spike `profile.toml` data); **NO profile card**.
-5. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
+4. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
    (derived-AG, infinity-categories — render pandoc-native; drop `/pandoc/*.html` iframes + `content/pandoc/`).
-6. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
+5. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
    author timeline/papers data, add `papers`/`notes`/`teaching`/`activities`/`about` pages, refactor nav,
    then rebuild → full `verify` → `ssg deploy /var/www/html`.
 
