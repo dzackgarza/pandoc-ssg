@@ -145,4 +145,15 @@ measured computed styles from a reference mathematical-research site (serif body
 geometric-sans headings, near-monochrome with one deep-navy link color, wide
 reading measure, whitespace over rules) — not in guessed values.
 
+## O19 — Deploy (generate + mirror to a directory)
+
+`ssg deploy DIR` runs the full build, then mirrors the built `dist/` into the
+target directory `DIR` with `rsync -a --delete`: every built file appears in
+`DIR` byte-identical, and any file in `DIR` that is not in the build is removed
+(no stale artifacts from prior deploys). The deploy surface is exactly this — a
+local directory mirror; the tool does not configure web servers, remote hosts, or
+DNS (the user owns those). rsync is a required external dependency; a missing
+rsync or a nonzero rsync exit fails loudly (`BuildError kind=deploy`), never a
+partial or silent copy.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).
