@@ -50,3 +50,36 @@ Resolved: generator/content split shipped — generator is content-free (pushed 
 **DONE — site theme (O18).** Moved off the bare/minimal-mistakes look to a restrained mathematical-research aesthetic, grounded in **measured** computed styles from daniellitt.com (not guessed — the prior ChatGPT analysis in AESTHETIC-GUIDELINES.md was rejected as speculation): serif body (self-hosted Noto Serif 16px/1.8, #575757) on off-white #fcfcfc, bold geometric-sans headings (self-hosted Jost, #222), underlined deep-navy #000475 links, ~720px measure, whitespace over rules, quiet components. `pandoc/assets/theme/` (site.css + woff2); build emits design-layer `assets/**` into dist (manifest.generated kind `theme`); templates link the stylesheet. Verified by screenshotting the rendered output, not by assertion. `/quals` deleted entirely (deprecated). Full `check` + browser `verify` are zero-findings.
 
 Known follow-ups (not defects): several migrated pages carry multiple body `# ` section headings rendered as `<h1>` alongside the template title h1 — legitimate content structure, but a future content/template pass could demote body sections to `<h2>` for cleaner hierarchy. Lower priority: `toc` component and non-youtube video providers (vimeo) when content needs them; manifest dependency tracking; review CI workflows.
+
+## IN PROGRESS — pull spike (garza-academic-hub) organizational decisions (2026-06-14)
+
+User-approved plan. **Principle:** garza-academic-hub is a FAILED spike (technical
+decisions irrelevant); pandoc-ssg is the right engine. Pull only the spike's
+*information architecture / organizational* decisions, filtered through
+`AESTHETIC-GUIDELINES.md` which WINS on every conflict (no profile card; restrained
+lists/quiet indices, not SaaS cards/badges/tag-pills). Goal: each design choice is a
+content/template/data edit with tiny blast radius. See cross-session memory
+[[redesign-spike-reconciliation]]. Decisions: keep single `_data/items.yaml`; fold
+Writing+Talks into a filterable **Notes** collection.
+
+- **DONE — O20 collection island** (generator `d03d88c`): `:::{.component
+  type="collection" items="KEY"}` → quiet filterable list (search + category + tag),
+  build emits `_collections/KEY.json` + bundles shared `collection` island
+  (`buildIsland(name)` generalizes the blog-index bundler). Engine only; not yet
+  wired into content.
+
+**Remaining sequence (each a TDD increment, then applied to content):**
+1. `timeline` component → teaching + activities (restrained dated list, not card/icon timeline).
+2. `papers` → research-program prose + bibliographic list w/ expandable abstracts (NOT cards).
+3. generalize `gallery`→`media-gallery` (filterable) + `link-group`.
+4. navbar → `CV · Papers · Notes · Teaching · Blog · About`; home stays prose-first;
+   **About** absorbs the contact/social metadata (the demoted spike `profile.toml` data); **NO profile card**.
+5. blog: TOC on posts (pandoc `table-of-contents`, depth 3) + **de-iframe** the two math posts
+   (derived-AG, infinity-categories — render pandoc-native; drop `/pandoc/*.html` iframes + `content/pandoc/`).
+6. content (`dzackgarza-site-v2026`): recategorize `items.yaml` into the Notes collection (+ tags/category),
+   author timeline/papers data, add `papers`/`notes`/`teaching`/`activities`/`about` pages, refactor nav,
+   then rebuild → full `verify` → `ssg deploy /var/www/html`.
+
+Spike spec source (read-only reference): `~/gitclones/garza-academic-hub` —
+`content/.meta/databases/*.toml` (papers/items/teaching/timeline/navigation/profile),
+`docs/CONTENT-GUIDE.md` (component vocabulary). Pull IA, NOT its React/daisyUI/profile-card tech.
