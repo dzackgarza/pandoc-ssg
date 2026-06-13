@@ -113,6 +113,34 @@ local function render_gallery(key)
   return table.concat(parts, "\n")
 end
 
+-- Restrained dated list for teaching/activities (O21). Author-ordered (no
+-- re-sort); each entry's `date` is the defining field (plain text) and a missing
+-- date aborts the build. `title` and optional `detail` render as inline markdown.
+local function render_timeline(key)
+  local entries = items[key]
+  if entries == nil then
+    error("component timeline: unknown items key '" .. tostring(key) .. "'")
+  end
+  local parts = { '<ul class="timeline">' }
+  for _, entry in ipairs(entries) do
+    local date = entry.date or ""
+    if date == "" then
+      error("component timeline: entry under '" .. tostring(key) .. "' is missing a date")
+    end
+    local title = entry.title or ""
+    local detail = entry.detail or ""
+    parts[#parts + 1] = '<li class="timeline__entry">'
+    parts[#parts + 1] = '<span class="timeline__date">' .. esc_text(date) .. "</span>"
+    parts[#parts + 1] = '<span class="timeline__title">' .. md_inline_html(title) .. "</span>"
+    if detail ~= "" then
+      parts[#parts + 1] = '<span class="timeline__detail">' .. md_inline_html(detail) .. "</span>"
+    end
+    parts[#parts + 1] = "</li>"
+  end
+  parts[#parts + 1] = "</ul>"
+  return table.concat(parts, "\n")
+end
+
 -- Embed providers (O17): provider name -> iframe src builder. Unknown providers
 -- and missing ids abort the build (fail loud).
 local function render_video(provider, id)
@@ -150,6 +178,9 @@ local function expand_div(el)
   end
   if ctype == "gallery" then
     return pandoc.RawBlock("html", render_gallery(el.attributes.items))
+  end
+  if ctype == "timeline" then
+    return pandoc.RawBlock("html", render_timeline(el.attributes.items))
   end
   if ctype == "video" then
     -- pandoc maps `id="x"` to the element identifier, not attributes.id
