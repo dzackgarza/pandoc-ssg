@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" >
+
+<head>
+  <meta charset="UTF-8">
+  <title>`Persistent Homology</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css">
+
+
+  <style>
+  /* NOTE: The styles were added inline because Prefixfree needs access to your styles and they must be inlined if they are on local disk! */
+  [class^="col-"] {
+    border: 1px dotted grey;
+  }
+
+  #canvasContents {
+    width:100%;
+  }
+
+  .container-fluid {
+    background-color: black;
+    color: white;
+  }
+
+  .oneHighlight {
+    color: green;
+  }
+
+  .inlined {
+    display: inline-block;
+      padding-right: 10px
+
+  }
+
+  body {
+    overflow: hidden;
+  }
+
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prefixfree/1.0.7/prefixfree.min.js"></script>
+
+</head>
+
+<body>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+<script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js" integrity="sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js" integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.10.0/math.min.js"></script>
+<script src="https://kms15.github.io/jsnum/jsnum-0.0.js"></script>
+
+<div class="container-fluid">
+	<div class="row" style="height:100vh;">
+		<div id="canvasContainer" class="col-lg-7">
+			<canvas id="canvasContents"></canvas>
+		</div>
+		<div class="col-lg-5">
+			<u>Control Panel</u><br>
+			<ul class='inlined'>
+				<li> Threshold: <span id="thresholdOutput">5.0</span></li>
+				<li> 0-Simplexes: <span id="0Simplexes"></span></li>
+				<li> 1-Simplexes: <span id="1Simplexes"></span></li>
+				<li> 2-Simplexes: <span id="2Simplexes"></span></li>
+				<li> 3-Simplexes: <span id="3Simplexes"></span></li>
+				<li> 4-Simplexes: <span id="4Simplexes"></span></li>
+			</ul>
+			<ul class='inlined'>
+				<li> Euler: <span id="eulerCharacteristic">0</span></li>
+				<li> Components: <span id="numComponents">0</span></li>
+				<li> H_0: <span id="0thHomology"></span></li>
+				<li> H_1: <span id="1stHomology"></span></li>
+				<li> H_2: <span id="2ndHomology"></span></li>
+				<li> H_3: <span id="3rdHomology"></span></li>
+			</ul>
+			<button type="button" class="btn btn-info btn-sm" id="toggleThreshold">Toggle Thresholds</button>
+			<button type="button" class="btn btn-info btn-sm" id="getNewVertices">New Graph</button>
+			<button type="button" class="btn btn-info btn-sm" id="togglePause">Pause</button> Threshold: <input id="thresholdTweak" type="range" min="5" max="100" step="1" oninput="showVal(this.value)" style="width:100%;">
+			</input>
+
+			<div id="matrixStuff">
+				<div id="adjacencyMatrix" class="inlined"></div>
+				<div id="degreeMatrix" class="inlined"></div>
+				<div id="laplacianMatrix" class='inlined'></div>
+		</div>
+
+		</div>
+	</div>
+
+</div>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/zepto/1.0/zepto.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/stats.js/r11/Stats.js'></script>
+<script  src="js/index.js"></script>
+
+</body>
+
+</html>

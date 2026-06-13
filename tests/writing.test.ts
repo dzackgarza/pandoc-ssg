@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
@@ -80,5 +80,26 @@ describe("real /talks/ page builds and fully expands", () => {
     expect(talksHtml).not.toContain("{%");
     expect(talksHtml).not.toContain("{:");
     expect(talksHtml).not.toContain('type="gallery"');
+  });
+});
+
+describe("real standalone apps pass through verbatim (O4, opaque)", () => {
+  test("persistent_homology files are byte-identical and not compiled", async () => {
+    for (const rel of ["persistent_homology/index.html", "persistent_homology/js/index.js"]) {
+      const src = await readFile(join(CONTENT, rel));
+      const dst = await readFile(join(outDir, rel));
+      expect(Buffer.compare(src, dst)).toBe(0);
+    }
+    // a directory at the .html path would mean it was wrongly compiled to index.html
+    const asPage = await stat(join(outDir, "persistent_homology", "index.html"));
+    expect(asPage.isFile()).toBe(true);
+  });
+
+  test("a markdown-looking file inside an opaque app is copied, not rendered", async () => {
+    // README.txt rides along verbatim; nothing in the opaque subtree is compiled
+    const src = await readFile(join(CONTENT, "persistent_homology", "README.txt"), "utf8");
+    const dst = await readFile(join(outDir, "persistent_homology", "README.txt"), "utf8");
+    expect(dst).toBe(src);
+    expect(dst).not.toContain("<!DOCTYPE html>");
   });
 });

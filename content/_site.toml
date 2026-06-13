@@ -1,0 +1,9 @@
+# Standalone sub-sites copied verbatim (opaque passthrough): their internal
+# files — including any markdown — are never compiled; public URLs and
+# behavior are preserved exactly. See Static-Site-Generator-Design.md
+# "Standalone sub-sites" and the migration plan's step 6.
+[[passthrough]]
+path = "persistent_homology"
+
+[[passthrough]]
+path = "square_topologies"
