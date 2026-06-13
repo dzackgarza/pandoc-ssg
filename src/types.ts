@@ -70,7 +70,6 @@ export interface NavItem {
   title: string;
   href: string;
   weight: number;
-  external?: boolean;
 }
 
 export interface BuildOptions {

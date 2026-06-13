@@ -12,4 +12,3 @@ weight = 20
 title = "Example"
 href = "https://example.com/"
 weight = 30
-external = true

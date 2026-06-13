@@ -30,9 +30,9 @@ Each page renders to standalone HTML through pandoc using its type's template: t
 
 Build emits `site-manifest.json` enumerating every route (source, url, output, type, schema) and every passthrough copy. Manifest ↔ `dist/` is a bijection: every emitted file is accounted for, every manifest entry exists on disk.
 
-## O7 — Navigation integrity
+## O7 — Navigation is config-driven
 
-Nav comes from `content/_data/navigation.toml`. Every internal nav target must resolve to a manifest route (or be declared external) or the build fails. Rendered pages contain the nav links.
+Nav is pure config: `content/_data/navigation.toml` declares an ordered list of `[[main]]` entries (`title`, `href`, `weight`). The SSG's only job is to validate that config's *shape* (malformed TOML or an unknown/missing field → `BuildError kind=nav`, fail loud) and expose it as the pandoc `nav` template variable, ordered by `weight`; the template's `$for(nav)$` populates the navbar. The build does **not** gate nav *targets* — an `href` may point at an on-site route, a passthrough asset (e.g. a CV PDF), or an off-site URL. Nav-link **integrity** is not special-cased: it is covered by the general link checker (O12), which resolves every rendered link (nav included) against routes + passthrough + on-disk files and is surfaced by `ssg check`. Rendered pages contain the nav links.
 
 ## O8 — Directory-inferred defaults
 

@@ -3,13 +3,11 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
-import type { Manifest } from "../src/types.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 
 const DEMO_CONTENT = join(FIXTURES, "demo", "content");
-const BAD_NAV_CONTENT = join(FIXTURES, "bad-nav", "content");
 const BAD_SCHEMA_CONTENT = join(FIXTURES, "bad-schema", "content");
 
 function freshOutDir(): Promise<string> {
@@ -42,11 +40,10 @@ async function walk(root: string, prefix = ""): Promise<string[]> {
 
 describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
   let outDir: string;
-  let manifest: Manifest;
 
   beforeAll(async () => {
     outDir = await freshOutDir();
-    manifest = await build({
+    await build({
       contentDir: DEMO_CONTENT,
       pandocDir: PANDOC_DIR,
       outDir,
@@ -147,16 +144,6 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     expect(html).toContain("Home");
     expect(html).toContain("About");
     expect(html).toContain("Example");
-  });
-});
-
-describe("O7: navigation integrity failure", () => {
-  test("nav target with no matching route rejects with BuildError kind=nav", async () => {
-    const outDir = await freshOutDir();
-    await expect(
-      build({ contentDir: BAD_NAV_CONTENT, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "nav" });
-    await rm(outDir, { recursive: true, force: true });
   });
 });
 

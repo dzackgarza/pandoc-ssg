@@ -8,7 +8,7 @@ import { classifyFiles } from "./classify.ts";
 import { loadSiteConfig } from "./config.ts";
 import { BuildError } from "./errors.ts";
 import { buildIsland } from "./islands.ts";
-import { assertNavTargets, loadNavigation } from "./nav.ts";
+import { loadNavigation } from "./nav.ts";
 import { renderPage } from "./pandoc.ts";
 import { assertNoCollisions, outputPathForRoute, routeForPage } from "./routes.ts";
 import { scanContent } from "./scan.ts";
@@ -169,7 +169,6 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let manifest: Manifest = { schemaVersion: 1, routes, passthrough, generated };
 
   let nav = await loadNavigation(contentDir);
-  assertNavTargets(nav, manifest);
 
   let mathMacros = await loadMathMacros(contentDir);
   let items = await loadItems(contentDir);
