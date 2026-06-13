@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
@@ -56,5 +56,42 @@ describe("O13: preview server over a built dist tree", () => {
     expect(res.status).toBe(404);
     let encoded = await fetch(`http://localhost:${server.port}/%2e%2e/package.json`);
     expect(encoded.status).toBe(404);
+  });
+});
+
+/**
+ * Regression (observed): `pandoc-ssg verify`/`serve` 404'd EVERY route against a
+ * real built dist because the CLI passes a relative, "./"-prefixed outDir
+ * ("dist" / "./dist"). `join("./dist","index.html")` normalizes to
+ * "dist/index.html", but the containment guard compared it against the raw
+ * "./dist" — `"dist/index.html".startsWith("./dist/")` is false — so every file
+ * was rejected. The existing suite missed it by only ever using absolute
+ * mkdtemp dirs.
+ */
+describe("O13: serve resolves files under a relative outDir (CLI invocation)", () => {
+  let origCwd: string;
+  let tmp: string;
+  let server: RunningServer;
+
+  beforeAll(async () => {
+    tmp = await mkdtemp(join(tmpdir(), "ssg-serve-rel-"));
+    await mkdir(join(tmp, "dist"), { recursive: true });
+    await writeFile(join(tmp, "dist", "index.html"), "<!DOCTYPE html>\n<title>home</title>", "utf8");
+    origCwd = process.cwd();
+    process.chdir(tmp);
+    // exactly how the CLI invokes it: a relative, "./"-prefixed output dir
+    server = startServer({ outDir: "./dist" });
+  });
+
+  afterAll(async () => {
+    server.stop();
+    process.chdir(origCwd);
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  test("GET / serves the index instead of 404ing", async () => {
+    let res = await fetch(`http://localhost:${server.port}/`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("home");
   });
 });
