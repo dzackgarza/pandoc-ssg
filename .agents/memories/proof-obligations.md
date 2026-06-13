@@ -93,4 +93,30 @@ dependency (dynamic import → actionable BuildError if absent), so the lean
 kernel never forces a browser on consumers; a content repo adds playwright to
 use `verify`.
 
+## O16 — Interactive blog-index island (Svelte/Vite)
+
+A `::: {.component type="blog-index"}` fenced div is the first **interactive
+island**: a client-hydrated Svelte component, not static Lua-rendered HTML. The
+build, when (and only when) a page uses this component:
+
+- emits `dist/blog/posts.json` enumerating every `blog-post.v1` page's metadata
+  (`title`, `date`, `url`, `tags`), ordered newest-`date`-first;
+- bundles the SSG-owned island source (`islands/blog-index/`) via Vite + the
+  Svelte plugin into a stable, self-contained ES module at
+  `dist/assets/islands/blog-index.js` (no content hash — the Lua filter emits a
+  fixed script src);
+- the Lua filter (`components.lua`, `type="blog-index"`) expands the placeholder
+  into a mount point `<div id="blog-index" data-posts="/blog/posts.json">` plus
+  `<script type="module" src="/assets/islands/blog-index.js">`.
+
+The island fetches its `data-posts` URL and renders a post list with
+**client-side search and tag filtering** (the replacement for the dropped
+tag/year/category archive pages). Both generated files are recorded in a new
+manifest dimension `generated[]` so O6's bijection still holds
+(`dist == manifest.json ∪ routes ∪ passthrough ∪ generated`); O12 resolves their
+internal links as on-disk files. Vite + svelte are **optional peer
+dependencies** (dynamic import, like Playwright for O15): a build that uses the
+component without them installed fails loudly with an actionable BuildError; a
+build that never uses the component never imports them.
+
 Linked: [requirements](requirements.md), [architecture](architecture.md).
