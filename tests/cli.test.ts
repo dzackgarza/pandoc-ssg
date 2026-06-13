@@ -183,9 +183,51 @@ describe("CLI check (O12)", () => {
 });
 
 describe("CLI serve (O13)", () => {
-  test("serve with no --out exits nonzero", async () => {
-    const r = await runCli(["serve"]);
-    expect(r.exitCode).not.toBe(0);
+  test("serve starts a server over a built tree and answers a request", async () => {
+    const contentDir = await stageContent("valid-site");
+    const outDir = await freshTmp("serve-out");
+    const built = await runCli([
+      "build",
+      "--content",
+      contentDir,
+      "--pandoc",
+      PANDOC_DIR,
+      "--out",
+      outDir,
+    ]);
+    expect(built.exitCode).toBe(0);
+
+    const proc = Bun.spawn(["bun", CLI, "serve", "--out", outDir, "--port", "0"], {
+      cwd: REPO,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    // The server announces "http://localhost:<port>/" on stdout once bound.
+    const reader = proc.stdout.getReader();
+    const decoder = new TextDecoder();
+    let banner = "";
+    let port = 0;
+    while (port === 0) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+      banner += decoder.decode(value);
+      const m = banner.match(/http:\/\/localhost:(\d+)\//);
+      if (m) {
+        port = Number(m[1]);
+      }
+    }
+    expect(port).toBeGreaterThan(0);
+
+    const res = await fetch(`http://localhost:${port}/`);
+    expect(res.status).toBe(200);
+
+    await reader.cancel();
+    proc.kill();
+    await proc.exited;
+    await fs.rm(outDir, { recursive: true, force: true });
   });
 });
 

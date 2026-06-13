@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "description": "Pandoc-centered static site generator: a small kernel for scanning, validation, routing, and manifest generation around pandoc-owned documents",
   "type": "module",
+  "bin": {
+    "pandoc-ssg": "src/cli.ts"
+  },
+  "files": [
+    "src",
+    "pandoc"
+  ],
   "scripts": {
     "test": "bun test --coverage --coverage-reporter=lcov --coverage-dir=.",
-    "types": "tsc --noEmit",
-    "build": "bun src/cli.ts build"
+    "types": "tsc --noEmit"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",

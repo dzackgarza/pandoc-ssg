@@ -1,11 +1,15 @@
+#!/usr/bin/env bun
 /**
- * CLI entrypoint. Subcommands:
- *   build --content DIR --pandoc DIR --out DIR        — full pipeline (O9)
- *   new post "Title" --content DIR                    — scaffold a blog post (O9)
- *   check --content DIR --pandoc DIR --out DIR        — build, then report
- *                                                       broken internal links;
- *                                                       exit 1 if any (O12)
- *   serve --out DIR [--port N]                         — preview the built tree (O13)
+ * CLI entrypoint. The generator ships no content; it operates on a content
+ * directory supplied by the caller (default: ./content in the current repo),
+ * the way a content repo depends on this tool. Subcommands:
+ *   build [--content DIR] [--pandoc DIR] [--out DIR]   — full pipeline (O9)
+ *   new post "Title" [--content DIR]                   — scaffold a blog post (O9)
+ *   check [--content DIR] [--pandoc DIR] [--out DIR]   — build, then report
+ *                                                        broken internal links;
+ *                                                        exit 1 if any (O12)
+ *   serve [--out DIR] [--port N]                        — preview the built tree (O13)
+ * Defaults: --content ./content, --pandoc the bundled design layer, --out ./dist.
  * Exits 0 on success; nonzero with the BuildError report on stderr.
  */
 import { mkdir, writeFile } from "node:fs/promises";
@@ -16,6 +20,15 @@ import { BuildError } from "./errors.ts";
 import { checkLinks } from "./links.ts";
 import { validatePageMeta } from "./schemas.ts";
 import { startServer } from "./serve.ts";
+
+/** The design layer (defaults, templates, filters) bundled with the generator. */
+let BUNDLED_PANDOC = join(import.meta.dir, "..", "pandoc");
+
+/** Flag value, or a fallback when the flag is absent. */
+function flagOr(flags: Map<string, string>, name: string, fallback: string): string {
+  let value = flags.get(name);
+  return value === undefined ? fallback : value;
+}
 
 /** Collect repeated `--flag value` pairs from argv into a flag map. */
 function parseFlags(args: string[]): { flags: Map<string, string>; positionals: string[] } {
@@ -37,14 +50,6 @@ function parseFlags(args: string[]): { flags: Map<string, string>; positionals: 
     }
   }
   return { flags, positionals };
-}
-
-function requireFlag(flags: Map<string, string>, name: string): string {
-  let value = flags.get(name);
-  if (value === undefined) {
-    throw new BuildError("config", [], `missing required flag --${name}`);
-  }
-  return value;
 }
 
 /**
@@ -71,18 +76,18 @@ function slugify(title: string): string {
 
 async function runBuild(flags: Map<string, string>): Promise<number> {
   await build({
-    contentDir: requireFlag(flags, "content"),
-    pandocDir: requireFlag(flags, "pandoc"),
-    outDir: requireFlag(flags, "out"),
+    contentDir: flagOr(flags, "content", "content"),
+    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
+    outDir: flagOr(flags, "out", "dist"),
   });
   return 0;
 }
 
 async function runCheck(flags: Map<string, string>): Promise<number> {
-  let outDir = requireFlag(flags, "out");
+  let outDir = flagOr(flags, "out", "dist");
   let manifest = await build({
-    contentDir: requireFlag(flags, "content"),
-    pandocDir: requireFlag(flags, "pandoc"),
+    contentDir: flagOr(flags, "content", "content"),
+    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
     outDir,
   });
   let broken = await checkLinks(outDir, manifest);
@@ -96,7 +101,7 @@ async function runCheck(flags: Map<string, string>): Promise<number> {
 }
 
 async function runServe(flags: Map<string, string>): Promise<number> {
-  let outDir = requireFlag(flags, "out");
+  let outDir = flagOr(flags, "out", "dist");
   let portFlag = flags.get("port");
   let port = portFlag === undefined ? undefined : Number(portFlag);
   let server = startServer({ outDir, port });
@@ -110,7 +115,7 @@ async function runNewPost(positionals: string[], flags: Map<string, string>): Pr
   if (title === undefined) {
     throw new BuildError("scaffold", [], "missing post title");
   }
-  let contentDir = requireFlag(flags, "content");
+  let contentDir = flagOr(flags, "content", "content");
   let date = today();
   let relPath = join("blog", `${date}-${slugify(title)}.md`);
   let target = join(contentDir, relPath);
