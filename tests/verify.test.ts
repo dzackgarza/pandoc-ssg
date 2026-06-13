@@ -20,6 +20,9 @@ const PAGES: Record<string, string> = {
   console: page('<h1>e</h1><script>console.error("boom")</script>'),
   throwpage: page('<h1>e</h1><script>throw new Error("kaboom")</script>'),
   markup: page("<p>{% include x %}</p>"),
+  // legitimate displayed code (LaTeX) that merely contains "{%" — not un-migrated
+  // Liquid. A real migrated post (latex-handwriting) hits this.
+  codemarkup: page("<pre><code>\\newcommand{\\setline}[2]{%\n  \\hrule\n}</code></pre>"),
   nolandmarks:
     "<!DOCTYPE html>\n<html><head><title>T</title></head><body><p>bare</p></body></html>",
 };
@@ -81,6 +84,10 @@ describe("O15: browser verification catches runtime defects", () => {
 
   test("un-migrated Liquid visible in the live DOM is reported", () => {
     expect(forUrl("/markup/")).toContain("unresolved-markup");
+  });
+
+  test("liquid-looking text inside a code block is NOT flagged", () => {
+    expect(forUrl("/codemarkup/")).not.toContain("unresolved-markup");
   });
 
   test("missing main and nav landmarks are both reported", () => {
