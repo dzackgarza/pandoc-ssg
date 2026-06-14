@@ -24,7 +24,7 @@ Every non-reserved asset file appears byte-identical in `dist/` at the same rela
 
 ## O5 — Rendering contract
 
-Each page renders to standalone HTML through pandoc using its type's template: title present, body markdown converted (headers, emphasis, links), TeX math wrapped for MathJax, site-wide math macros from `content/_data/math-macros.yaml` injected into the page head exactly once.
+Each page renders to standalone HTML through pandoc using its type's template: title present, body markdown converted (headers, emphasis, links), TeX math wrapped for MathJax, site-wide math macros from `content/_data/math-macros.yaml` injected into the page head exactly once. MathJax loads on every page (not gated on the page containing pandoc-level math, so island-authored math still typesets), and its config recognizes **both** `$…$` and `\(…\)` inline (and `$$…$$` / `\[…\]` display) delimiters — one math path for page content and island data alike. The `normalize_math` filter (ported from `~/.pandoc`) normalizes displayed equations into `align*` environments (`align` when a `\label` is present), not bare `\[ \]`; inline math stays pandoc's `\( \)`.
 
 ## O6 — Manifest as single contract
 
@@ -172,8 +172,14 @@ partial or silent copy.
 `::: {.component type="collection" items="KEY"}` is an interactive island that
 renders the `items.yaml` array under `KEY` as a **quiet filterable list** (the
 Notes index that folds Writing+Talks): client-side search + category facet + tag
-facet, rendered as a restrained list (title link + muted category + description),
-NOT cards/badges/tag-pills (per AESTHETIC-GUIDELINES). The build emits
+facet, rendered as a restrained list — each item is `{title, category,
+description, tags[], links[]{label,href}}`: the title is a plain label and each
+link renders as its own labeled anchor (e.g. PDF · HTML), preserving every artifact
+(format mirrors, multi-instructor note sets) — NOT cards/badges/tag-pills (per
+AESTHETIC-GUIDELINES). Item titles/descriptions may carry math; the island
+re-typesets its rendered DOM with the page's MathJax (the one math path) on
+hydration and after each filter change, since it mounts after MathJax's startup
+pass. The build emits
 `dist/_collections/KEY.json` for each referenced key (unknown key →
 `BuildError kind=config`), bundles the shared `collection` Svelte island to
 `assets/islands/collection.js` (the generalized `buildIsland`, optional vite/svelte
