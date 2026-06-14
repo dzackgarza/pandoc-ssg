@@ -25,6 +25,13 @@ const PAGES: Record<string, string> = {
   codemarkup: page("<pre><code>\\newcommand{\\setline}[2]{%\n  \\hrule\n}</code></pre>"),
   nolandmarks:
     "<!DOCTYPE html>\n<html><head><title>T</title></head><body><p>bare</p></body></html>",
+  // Captured from the live derived-AG page: MathJax renders an undefined macro
+  // (the author's global \GGm, absent from the injected set) as a LITERAL control
+  // sequence inside the container, and raises NO <mjx-merror>. 61 of 154 containers
+  // on that page were broken this way, yet verify reported zero findings because it
+  // only counts <mjx-merror>. The gate must catch leftover TeX control sequences in
+  // rendered math.
+  undefinedmacro: page('<mjx-container class="MathJax">K(\\GGm,n)</mjx-container>'),
 };
 
 function manifestFor(keys: string[]): Manifest {
@@ -94,5 +101,18 @@ describe("O15: browser verification catches runtime defects", () => {
     let issues = forUrl("/nolandmarks/");
     expect(issues).toContain("missing-main");
     expect(issues).toContain("missing-nav");
+  });
+
+  test("an undefined macro left as a literal control sequence in rendered math is reported", () => {
+    // Reproduces the live derived-AG defect: MathJax emits no <mjx-merror> for an
+    // undefined macro, so the merror check is blind to it. A correctly rendered
+    // mjx-container never retains a literal \macro; its presence proves unrendered
+    // math / an undefined macro that must gate the build before deploy.
+    expect(forUrl("/undefinedmacro/")).toContain("undefined-macro");
+  });
+
+  test("a well-formed page with rendered math is NOT flagged for undefined macros", () => {
+    // Glyph-only container (no leftover backslash control sequence) is correct math.
+    expect(forUrl("/good/")).toEqual([]);
   });
 });
