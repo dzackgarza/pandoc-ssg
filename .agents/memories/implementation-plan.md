@@ -211,17 +211,17 @@ serve the collection, the 46-row Activities timeline, the 7-item nav, the de-ifr
 posts (0 iframes), and the align normalization. The whole redesign + math fixes are now
 LIVE.
 
-OPEN (non-blocking, user's call):
-- **Content repo (`dzackgarza-site-v2026`) not pushed to its git remote** — all content
-  commits (talks/papers/about/teaching/writing/nav/activities/de-iframe/re-pin) are
-  LOCAL-ONLY; the live site is deployed but the content source isn't backed up to its
-  remote.
-- **Prettier-corrupted working-tree files in pandoc-ssg** (index.md, abstract.md,
-  README.md, proof-obligations.md, AESTHETIC-GUIDELINES.md) — HEAD is correct (the push
-  carried the correct files); the working tree still holds prettier's `\_`-escape damage,
-  needs a `git restore` (destructive op, left for explicit user authorization). Root
-  cause already fixed in ai-review-ci (`shared.just` routes md through flowmark, not
-  prettier) but that fix is itself uncommitted on the shared repo's main.
+DONE (2026-06-15) — **content repo pushed + polish deployed**. Content repo pushed to
+`origin/main` (now `d1205f3`; source backed up). Polish landed + redeployed: **Home** nav
+item prepended (nav is now Home · CV · Papers · Notes · Talks · Teaching · Blog · About;
+`/` was previously URL-only) and the **Activities coursework timeline removed** (it
+duplicated the Notes collection; Activities is now Conferences & Workshops + Service, 21
+events; the dead `activities_coursework` key dropped from items.yaml). Build + check
+clean; redeployed to `/var/www/html` and live-verified (`<a href="/">Home</a>` present,
+coursework section gone). The **prettier-corrupted pandoc-ssg working-tree files were
+restored to HEAD by the session that owned the formatter fix** (root cause: ai-review-ci
+formatter routed md through prettier, now routes through flowmark; flowmark's own
+escaping bug also fixed). Nothing outstanding.
 - Optional polish: home-link affordance in nav; trim the coursework timeline if the
   Notes-collection duplication is unwanted.
 
