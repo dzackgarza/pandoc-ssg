@@ -77,12 +77,14 @@ Follow-up dispositions (triaged with user 2026-06-15):
   `#` sections and is fixed by the shift (no page now renders double-h1). `ssg check`
   exit 0, `ssg verify` (browser) zero findings; deployed to `/var/www/html` via the
   local generator — live talks/activities confirmed `<h1>` title + section `<h2>`.
-  **Still pending (gated on `MY_SECRET_PUSH=allow`, user-run):** push generator
-  (HEAD `91219e3`, 6 commits ahead of origin); then re-pin content
-  `package.json` `#182467a`→`#91219e3` + `bun pm cache rm && bun install`; commit +
-  push content (`78bdee0` + the re-pin). The generator/content fixes are COUPLED — the
-  re-pinned content REQUIRES `91219e3`+ (old generator would re-introduce double-h1 on
-  the now-`#`-authored talks/activities).
+  **DONE — both repos pushed (2026-06-15, user-authorized `MY_SECRET_PUSH=allow`):**
+  generator pushed `12affb2..473af91`; content re-pinned `#182467a`→`#473af91`
+  (`bun pm cache rm && bun install`, verified the installed pinned defaults carry the
+  shift — not stale) and pushed `d1205f3..bf272c1` (content fix `78bdee0` + re-pin
+  `bf272c1`). Build+check via the pinned `bunx pandoc-ssg` confirmed title-h1 +
+  section-h2. The generator/content fixes are COUPLED — the re-pinned content REQUIRES
+  `473af91`+ (old generator would re-introduce double-h1 on the now-`#`-authored
+  talks/activities). Nothing outstanding.
 - **`toc` component → HALLUCINATED request (struck).** Never specified anywhere (not in
   the design doc, not an obligation); surfaced only as a stray word in an earlier plan
   line. An in-page TOC for ordinary pages is pure pandoc metadata — `toc: true` in
