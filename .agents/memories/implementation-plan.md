@@ -43,7 +43,8 @@ Resolved: generator/content split shipped — generator is content-free (pushed 
 2. **DONE** — Blog creation + generation + aggregation. `ssg new post` scaffolds (O9). The aggregation is a **Svelte/Vite interactive island** (user chose this over a static list): O16 — build emits `blog/posts.json`, bundles `islands/blog-index/` to `assets/islands/blog-index.js`, Lua filter emits the hydration mount; client-side **search + tag + category** facets (replaces the dropped archives). O17 — `type="video"` embed component for `{% include video %}`. All 14 `_posts` migrated into `dzackgarza-site-v2026` (commit `c263e68`); full `ssg verify` is zero-findings across the whole site. Two generator bugs found+fixed during migration via TDD: O13 serve 404'd every route under a relative `--out ./dist` (normalize outDir); O15 unresolved-markup false-flagged `{%` inside code blocks (scan prose only). vite/svelte are optional peer deps. Only residual broken link sitewide is the pre-existing `/quals`.
 
 **Scope corrections (do not reintroduce):**
-- NO generated tag/year/category archive *pages*. The other repos dropped those entirely; the blog aggregation component (search/filter by tag/category) replaces them. Do not build per-tag/per-year static index pages.
+
+- NO generated tag/year/category archive _pages_. The other repos dropped those entirely; the blog aggregation component (search/filter by tag/category) replaces them. Do not build per-tag/per-year static index pages.
 - Deploy = local directory mirror only. `ssg deploy DIR` (O19) builds then `rsync -a --delete` into DIR (e.g. `/var/www/html`); that is the entire deploy surface. The USER still owns web servers, remote hosting, DNS — the tool never configures those. (Gotcha: this system's interactive `cp` is aliased to `cp -i`, so a manual `cp` deploy silently skips existing files; use `ssg deploy`, which rsyncs and removes stale files.)
 - Standalone HTML pages (PQ Classification, Semidirect Products, UCSD, Zotero report) and apps (MakeMeAQual, threejs, math_journal) are pure passthrough — `cp` into content/, copied verbatim (O4). Not "work", not migration.
 
@@ -55,7 +56,7 @@ Known follow-ups (not defects): several migrated pages carry multiple body `# ` 
 
 User-approved plan. **Principle:** garza-academic-hub is a FAILED spike (technical
 decisions irrelevant); pandoc-ssg is the right engine. Pull only the spike's
-*information architecture / organizational* decisions, filtered through
+_information architecture / organizational_ decisions, filtered through
 `AESTHETIC-GUIDELINES.md` which WINS on every conflict (no profile card; restrained
 lists/quiet indices, not SaaS cards/badges/tag-pills). Goal: each design choice is a
 content/template/data edit with tiny blast radius. See cross-session memory
@@ -63,13 +64,13 @@ content/template/data edit with tiny blast radius. See cross-session memory
 Writing+Talks into a filterable **Notes** collection.
 
 - **DONE — O20 collection island** (generator `d03d88c`): `:::{.component
-  type="collection" items="KEY"}` → quiet filterable list (search + category + tag),
+type="collection" items="KEY"}` → quiet filterable list (search + category + tag),
   build emits `_collections/KEY.json` + bundles shared `collection` island
   (`buildIsland(name)` generalizes the blog-index bundler). Engine only; not yet
   wired into content.
 
 - **DONE — O21 timeline component** (generator `13dc3b0`): `:::{.component
-  type="timeline" items="KEY"}` → static Lua-rendered `<ul class="timeline">` of
+type="timeline" items="KEY"}` → static Lua-rendered `<ul class="timeline">` of
   author-ordered `<li class="timeline__entry">` rows (plain-text date span +
   inline-markdown title + optional detail span). Empty date / unknown key abort the
   build. Engine only; no CSS yet (add with rendered evidence at content-wiring step,
@@ -85,16 +86,16 @@ Writing+Talks into a filterable **Notes** collection.
   grid, NO client-side filter** — filters are the wrong atmosphere per
   AESTHETIC-GUIDELINES (wins on conflict); tags ride only as a `data-tags` attribute.
   media-gallery (O23) **replaced** the old `gallery` entirely (render_gallery + branch
-  + `.gallery*` CSS renamed to `.media-gallery*` + README + O11 text all updated);
-  image items use src/href, video items reuse the O17 youtube embed (OSOT). link-group
-  (O24) renders a restrained titled `<section>` of external links (href required per
-  link). `/talks/` migrates `gallery`→`media-gallery` at the content step.
+  - `.gallery*` CSS renamed to `.media-gallery*` + README + O11 text all updated);
+    image items use src/href, video items reuse the O17 youtube embed (OSOT). link-group
+    (O24) renders a restrained titled `<section>` of external links (href required per
+    link). `/talks/` migrates `gallery`→`media-gallery` at the content step.
 
 - **DONE (generator side) — navbar architecture (O7 reframed)**. **Binding decision
   (user, this session): the navbar is pure config; the renderer must NOT gate nav
   targets.** The flat nav already renders `CV · Papers · Notes · Teaching · Blog ·
-  About` from `navigation.toml` via the template `$for(nav)$`, so labels/structure are
-  content. The generator increment was *removing* overreach: deleted the build-fatal
+About` from `navigation.toml` via the template `$for(nav)$`, so labels/structure are
+  content. The generator increment was _removing_ overreach: deleted the build-fatal
   `assertNavTargets` (route-only gate) + `isExternal` + the dead `external` field; nav
   hrefs may now point at routes, passthrough assets (CV PDF), or off-site. Nav-link
   integrity is delegated to O12 (`ssg check`); burden transferred to a new
@@ -128,13 +129,26 @@ imgs); **Papers** page (/papers/, O22, from papers.toml — DOI/slides omitted a
 non-doctrine extras); **About** page (/about/, O24 link-group from profile.toml, no
 card/avatar); **Teaching** timeline (/teaching/, O21, this repo's /courses/ links).
 
-REMAINING (next session): **Notes/Writing fold** — writing.md is rich like talks
-(prose: recent courses, talks/seminars, expository, big Resources section; + 11
-feature-row card groups by subject; + a "Links to Notes by Others" section). Same
-rich-vs-fold tension as talks. Planned approach (pending): keep writing.md rich, turn
-the subject card-groups into ONE O20 **collection** island (category facet = subject,
-realizing the "filterable Notes collection"), convert "Links to Notes by Others" → O24
-**link-group**, keep prose sections; label nav "Notes"→/writing/. Then: **Activities**
+DONE (2026-06-14, content `e516f51` + generator `b0991f4`) — **Notes/Writing fold**.
+User correction (binding): ALL of Writing folds into ONE filterable collection with
+category + tags (the upstream IA), NOT a partial fold and NOT "keep rich"; **Talks
+remains separate** (the /talks/ gallery page stays; on the Writing page the nested
+Talks/Seminars notes section + the Resources prose stay rich, the notes_by_others
+link-group stays). The 11 subject feature-row groups + recent-course bullets (K3,
+Hochschild) + the Expository section → one `notes` key (38 entries, category
+Notes/Expository, subject tags); dead `feature_row_*` keys removed. Courses taught twice
+(Commutative Algebra, Lie Algebras) split into one entry per instructor. **Generator
+increment first (O20 multi-link, RED `d906e36`→GREEN `b0991f4`):** the collection Item
+dropped single `url` for required `links[]{label,href}` (matching upstream
+`[[items.links]]`) so every PDF/HTML mirror + multi-instructor note set is preserved
+with zero loss; title is a plain label, links render as labeled anchors. 162 generator
+tests green; content build + `ssg check` clean. Open cosmetic: the `Category $\OO$`
+title renders literal LaTeX in the plain-text collection list (feature-row rendered it
+as math) — left faithful, a content decision (retitle "Category O" or add math to the
+island). Pre-existing dead items.yaml keys left out of scope: `feature_row` (generic),
+`gallery_ex`, `MathDrawingGallery`, `MathCodeGallery`.
+
+REMAINING (next session): **Activities**
 timeline (spike timeline.toml, 340 lines); **nav** restructure (CV·Papers·Notes·Talks·
 Teaching·Blog·About — CV only if a CV asset exists, else omit; Talks kept per decision);
 **de-iframe** the 2 math posts (content/pandoc/); **CSS** for timeline/papers/collection/
