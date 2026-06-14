@@ -66,8 +66,17 @@ Follow-up dispositions (triaged with user 2026-06-15):
   no conflict. (NOT a soft-normalization: input is well-formed under this convention;
   the shift is a deterministic uniform transform accounting for the injected title.
   Earlier "uniformize to `##`" / fail-loud-h1-guard dispositions were wrong and are
-  retracted.) Implement with a test asserting the rendered h-levels + rendered
-  verification, then re-pin + redeploy the content repo (push gate is the user's).
+  retracted.) **DONE generator-side** (RED `b26875f` → GREEN `3411fcf`): added
+  `shift-heading-level-by: 1` to both defaults; `tests/build.test.ts` asserts the
+  rendered about page has a single h1 (the title) with `#`→h2/`##`→h3; blog-toc
+  fixtures re-authored one level up so the depth-3 TOC spec still holds. 165 tests
+  green; rendered both fixtures and confirmed. **Content-repo follow-up (user-owned,
+  not yet done):** re-pin the generator dep to `3411fcf`+ and audit
+  `dzackgarza-site-v2026` authoring — pages migrated with `##`-body-sections (a
+  workaround to dodge the old double-h1) will now shift to h3 and render one level too
+  deep; re-author those to natural `#` sections. Pages already authored with `#`
+  sections are *fixed* by the shift (their double-h1 is gone). Then rebuild → `ssg
+  verify` → `ssg deploy /var/www/html` (push gate is the user's).
 - **`toc` component → HALLUCINATED request (struck).** Never specified anywhere (not in
   the design doc, not an obligation); surfaced only as a stray word in an earlier plan
   line. An in-page TOC for ordinary pages is pure pandoc metadata — `toc: true` in
