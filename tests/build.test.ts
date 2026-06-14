@@ -163,6 +163,21 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     expect(html).toContain("\\end{align*}");
   });
 
+  test("O5: single-backslash \\(...\\) and \\[...\\] delimiters parse as math", async () => {
+    const html = await readFile(join(outDir, "about", "index.html"), "utf8");
+    // The archived notes author display math as \[...\] and inline as \(...\).
+    // Without tex_math_single_backslash these are mangled into literal prose
+    // (e.g. "[ ... ]" with macros dropped), which no current verify check sees.
+    // Inline \(\zeta_{sb}\) must become a math-inline span, not literal text.
+    expect(html).toContain('<span class="math inline">\\(\\zeta_{\\mathrm{sb}}\\)</span>');
+    // Display \[...\] must become a math-display span (normalize wraps align*),
+    // not a literal "[" before the body.
+    expect(html).toContain('<span class="math display">');
+    expect(html).toContain("\\xi_{\\mathrm{sb}} = \\alpha");
+    expect(html).not.toContain("[\n\\xi");
+    expect(html).not.toContain("(\\zeta_{\\mathrm{sb}})");
+  });
+
   test("O5: home route and blog route render with their titles", async () => {
     expect(await exists(join(outDir, "index.html"))).toBe(true);
 
