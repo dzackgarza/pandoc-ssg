@@ -126,6 +126,16 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     expect(html).toContain("\\mathbb{A}");
   });
 
+  test("O5: display math is normalized to an align environment", async () => {
+    const html = await readFile(join(outDir, "about", "index.html"), "utf8");
+    // The normalize filter wraps displayed equations in align* (the required
+    // align normalization), not bare \[ \].
+    expect(html).toContain('<span class="math display">');
+    expect(html).toContain("\\begin{align*}");
+    expect(html).toContain("x^2 + y^2 = z^2");
+    expect(html).toContain("\\end{align*}");
+  });
+
   test("O5: home route and blog route render with their titles", async () => {
     expect(await exists(join(outDir, "index.html"))).toBe(true);
 
