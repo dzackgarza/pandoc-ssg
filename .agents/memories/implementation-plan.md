@@ -184,15 +184,30 @@ soft box. Bug fixed in passing: the top-nav rules (`nav {...}`) were bleeding in
 post-toc `<nav>` (centered chrome); scoped them to `body > nav`. (media-gallery already
 had CSS from O23.)
 
-REMAINING (next session): **Activities** timeline (spike timeline.toml, 340 lines);
-**nav** restructure (CV·Papers·Notes·Talks·Teaching·Blog·About — CV only if a CV asset
-exists, else omit; Talks kept per decision); **de-iframe** the 2 math posts
-(content/pandoc/); then **re-pin generator** (push pandoc-ssg to GitHub + `bun pm cache
-rm` + re-pin content repo SHA), full `ssg verify`, `ssg deploy /var/www/html` (push +
-deploy are outward-facing — confirm with user). NOTE: all generator work this session
-(multi-link collection, MathJax one-path fix, normalize_math filter, component CSS) is
-committed locally and verified against the LOCAL generator only; the published site has
-none of it until the re-pin.
+DONE (2026-06-14, content `f873691`) — **nav restructure + Activities + de-iframe**.
+nav: `navigation.toml` now CV (the existing /assets/pdfs/CV_DZackGarza.pdf) · Papers ·
+Notes(/writing/) · Talks · Teaching · Blog · About (no Home item — flagged: the template
+has no site-name home link, so / is currently only reachable by URL). Activities: the
+verbose v2018 prose page was replaced with three O21 timelines (Conferences & Workshops /
+Graduate Coursework / Service) over `activities_{conferences,coursework,service}` keys
+converted from the spike timeline.toml (46 events; `/website/` paths rebased to /assets/
+or the live legacy site). NOTE the **coursework timeline duplicates the Notes
+collection** (same courses, two views — faithful to the spike, flagged for the user).
+De-iframe: the two math posts iframed standalone HTML carrying defunct MathJax v2
+(cdn.mathjax.org); replaced with native `:::{.include}` transcludes of the markdown
+sources in `assets/archived_notes/`, removed `content/pandoc/*.html`. Rendered-verified:
+timeline + 7-item nav render; the de-iframed post's transcluded math typesets with ZERO
+MathJax errors (the notes don't exceed the 12-macro set) and the blog auto-TOC lists the
+note's sections. Build + `ssg check` clean.
+
+REMAINING — only the **outward-facing deploy** is left (needs explicit user go):
+**re-pin generator** (push pandoc-ssg to GitHub + `bun pm cache rm` + re-pin the content
+repo's generator dep to the new SHA), then full `ssg verify`, then `ssg deploy
+/var/www/html`. ALL generator work this session (multi-link collection, MathJax one-path
+fix, normalize_math filter, component CSS) AND all content work is committed locally and
+verified against the LOCAL generator only; the PUBLISHED site has none of it until the
+re-pin. (Optional polish, not blocking: home-link affordance in nav; trim coursework
+timeline if the Notes duplication is unwanted.)
 
 (Superseded note) all generator-side increments (O20–O25) are DONE; the original
 remaining-phase description follows:
