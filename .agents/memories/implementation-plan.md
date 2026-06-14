@@ -289,3 +289,24 @@ evidence**; then rebuild → full `ssg verify` → `ssg deploy /var/www/html`.
 Spike spec source (read-only reference): `~/gitclones/garza-academic-hub` —
 `content/.meta/databases/*.toml` (papers/items/teaching/timeline/navigation/profile),
 `docs/CONTENT-GUIDE.md` (component vocabulary). Pull IA, NOT its React/daisyUI/profile-card tech.
+
+## MathJax macros live + math QC gate — DONE + DEPLOYED (2026-06-15)
+
+Bug (user-reported): the live derived-AG page rendered the author's global macros
+(`\GG`/`\et`/`\spec`/`\tensor`) as literal text — 61/154 math containers broken —
+and `ssg verify` passed because MathJax raises no `<mjx-merror>` for undefined
+macros (verify only counted merror). Root cause: the build injected the vendored
+12-macro `_data/math-macros.yaml`; the author's live set has 1476 macros.
+
+Fix (TDD, all RED→GREEN committed): see [proof-obligations](proof-obligations.md)
+O26 (live extraction from the `~/.pandoc` manifest via a bundled uv extractor;
+vendored yaml deleted both repos) + O27 (verify flags leftover `\controlSequence`
+in rendered math; `ssg deploy` gates on verify). Also fixed the upstream
+`~/.pandoc/bin/generate-mathjax-config.py` to read the same manifest (no hard-coded
+filename tuple) — output byte-identical (1476). Generator pushed `6db9b29`; content
+re-pinned `#473af91`→`#6db9b29` + vendored yaml removed (`bc69022`); deployed to
+`/var/www/html` via the gating `ssg deploy` (verify clean, 0 findings — the macros
+now resolve). 169 generator tests green. Note: a transient `console-error`
+(YouTube iframe compute-pressure permissions policy) appeared once in verify, did
+NOT recur on isolated re-runs — env noise, not engineered around (per
+[[transient-failures-rerun-dont-engineer]]).
