@@ -8,3 +8,4 @@ template: ${.}/../templates/page.html
 filters:
   - ${.}/../filters/transclude.lua
   - ${.}/../filters/components.lua
+  - ${.}/../filters/normalize_math.lua
