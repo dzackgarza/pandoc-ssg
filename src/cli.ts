@@ -25,6 +25,7 @@
  * Exits 0 on success; nonzero with the BuildError report on stderr.
  */
 import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import matter from "gray-matter";
 import { build } from "./build.ts";
@@ -38,6 +39,29 @@ import { verifySite } from "./verify.ts";
 
 /** The design layer (defaults, templates, filters) bundled with the generator. */
 let BUNDLED_PANDOC = join(import.meta.dir, "..", "pandoc");
+
+/**
+ * Canonical MathJax macro manifest: the live, author-maintained declaration of
+ * which LaTeX macro files feed MathJax. This is the bundled opinionated default;
+ * `--mathjax-macros` overrides it. The build extracts macros from it every run
+ * and fails loudly if it is absent — macros are never vendored.
+ */
+let DEFAULT_MACRO_MANIFEST = join(homedir(), ".pandoc", "styles", "macros", "mathjax-sources.txt");
+
+/** Common build options shared by build/check/verify/deploy. */
+function buildOpts(flags: Map<string, string>): {
+  contentDir: string;
+  pandocDir: string;
+  outDir: string;
+  macroManifest: string;
+} {
+  return {
+    contentDir: flagOr(flags, "content", "content"),
+    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
+    outDir: flagOr(flags, "out", "dist"),
+    macroManifest: flagOr(flags, "mathjax-macros", DEFAULT_MACRO_MANIFEST),
+  };
+}
 
 /** Flag value, or a fallback when the flag is absent. */
 function flagOr(flags: Map<string, string>, name: string, fallback: string): string {
@@ -90,51 +114,51 @@ function slugify(title: string): string {
 }
 
 async function runBuild(flags: Map<string, string>): Promise<number> {
-  await build({
-    contentDir: flagOr(flags, "content", "content"),
-    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
-    outDir: flagOr(flags, "out", "dist"),
-  });
+  await build(buildOpts(flags));
   return 0;
 }
 
 async function runCheck(flags: Map<string, string>): Promise<number> {
-  let outDir = flagOr(flags, "out", "dist");
-  let manifest = await build({
-    contentDir: flagOr(flags, "content", "content"),
-    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
-    outDir,
-  });
-  let issues = await validateSite(outDir, manifest);
+  let opts = buildOpts(flags);
+  let manifest = await build(opts);
+  let issues = await validateSite(opts.outDir, manifest);
   for (const issue of issues) {
     process.stderr.write(`page issue: ${issue.issue} (in ${issue.page})\n`);
   }
-  let broken = await checkLinks(outDir, manifest);
+  let broken = await checkLinks(opts.outDir, manifest);
   for (const link of broken) {
     process.stderr.write(`broken link: ${link.target} (in ${link.sourcePage})\n`);
   }
   return issues.length + broken.length === 0 ? 0 : 1;
 }
 
-async function runVerify(flags: Map<string, string>): Promise<number> {
-  let outDir = flagOr(flags, "out", "dist");
-  let manifest = await build({
-    contentDir: flagOr(flags, "content", "content"),
-    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
-    outDir,
-  });
-  let server = startServer({ outDir });
-  let findings: Awaited<ReturnType<typeof verifySite>>;
-  try {
-    findings = await verifySite({ baseUrl: `http://localhost:${server.port}`, manifest });
-  } finally {
-    server.stop();
-  }
+/** Write each verification finding to stderr. */
+function reportFindings(findings: Awaited<ReturnType<typeof verifySite>>): void {
   for (const f of findings) {
     process.stderr.write(
       `verify: ${f.issue} on ${f.url}${f.detail === "" ? "" : ` — ${f.detail}`}\n`,
     );
   }
+}
+
+/** Serve the built tree and browser-verify every route; stops the server. */
+async function verifyOut(
+  outDir: string,
+  manifest: Awaited<ReturnType<typeof build>>,
+): Promise<Awaited<ReturnType<typeof verifySite>>> {
+  let server = startServer({ outDir });
+  try {
+    return await verifySite({ baseUrl: `http://localhost:${server.port}`, manifest });
+  } finally {
+    server.stop();
+  }
+}
+
+async function runVerify(flags: Map<string, string>): Promise<number> {
+  let opts = buildOpts(flags);
+  let manifest = await build(opts);
+  let findings = await verifyOut(opts.outDir, manifest);
+  reportFindings(findings);
   return findings.length === 0 ? 0 : 1;
 }
 
@@ -143,14 +167,19 @@ async function runDeploy(positionals: string[], flags: Map<string, string>): Pro
   if (deployDir === undefined) {
     throw new BuildError("config", [], "missing deploy target directory: ssg deploy DIR");
   }
-  let outDir = flagOr(flags, "out", "dist");
-  await build({
-    contentDir: flagOr(flags, "content", "content"),
-    pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
-    outDir,
-  });
-  await deploySite(outDir, deployDir);
-  process.stdout.write(`deployed ${outDir} -> ${deployDir}\n`);
+  let opts = buildOpts(flags);
+  let manifest = await build(opts);
+  // Deploy gate: browser-verify the built tree and refuse to publish if any page
+  // has a rendering defect (undefined macro, unrendered math, missing landmark,
+  // broken script). Broken pages must never reach the live web root.
+  let findings = await verifyOut(opts.outDir, manifest);
+  if (findings.length > 0) {
+    reportFindings(findings);
+    process.stderr.write(`deploy aborted: ${findings.length} verification finding(s)\n`);
+    return 1;
+  }
+  await deploySite(opts.outDir, deployDir);
+  process.stdout.write(`deployed ${opts.outDir} -> ${deployDir}\n`);
   return 0;
 }
 
