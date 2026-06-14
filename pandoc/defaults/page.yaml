@@ -2,6 +2,7 @@ from: markdown+yaml_metadata_block+fenced_divs+tex_math_dollars
 to: html5
 wrap: none
 standalone: true
+shift-heading-level-by: 1
 html-math-method:
   method: mathjax
 template: ${.}/../templates/page.html
