@@ -6,7 +6,7 @@
     title: string;
     category: string;
     description: string;
-    url?: string;
+    links: { label: string; href: string }[];
     tags: string[];
   }
 
@@ -103,13 +103,16 @@
   <ul class="collection__list">
     {#each filtered as item}
       <li class="collection__item">
-        {#if item.url}
-          <a class="collection__link" href={item.url}>{item.title}</a>
-        {:else}
-          <span class="collection__title">{item.title}</span>
-        {/if}
+        <span class="collection__title">{item.title}</span>
         {#if item.category}<span class="collection__cat">{item.category}</span>{/if}
         {#if item.description}<p class="collection__desc">{item.description}</p>{/if}
+        {#if item.links.length > 0}
+          <span class="collection__links">
+            {#each item.links as link}
+              <a class="collection__link" href={link.href}>{link.label}</a>
+            {/each}
+          </span>
+        {/if}
       </li>
     {/each}
   </ul>
