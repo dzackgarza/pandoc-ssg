@@ -70,13 +70,19 @@ Follow-up dispositions (triaged with user 2026-06-15):
   `shift-heading-level-by: 1` to both defaults; `tests/build.test.ts` asserts the
   rendered about page has a single h1 (the title) with `#`→h2/`##`→h3; blog-toc
   fixtures re-authored one level up so the depth-3 TOC spec still holds. 165 tests
-  green; rendered both fixtures and confirmed. **Content-repo follow-up (user-owned,
-  not yet done):** re-pin the generator dep to `3411fcf`+ and audit
-  `dzackgarza-site-v2026` authoring — pages migrated with `##`-body-sections (a
-  workaround to dodge the old double-h1) will now shift to h3 and render one level too
-  deep; re-author those to natural `#` sections. Pages already authored with `#`
-  sections are *fixed* by the shift (their double-h1 is gone). Then rebuild → `ssg
-  verify` → `ssg deploy /var/www/html` (push gate is the user's).
+  green; rendered both fixtures and confirmed. **Content audit + fix DONE + DEPLOYED
+  LIVE (2026-06-15):** full-site render scan found only `activities.md` + `talks.md`
+  authored with `##`-top-sections (the double-h1 workaround) → rendered h3; demoted
+  their headings `##`→`#` (content commit `78bdee0`). Every other page already used
+  `#` sections and is fixed by the shift (no page now renders double-h1). `ssg check`
+  exit 0, `ssg verify` (browser) zero findings; deployed to `/var/www/html` via the
+  local generator — live talks/activities confirmed `<h1>` title + section `<h2>`.
+  **Still pending (gated on `MY_SECRET_PUSH=allow`, user-run):** push generator
+  (HEAD `91219e3`, 6 commits ahead of origin); then re-pin content
+  `package.json` `#182467a`→`#91219e3` + `bun pm cache rm && bun install`; commit +
+  push content (`78bdee0` + the re-pin). The generator/content fixes are COUPLED — the
+  re-pinned content REQUIRES `91219e3`+ (old generator would re-introduce double-h1 on
+  the now-`#`-authored talks/activities).
 - **`toc` component → HALLUCINATED request (struck).** Never specified anywhere (not in
   the design doc, not an obligation); surfaced only as a stray word in an earlier plan
   line. An in-page TOC for ordinary pages is pure pandoc metadata — `toc: true` in
