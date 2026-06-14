@@ -52,13 +52,21 @@ Resolved: generator/content split shipped — generator is content-free (pushed 
 
 Follow-up dispositions (triaged with user 2026-06-15):
 
-- **Body headings → REAL task.** Several migrated pages carry body `# ` section
-  headings rendered as `<h1>` alongside the template title h1 (two competing h1s).
-  Agreed solution (user): demote all body headings by one level **at render**, via
-  pandoc `shift-heading-level-by: 1` in the defaults — not a content/per-page edit.
-  Leaves the template `$title$` as the sole h1; body `#`→h2, `##`→h3, etc. Implement
-  with a test + rendered verification; blog interaction with the O25 TOC (toc-depth 3)
-  must be checked since shifting moves authored `##` to h3.
+- **Body headings → DATA UNIFORMITY problem (not a render hack).** Several migrated
+  pages carry body `# ` section headings rendered as `<h1>` alongside the template
+  title h1 (two competing h1s). This is non-uniform/incorrect *content authoring*: the
+  page title is frontmatter-owned and template-rendered as the sole `<h1>`, so body
+  sections must start at `##` (h2). Migrated Jekyll pages that used `#` for body
+  sections are simply wrong and must be **uniformized to the correct convention**, not
+  papered over. REJECTED approach: `shift-heading-level-by: 1` at render — that is a
+  soft-normalization of malformed input (silently demotes whatever the author wrote),
+  and it only "works" if every page uniformly mis-uses `#`; a correctly-authored `##`
+  page would get shifted to `###`. If you must enforce uniformity, enforce the *correct*
+  convention. Correct fix: (1) one-time content correction in `dzackgarza-site-v2026` —
+  demote offending body `#`→`##` (cascade deeper levels) so the title h1 is the only h1;
+  (2) optional, fail-loud, house-aligned — a generator guard that **rejects** a page
+  whose rendered body contains an `<h1>`, since the title h1 is template-owned (loud
+  rejection of malformed data, never silent repair).
 - **`toc` component → HALLUCINATED request (struck).** Never specified anywhere (not in
   the design doc, not an obligation); surfaced only as a stray word in an earlier plan
   line. An in-page TOC for ordinary pages is pure pandoc metadata — `toc: true` in
