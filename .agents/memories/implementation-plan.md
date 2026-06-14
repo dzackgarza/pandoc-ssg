@@ -172,14 +172,27 @@ in `align*` (`align` when a `\label` is present), not bare `\[ \]`; inline math 
 pandoc's `\( \)`. (Lesson: do not relitigate an explicit user directive as "redundant" —
 the align-wrapping was the required feature.)
 
-REMAINING (next session): **Activities**
-timeline (spike timeline.toml, 340 lines); **nav** restructure (CV·Papers·Notes·Talks·
-Teaching·Blog·About — CV only if a CV asset exists, else omit; Talks kept per decision);
-**de-iframe** the 2 math posts (content/pandoc/); **CSS** for timeline/papers/collection/
-post-toc/link-group grounded in **rendered evidence** (Playwright screenshots, not
-guessed); then **re-pin generator** (push pandoc-ssg @845a150+ to GitHub + `bun pm cache
-rm`), full `ssg verify`, `ssg deploy /var/www/html` (push + deploy are outward-facing —
-confirm with user).
+DONE (2026-06-14, generator `4c10940`) — **component CSS** for collection / timeline /
+papers / link-group / post-toc, in `pandoc/assets/theme/site.css`, grounded in the
+measured theme tokens + doctrine and verified by Playwright screenshots at desktop +
+375px (NOT guessed): collection mirrors the blog-index posture (search + text-button
+category/tag facets + plain list, Jost titles, muted uppercase category, navy multi-link
+rows); timeline = muted Jost date column beside each entry (stacks on mobile); papers =
+program-first bibliographic list w/ muted meta + native `<details>` abstract, no cards;
+link-group = quiet h2-titled no-bullet link list; post-toc = restrained nested TOC in a
+soft box. Bug fixed in passing: the top-nav rules (`nav {...}`) were bleeding into the
+post-toc `<nav>` (centered chrome); scoped them to `body > nav`. (media-gallery already
+had CSS from O23.)
+
+REMAINING (next session): **Activities** timeline (spike timeline.toml, 340 lines);
+**nav** restructure (CV·Papers·Notes·Talks·Teaching·Blog·About — CV only if a CV asset
+exists, else omit; Talks kept per decision); **de-iframe** the 2 math posts
+(content/pandoc/); then **re-pin generator** (push pandoc-ssg to GitHub + `bun pm cache
+rm` + re-pin content repo SHA), full `ssg verify`, `ssg deploy /var/www/html` (push +
+deploy are outward-facing — confirm with user). NOTE: all generator work this session
+(multi-link collection, MathJax one-path fix, normalize_math filter, component CSS) is
+committed locally and verified against the LOCAL generator only; the published site has
+none of it until the re-pin.
 
 (Superseded note) all generator-side increments (O20–O25) are DONE; the original
 remaining-phase description follows:
