@@ -200,14 +200,30 @@ timeline + 7-item nav render; the de-iframed post's transcluded math typesets wi
 MathJax errors (the notes don't exceed the 12-macro set) and the blog auto-TOC lists the
 note's sections. Build + `ssg check` clean.
 
-REMAINING — only the **outward-facing deploy** is left (needs explicit user go):
-**re-pin generator** (push pandoc-ssg to GitHub + `bun pm cache rm` + re-pin the content
-repo's generator dep to the new SHA), then full `ssg verify`, then `ssg deploy
-/var/www/html`. ALL generator work this session (multi-link collection, MathJax one-path
-fix, normalize_math filter, component CSS) AND all content work is committed locally and
-verified against the LOCAL generator only; the PUBLISHED site has none of it until the
-re-pin. (Optional polish, not blocking: home-link affordance in nav; trim coursework
-timeline if the Notes duplication is unwanted.)
+DONE (2026-06-15) — **DEPLOYED**. Generator pushed to GitHub (`origin/main` =
+`182467a`; pushed `--no-verify` with `MY_SECRET_PUSH=allow` — both explicitly
+user-authorized, because the global pre-push hook runs `just test` which fails on the
+known semgrep `ts-no-or-default` defect in `src/verify.ts` AND was deadlocking with a
+concurrent `just proof` from another session). Content repo re-pinned `#8a0a7a1` →
+`#182467a` + `bun pm cache rm` + `bun install` (content commit `2b205f5`). `ssg verify`
+clean (exit 0); `ssg deploy /var/www/html` succeeded — live web root (487M) verified to
+serve the collection, the 46-row Activities timeline, the 7-item nav, the de-iframed
+posts (0 iframes), and the align normalization. The whole redesign + math fixes are now
+LIVE.
+
+OPEN (non-blocking, user's call):
+- **Content repo (`dzackgarza-site-v2026`) not pushed to its git remote** — all content
+  commits (talks/papers/about/teaching/writing/nav/activities/de-iframe/re-pin) are
+  LOCAL-ONLY; the live site is deployed but the content source isn't backed up to its
+  remote.
+- **Prettier-corrupted working-tree files in pandoc-ssg** (index.md, abstract.md,
+  README.md, proof-obligations.md, AESTHETIC-GUIDELINES.md) — HEAD is correct (the push
+  carried the correct files); the working tree still holds prettier's `\_`-escape damage,
+  needs a `git restore` (destructive op, left for explicit user authorization). Root
+  cause already fixed in ai-review-ci (`shared.just` routes md through flowmark, not
+  prettier) but that fix is itself uncommitted on the shared repo's main.
+- Optional polish: home-link affordance in nav; trim the coursework timeline if the
+  Notes-collection duplication is unwanted.
 
 (Superseded note) all generator-side increments (O20–O25) are DONE; the original
 remaining-phase description follows:
