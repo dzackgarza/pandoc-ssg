@@ -272,3 +272,33 @@ link group's purpose is working links, so a targetless link is a content error. 
 unknown items key aborts the build the same way.
 
 Linked: [requirements](requirements.md), [architecture](architecture.md).
+
+## O26 — MathJax macros are extracted live, never vendored
+
+The site-wide MathJax macro set is generated at every build from the author's
+canonical LaTeX macro sources — never stored in the SSG or content. A declarative
+manifest (`~/.pandoc/styles/macros/mathjax-sources.txt`, the bundled CLI default for
+`--mathjax-macros`; overridable) declares *which* `.tex` files feed MathJax. The
+SSG bundles a vendored extraction *script* (`pandoc/bin/extract_mathjax_macros.py`,
+PEP723/uv) that parses `\newcommand`/`\def`/`\DeclareMathOperator` and emits the
+MathJax 3 `tex.macros` map (string body, or `[body, nargs]` for arg-macros) to
+stdout. `build.ts generateMathMacros` runs it each build and fails loudly on any
+error (missing uv/script/manifest/listed file, or malformed output) — no silent
+empty fallback. The `~/.pandoc` recipe (`generate-mathjax-config.py`) reads the
+**same** manifest (no hard-coded filename tuple), so both consumers stay in
+lock-step. **Why this obligation exists:** the live derived-AG page rendered the
+author's globals (`\GG`/`\et`/`\spec`/`\tensor`) as literal text because the build
+injected a vendored 12-macro `_data/math-macros.yaml`; the live source has 1476.
+The vendored yaml is deleted from both repos.
+
+## O27 — Rendered-math QC gate; deploy refuses broken pages
+
+Undefined macros do NOT raise `<mjx-merror>` in MathJax v3 — they render as a
+literal `\controlSequence` inside the container (61/154 on the live derived-AG page,
+all undetected by the prior merror-only check). `verifySite` (O15) now scans every
+rendered `mjx-container`/`span.math` for a leftover `\[a-zA-Z]+` and reports an
+`undefined-macro` finding; correctly typeset math is glyph-only. `ssg deploy`
+browser-verifies the built tree and **aborts (exit 1, nothing published)** on any
+verify finding — broken pages cannot reach the live web root.
+
+Linked: [requirements](requirements.md), [architecture](architecture.md).
