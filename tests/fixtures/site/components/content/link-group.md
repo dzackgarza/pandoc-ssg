@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.component type="link-group" items="demo-links"}
+:::{.component type="link-group" items="demo-links"}
 :::

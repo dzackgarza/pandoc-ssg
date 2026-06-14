@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.include path="../../../../../../etc/hostname"}
+:::{.include path="../../../../../../etc/hostname"}
 :::

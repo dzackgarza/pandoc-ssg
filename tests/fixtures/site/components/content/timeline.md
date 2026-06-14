@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.component type="timeline" items="demo-timeline"}
+:::{.component type="timeline" items="demo-timeline"}
 :::

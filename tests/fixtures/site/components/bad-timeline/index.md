@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.component type="timeline" items="does-not-exist"}
+:::{.component type="timeline" items="does-not-exist"}
 :::

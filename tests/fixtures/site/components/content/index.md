@@ -7,5 +7,5 @@ site:
 
 # Notes
 
-::: {.component type="feature-row" items="demo-row"}
+:::{.component type="feature-row" items="demo-row"}
 :::

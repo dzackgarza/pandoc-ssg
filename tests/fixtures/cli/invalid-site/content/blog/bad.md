@@ -7,5 +7,4 @@ title: 'Missing Date Post'
 
 # Missing Date Post
 
-blog-post.v1 requires a date field; this file omits it, so the build must
-fail and name this content-relative path.
+blog-post.v1 requires a date field; this file omits it, so the build must fail and name this content-relative path.

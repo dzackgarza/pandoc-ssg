@@ -7,7 +7,7 @@ site:
 
 ## Section
 
-This page has _emphasis_ and inline math $E = mc^2$ in the body.
+This page has *emphasis* and inline math $E = mc^2$ in the body.
 
 A displayed equation:
 

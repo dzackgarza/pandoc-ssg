@@ -7,4 +7,4 @@ title: About
 
 # About
 
-Some _emphasis_ and a [link](https://example.com).
+Some *emphasis* and a [link](https://example.com).

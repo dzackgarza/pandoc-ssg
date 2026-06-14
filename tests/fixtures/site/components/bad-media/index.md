@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.component type="media-gallery" items="bad-media"}
+:::{.component type="media-gallery" items="bad-media"}
 :::

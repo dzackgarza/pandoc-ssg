@@ -7,5 +7,5 @@ site:
 
 # Blog
 
-::: {.component type="blog-index"}
+:::{.component type="blog-index"}
 :::

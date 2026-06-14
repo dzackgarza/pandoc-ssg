@@ -7,5 +7,5 @@ site:
 
 # Notes
 
-::: {.component type="collection" items="notes"}
+:::{.component type="collection" items="notes"}
 :::

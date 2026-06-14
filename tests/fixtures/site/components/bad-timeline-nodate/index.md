@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.component type="timeline" items="undated"}
+:::{.component type="timeline" items="undated"}
 :::

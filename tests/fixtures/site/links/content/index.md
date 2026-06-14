@@ -7,5 +7,4 @@ site:
 
 # Home
 
-This page links to [ok](/about/) and to [bad](/nope/) and to
-[external](https://example.com).
+This page links to [ok](/about/) and to [bad](/nope/) and to [external](https://example.com).

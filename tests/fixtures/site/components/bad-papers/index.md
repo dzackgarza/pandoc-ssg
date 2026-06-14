@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.component type="papers" items="does-not-exist"}
+:::{.component type="papers" items="does-not-exist"}
 :::

@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.component type="does-not-exist"}
+:::{.component type="does-not-exist"}
 :::

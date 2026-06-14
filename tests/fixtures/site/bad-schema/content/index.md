@@ -7,4 +7,5 @@ site:
 
 # Home
 
-This page is valid. A sibling page is not, which must abort the whole build.
+This page is valid.
+A sibling page is not, which must abort the whole build.

@@ -7,5 +7,5 @@ site:
 
 # Math 2250
 
-Course landing page. The syllabus files alongside this page are plain
-downloadable assets, not compiled pages.
+Course landing page.
+The syllabus files alongside this page are plain downloadable assets, not compiled pages.

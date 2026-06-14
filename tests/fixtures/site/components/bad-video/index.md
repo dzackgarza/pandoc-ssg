@@ -7,5 +7,5 @@ site:
 
 # Bad Video
 
-::: {.component type="video" provider="myspace" id="abc"}
+:::{.component type="video" provider="myspace" id="abc"}
 :::

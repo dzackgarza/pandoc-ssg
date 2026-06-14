@@ -7,5 +7,5 @@ site:
 
 # Video
 
-::: {.component type="video" provider="youtube" id="zRPa-VAvl6Q"}
+:::{.component type="video" provider="youtube" id="zRPa-VAvl6Q"}
 :::

@@ -5,5 +5,5 @@ site:
   schema: page.v1
 ---
 
-::: {.component type="papers" items="untitled"}
+:::{.component type="papers" items="untitled"}
 :::
