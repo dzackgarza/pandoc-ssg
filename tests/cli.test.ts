@@ -244,6 +244,33 @@ describe("CLI serve (O13)", () => {
   });
 });
 
+describe("CLI deploy gate (O15)", () => {
+  test("deploy refuses to publish a site with a verification finding", async () => {
+    const contentDir = await stageContent("deploy-gate-site");
+    const outDir = await freshTmp("deploy-gate-out");
+    const target = path.join(await freshTmp("deploy-gate-target"), "live");
+
+    const r = await runCli([
+      "deploy",
+      target,
+      "--content",
+      contentDir,
+      "--pandoc",
+      PANDOC_DIR,
+      "--mathjax-macros",
+      MACRO_MANIFEST,
+      "--out",
+      outDir,
+    ]);
+
+    expect(r.exitCode).not.toBe(0);
+    // The page leaks un-migrated Liquid; verify reports it (structured contract).
+    expect(r.stderr).toContain("unresolved-markup");
+    // The gate aborted before publishing: nothing reached the live target.
+    expect(await Bun.file(path.join(target, "index.html")).exists()).toBe(false);
+  });
+});
+
 describe("CLI argument errors (O9)", () => {
   test("unknown subcommand exits nonzero", async () => {
     const r = await runCli(["frobnicate"]);
