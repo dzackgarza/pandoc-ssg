@@ -52,21 +52,22 @@ Resolved: generator/content split shipped — generator is content-free (pushed 
 
 Follow-up dispositions (triaged with user 2026-06-15):
 
-- **Body headings → DATA UNIFORMITY problem (not a render hack).** Several migrated
-  pages carry body `# ` section headings rendered as `<h1>` alongside the template
-  title h1 (two competing h1s). This is non-uniform/incorrect *content authoring*: the
-  page title is frontmatter-owned and template-rendered as the sole `<h1>`, so body
-  sections must start at `##` (h2). Migrated Jekyll pages that used `#` for body
-  sections are simply wrong and must be **uniformized to the correct convention**, not
-  papered over. REJECTED approach: `shift-heading-level-by: 1` at render — that is a
-  soft-normalization of malformed input (silently demotes whatever the author wrote),
-  and it only "works" if every page uniformly mis-uses `#`; a correctly-authored `##`
-  page would get shifted to `###`. If you must enforce uniformity, enforce the *correct*
-  convention. Correct fix: (1) one-time content correction in `dzackgarza-site-v2026` —
-  demote offending body `#`→`##` (cascade deeper levels) so the title h1 is the only h1;
-  (2) optional, fail-loud, house-aligned — a generator guard that **rejects** a page
-  whose rendered body contains an `<h1>`, since the title h1 is template-owned (loud
-  rejection of malformed data, never silent repair).
+- **Body headings → uniform compile-time heading shift (REAL task).** Authoring
+  convention is natural prose: title lives in frontmatter YAML, body uses `#` for
+  sections, `##` for subsections, etc. The content does NOT contain its own title
+  heading. At compile time the template injects the metadata title as the sole `<h1>`,
+  so the body must be shifted down one level to make room. Solution: `shift-heading-level-by: 1`
+  in the pandoc defaults, applied **uniformly to every page type** (page.yaml AND
+  blog.yaml) — no special-casing, no content edits, no authoring restriction.
+  Verified behavior (pandoc 3.x, `--shift-heading-level-by=1 -s`): metadata
+  `title:` → `<h1 class="title">` (untouched — the promote-to-title special case is
+  only at shift `-1`); authored `#`→h2, `##`→h3. Blog O25 TOC: after the shift, sections
+  are h2 and subsections h3, so `toc-depth: 3` captures sections+subsections correctly —
+  no conflict. (NOT a soft-normalization: input is well-formed under this convention;
+  the shift is a deterministic uniform transform accounting for the injected title.
+  Earlier "uniformize to `##`" / fail-loud-h1-guard dispositions were wrong and are
+  retracted.) Implement with a test asserting the rendered h-levels + rendered
+  verification, then re-pin + redeploy the content repo (push gate is the user's).
 - **`toc` component → HALLUCINATED request (struck).** Never specified anywhere (not in
   the design doc, not an obligation); surfaced only as a stray word in an earlier plan
   line. An in-page TOC for ordinary pages is pure pandoc metadata — `toc: true` in
