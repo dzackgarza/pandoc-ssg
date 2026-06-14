@@ -14,8 +14,12 @@ export interface RenderInput {
   pandocDir: string;
   pageType: PageType;
   nav: NavItem[];
-  /** site-wide MathJax macro map (name → TeX), from _data/math-macros.yaml */
-  mathMacros: Record<string, string>;
+  /**
+   * Site-wide MathJax macro map, extracted live from the canonical macro
+   * manifest. A zero-arg macro is a string body; an N-arg macro is
+   * [body, argCount] (MathJax 3 tex.macros form).
+   */
+  mathMacros: Record<string, string | [string, number]>;
   /** data backing components (e.g. feature-row collections), from _data/items.yaml */
   items: Record<string, unknown>;
   /** absolute content root; transclusion rejects includes resolving outside it */
@@ -26,7 +30,9 @@ export interface RenderInput {
  * Build the single MathJax configuration script fragment carrying the
  * site-wide macros. Emitted verbatim into the page head exactly once.
  */
-function mathjaxConfig(macros: Record<string, string>): string {
+function mathjaxConfig(macros: Record<string, string | [string, number]>): string {
+  // JSON.stringify renders a string body as "body" and an [body, n] arg-macro
+  // as ["body",n] — both valid MathJax 3 tex.macros entries.
   let entries = Object.entries(macros).map(
     ([name, tex]) => `      ${JSON.stringify(name)}: ${JSON.stringify(tex)}`,
   );

@@ -147,11 +147,10 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     // \Ztest exists only in the fixture .tex referenced by the manifest; its
     // presence proves the build ran the live extractor over the manifest rather
     // than reading a stored macro map.
-    expect(html).toContain('"Ztest"');
-    expect(html).toContain("\\mathbb{Z}_{\\mathrm{test}}");
-    // \DeclareMathOperator and arg-macros come through in MathJax form too.
-    expect(html).toContain("\\operatorname{Spec}");
-    expect(html).toContain('"pair": ["\\\\langle #1, #2 \\\\rangle", 2]');
+    expect(html).toContain('"Ztest": "\\\\mathbb{Z}_{\\\\mathrm{test}}"');
+    // \DeclareMathOperator → \operatorname{...}; an arg-macro → [body, n] form.
+    expect(html).toContain('"Spectest": "\\\\operatorname{Spec}"');
+    expect(html).toContain('"pair": ["\\\\langle #1, #2 \\\\rangle",2]');
   });
 
   test("O5: display math is normalized to an align environment", async () => {

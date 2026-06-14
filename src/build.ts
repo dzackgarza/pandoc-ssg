@@ -51,9 +51,12 @@ let matterOptions = {
   },
 };
 
-let macrosShape = z.object({
-  macros: z.record(z.string(), z.string()).optional(),
-});
+// MathJax 3 tex.macros map: a zero-arg macro is a string body; an N-arg macro
+// is [body, argCount]. This is exactly the extractor's stdout shape.
+let macroMapShape = z.record(
+  z.string(),
+  z.union([z.string(), z.tuple([z.string(), z.number()])]),
+);
 
 /**
  * Load content/_data/items.yaml: the data backing data-driven components
@@ -74,21 +77,32 @@ async function loadItems(contentDir: string): Promise<Record<string, unknown>> {
   return parsed.data;
 }
 
-/** Load content/_data/math-macros.yaml. Missing file → no macros. */
-async function loadMathMacros(contentDir: string): Promise<Record<string, string>> {
-  let macrosPath = join(contentDir, "_data", "math-macros.yaml");
-  if (!(await Bun.file(macrosPath).exists())) {
-    return {};
+/**
+ * Extract MathJax macros live by running the bundled extractor over the macro
+ * manifest. The macros are generated every build from the canonical LaTeX
+ * source — never read from a stored copy. Fails loudly (BuildError) if uv, the
+ * script, the manifest, or any listed macro file is missing, or if the output
+ * is not a valid MathJax macro map. There is no silent empty fallback.
+ */
+async function generateMathMacros(
+  manifestPath: string,
+  pandocDir: string,
+): Promise<Record<string, string | [string, number]>> {
+  let script = join(pandocDir, "bin", "extract_mathjax_macros.py");
+  let proc = Bun.spawn(["uv", "run", script, manifestPath], { stdout: "pipe", stderr: "pipe" });
+  let [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (exitCode !== 0) {
+    throw new BuildError("config", [manifestPath], `macro extraction failed: ${stderr.trim()}`);
   }
-  let raw = await readFile(macrosPath, "utf8");
-  let parsed = macrosShape.safeParse(YAML.parse(raw));
+  let parsed = macroMapShape.safeParse(JSON.parse(stdout));
   if (!parsed.success) {
-    throw new BuildError("config", ["_data/math-macros.yaml"], parsed.error.message);
+    throw new BuildError("config", [manifestPath], parsed.error.message);
   }
-  if (parsed.data.macros === undefined) {
-    return {};
-  }
-  return parsed.data.macros;
+  return parsed.data;
 }
 
 interface PlannedPage {
@@ -170,7 +184,10 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
 
   let nav = await loadNavigation(contentDir);
 
-  let mathMacros = await loadMathMacros(contentDir);
+  let mathMacros =
+    opts.macroManifest === undefined
+      ? {}
+      : await generateMathMacros(opts.macroManifest, pandocDir);
   let items = await loadItems(contentDir);
 
   // Render every page (pandoc) before any write so a failure aborts cleanly.
