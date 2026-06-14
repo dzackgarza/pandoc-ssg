@@ -47,7 +47,10 @@ async function loadChromium(): Promise<unknown> {
  *   missing-main       — no <main> landmark in the live DOM
  *   missing-nav        — no <nav> landmark in the live DOM
  *   unresolved-markup  — `{% … %}`/`{: … }` visible in rendered text
- *   mathjax-error      — MathJax produced <mjx-merror> (e.g. an undefined macro)
+ *   mathjax-error      — MathJax produced <mjx-merror>
+ *   undefined-macro    — rendered math retains a literal \controlSequence (an
+ *                        undefined macro or unrendered TeX; MathJax raises no
+ *                        mjx-merror for these)
  *   console-error      — the page logged a console error
  *   page-error         — an uncaught exception fired on the page
  *
@@ -131,6 +134,17 @@ async function verifyPage(
   let merror = await page.locator("mjx-merror").count();
   if (merror > 0) {
     findings.push({ url, issue: "mathjax-error", detail: `${merror} expression(s)` });
+  }
+  // Undefined macros do NOT raise <mjx-merror> in MathJax v3 — they render as a
+  // literal control sequence inside the container (and fully unrendered math keeps
+  // its raw TeX in span.math). Correctly typeset math is glyph-only, so any leftover
+  // \controlSequence in rendered math proves an undefined macro / unrendered
+  // expression that must gate the build before deploy.
+  let leftover = (await page.evaluate(
+    "(() => { const out = []; for (const el of document.querySelectorAll('mjx-container, span.math')) { const m = (el.textContent || '').match(/\\\\[a-zA-Z]+/g); if (m) { out.push(...m); } } return Array.from(new Set(out)); })()",
+  )) as string[];
+  if (leftover.length > 0) {
+    findings.push({ url, issue: "undefined-macro", detail: leftover.slice(0, 8).join(" ") });
   }
   for (const text of consoleErrors) {
     // A 404 on a third-party image/font is a link concern, not a page defect,
