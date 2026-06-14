@@ -1,0 +1,7 @@
+% Hermetic macro source for build tests. Mirrors the real ~/.pandoc tier files
+% in shape (\newcommand, \DeclareMathOperator, an arg-macro) without depending on
+% the live macro set, which changes frequently.
+\newcommand{\AA}{\mathbb{A}}
+\newcommand{\Ztest}{\mathbb{Z}_{\mathrm{test}}}
+\DeclareMathOperator{\Spectest}{Spec}
+\newcommand{\pair}[2]{\langle #1, #2 \rangle}

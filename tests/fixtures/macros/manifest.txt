@@ -1,0 +1,2 @@
+# Hermetic test manifest (mirrors ~/.pandoc/styles/macros/mathjax-sources.txt).
+test-macros.tex

@@ -10,6 +10,9 @@ const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 const DEMO_CONTENT = join(FIXTURES, "demo", "content");
 const BAD_SCHEMA_CONTENT = join(FIXTURES, "bad-schema", "content");
 const BLOG_TOC_CONTENT = join(FIXTURES, "blog-toc", "content");
+// Hermetic macro source (manifest + .tex) — the build extracts MathJax macros
+// from it live, exactly as the real build reads ~/.pandoc's manifest.
+const MACRO_MANIFEST = join(import.meta.dir, "fixtures", "macros", "manifest.txt");
 
 function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-out-"));
@@ -48,6 +51,7 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
       contentDir: DEMO_CONTENT,
       pandocDir: PANDOC_DIR,
       outDir,
+      macroManifest: MACRO_MANIFEST,
     });
   });
 
@@ -136,6 +140,18 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     const occurrences = html.split("window.MathJax").length - 1;
     expect(occurrences).toBe(1);
     expect(html).toContain("\\mathbb{A}");
+  });
+
+  test("O5: macros are extracted live from the manifest, not a vendored map", async () => {
+    const html = await readFile(join(outDir, "about", "index.html"), "utf8");
+    // \Ztest exists only in the fixture .tex referenced by the manifest; its
+    // presence proves the build ran the live extractor over the manifest rather
+    // than reading a stored macro map.
+    expect(html).toContain('"Ztest"');
+    expect(html).toContain("\\mathbb{Z}_{\\mathrm{test}}");
+    // \DeclareMathOperator and arg-macros come through in MathJax form too.
+    expect(html).toContain("\\operatorname{Spec}");
+    expect(html).toContain('"pair": ["\\\\langle #1, #2 \\\\rangle", 2]');
   });
 
   test("O5: display math is normalized to an align environment", async () => {
