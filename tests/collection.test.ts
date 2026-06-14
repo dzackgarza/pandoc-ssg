@@ -42,7 +42,11 @@ describe("O20: collection island build output", () => {
     const raw = await readFile(join(outDir, "_collections", "notes.json"), "utf8");
     const data = JSON.parse(raw) as CItem[];
     expect(data.map((i) => i.title)).toContain("A-infinity Categories and the Fukaya Category");
-    expect(data.map((i) => i.category).sort()).toEqual(["Expository", "Notes", "Talks"]);
+    expect([...new Set(data.map((i) => i.category))].sort()).toEqual([
+      "Expository",
+      "Notes",
+      "Talks",
+    ]);
     const fukaya = data.find((i) => i.title === "A-infinity Categories and the Fukaya Category");
     expect(fukaya?.links).toEqual([
       { label: "PDF", href: "/talks/fukaya/fukaya.pdf" },
@@ -99,8 +103,23 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
   });
 
   test("renders all items after hydration", async () => {
-    expect((await titles()).length).toBe(3);
+    expect((await titles()).length).toBe(4);
   });
+
+  test(
+    "typesets math in an item title via the site MathJax + macros",
+    async () => {
+      // The "Sheaf cohomology of $\OO_X$" title uses the site-wide \OO macro
+      // and is injected by the island after MathJax's startup pass. It must be
+      // typeset by the same global MathJax (one math path), not left literal.
+      const item = page.locator(".collection__item", { hasText: "Sheaf cohomology" });
+      await item.locator(".collection__title mjx-container").waitFor({ timeout: 15000 });
+      const titleText = await item.locator(".collection__title").innerText();
+      expect(titleText).not.toContain("$");
+      expect(await item.locator(".collection__title mjx-container").count()).toBe(1);
+    },
+    30000,
+  );
 
   test("a category facet narrows to that category", async () => {
     await page

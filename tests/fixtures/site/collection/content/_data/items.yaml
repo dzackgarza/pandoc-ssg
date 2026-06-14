@@ -22,3 +22,10 @@ notes:
     links:
       - label: PDF
         href: /writing/krantz/krantz.pdf
+  - title: Sheaf cohomology of $\OO_X$
+    category: Notes
+    description: A note whose title uses a site-wide custom macro.
+    tags: [algebra]
+    links:
+      - label: PDF
+        href: /notes/sheaf/sheaf.pdf
