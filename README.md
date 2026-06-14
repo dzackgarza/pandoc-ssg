@@ -28,7 +28,9 @@ new TITLE: ; {{SSG}} new post "{{TITLE}}"
 ```
 pandoc-ssg build  [--content DIR] [--pandoc DIR] [--out DIR]
 pandoc-ssg check  [--content DIR] [--pandoc DIR] [--out DIR]
+pandoc-ssg verify [--content DIR] [--pandoc DIR] [--out DIR]   # build, then browser-verify every page
 pandoc-ssg serve  [--out DIR] [--port N]
+pandoc-ssg deploy DIR [--content DIR] [--pandoc DIR] [--out DIR]  # build, then rsync -a --delete into DIR
 pandoc-ssg new post "Title" [--content DIR]
 ```
 
@@ -43,9 +45,9 @@ content/
   index.md                 # a page: needs `site.page: true` frontmatter
   writing.md               # site.route override, components, math
   _data/
-    navigation.toml        # nav (targets must resolve to routes)
+    navigation.toml        # nav config; hrefs may be routes, passthrough assets, or off-site (link integrity via `check`)
     math-macros.yaml        # site-wide MathJax macros
-    items.yaml             # data backing components (feature-row, media-gallery, timeline, papers)
+    items.yaml             # data backing components (feature-row, media-gallery, timeline, papers, collection, link-group)
   _site.toml               # passthrough subtrees, directory→type inference
   some-app/                # opaque passthrough: copied verbatim
 ```
@@ -73,6 +75,6 @@ Fenced-div components expand from `_data/items.yaml`:
 
 ```
 bun install
-bun test          # 88 tests, real pandoc, no mocks
+bun test          # 164 tests, real pandoc + Playwright, no mocks
 bun run types     # tsc --noEmit
 ```
