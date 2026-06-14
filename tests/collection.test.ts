@@ -15,7 +15,7 @@ interface CItem {
   title: string;
   category: string;
   description: string;
-  url: string;
+  links: { label: string; href: string }[];
   tags: string[];
 }
 
@@ -43,6 +43,11 @@ describe("O20: collection island build output", () => {
     const data = JSON.parse(raw) as CItem[];
     expect(data.map((i) => i.title)).toContain("A-infinity Categories and the Fukaya Category");
     expect(data.map((i) => i.category).sort()).toEqual(["Expository", "Notes", "Talks"]);
+    const fukaya = data.find((i) => i.title === "A-infinity Categories and the Fukaya Category");
+    expect(fukaya?.links).toEqual([
+      { label: "PDF", href: "/talks/fukaya/fukaya.pdf" },
+      { label: "HTML", href: "/talks/fukaya/fukaya.html" },
+    ]);
   });
 
   test("bundles the shared collection island", async () => {
@@ -74,9 +79,7 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
   let browser: any;
 
   async function titles(): Promise<string[]> {
-    return page
-      .locator(".collection__item .collection__link, .collection__item .collection__title")
-      .allInnerTexts();
+    return page.locator(".collection__item .collection__title").allInnerTexts();
   }
 
   beforeAll(async () => {
@@ -106,5 +109,15 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
       .click();
     await page.waitForFunction("document.querySelectorAll('.collection__item').length === 1");
     expect(await titles()).toEqual(["A-infinity Categories and the Fukaya Category"]);
+  });
+
+  test("renders each of an item's links as a labeled anchor", async () => {
+    const item = page.locator(".collection__item", {
+      hasText: "A-infinity Categories and the Fukaya Category",
+    });
+    const links = item.locator(".collection__link");
+    expect(await links.allInnerTexts()).toEqual(["PDF", "HTML"]);
+    expect(await links.nth(0).getAttribute("href")).toBe("/talks/fukaya/fukaya.pdf");
+    expect(await links.nth(1).getAttribute("href")).toBe("/talks/fukaya/fukaya.html");
   });
 });

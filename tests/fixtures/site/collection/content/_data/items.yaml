@@ -2,15 +2,23 @@ notes:
   - title: Algebraic Number Theory
     category: Notes
     description: Graduate course notes from Spring 2021.
-    url: /notes/ant/
     tags: [algebra, number-theory]
+    links:
+      - label: PDF
+        href: /notes/ant/ant.pdf
   - title: A-infinity Categories and the Fukaya Category
     category: Talks
     description: UGA Symplectic Reading Seminar, September 2022.
-    url: /talks/fukaya/
     tags: [topology, category-theory]
+    links:
+      - label: PDF
+        href: /talks/fukaya/fukaya.pdf
+      - label: HTML
+        href: /talks/fukaya/fukaya.html
   - title: Notes on a Mathematician's Survival Guide
     category: Expository
     description: Reflections on Krantz.
-    url: /writing/krantz/
     tags: [advice]
+    links:
+      - label: PDF
+        href: /writing/krantz/krantz.pdf
