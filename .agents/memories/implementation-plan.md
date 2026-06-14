@@ -160,13 +160,17 @@ and two engines fragment rendering): `src/pandoc.ts mathjaxConfig()` now emits
 emitted; both templates load the MathJax v3 script unconditionally (version explicit in
 the template now — change there for v4); `islands/lib/mathjax.ts` waits for MathJax then
 typesets, and the collection island re-typesets on hydration + each filter change.
-Verified on the real Writing page (`\OO` → mathcal-O mjx-container). A separate
-delimiter-normalization filter (the ~/.pandoc `convert_math_delimiters.lua` the user
-referenced) is now REDUNDANT for correctness — reading both delimiters already covers
-page (pandoc emits `\(\)`) and island (`$..$`); not added (a redundant second mechanism
-is the same anti-pattern as the rejected two-path approach). Open if the user wants it:
-the filter's display-math→align-environment wrapping is a *separate* feature, unrelated
-to this bug.
+Verified on the real Writing page (`\OO` → mathcal-O mjx-container).
+
+DONE (2026-06-14, generator RED `f1c5182`→GREEN `9125b5d`) — **math normalization
+filter** (user-directed; NOT optional/redundant — the point was to reuse the existing
+filter, which ALSO does the required align normalization the delimiter config does not).
+Ported `~/.pandoc/filters/convert_math_delimiters.lua` (HTML path only — generator emits
+html5) to `pandoc/filters/normalize_math.lua` and wired into both `page.yaml` +
+`blog.yaml` filter chains (after components.lua). Effect: displayed equations are wrapped
+in `align*` (`align` when a `\label` is present), not bare `\[ \]`; inline math stays
+pandoc's `\( \)`. (Lesson: do not relitigate an explicit user directive as "redundant" —
+the align-wrapping was the required feature.)
 
 REMAINING (next session): **Activities**
 timeline (spike timeline.toml, 340 lines); **nav** restructure (CV·Papers·Notes·Talks·
