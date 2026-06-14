@@ -142,11 +142,31 @@ increment first (O20 multi-link, RED `d906e36`→GREEN `b0991f4`):** the collect
 dropped single `url` for required `links[]{label,href}` (matching upstream
 `[[items.links]]`) so every PDF/HTML mirror + multi-instructor note set is preserved
 with zero loss; title is a plain label, links render as labeled anchors. 162 generator
-tests green; content build + `ssg check` clean. Open cosmetic: the `Category $\OO$`
-title renders literal LaTeX in the plain-text collection list (feature-row rendered it
-as math) — left faithful, a content decision (retitle "Category O" or add math to the
-island). Pre-existing dead items.yaml keys left out of scope: `feature_row` (generic),
-`gallery_ex`, `MathDrawingGallery`, `MathCodeGallery`.
+tests green; content build + `ssg check` clean. Pre-existing dead items.yaml keys left
+out of scope: `feature_row` (generic), `gallery_ex`, `MathDrawingGallery`,
+`MathCodeGallery`.
+
+DONE (2026-06-14, generator RED `0cb4379`→GREEN `96a53bd`) — **island math rendering
+(one MathJax path)**. The `Category $\OO$` title (and any math in island JSON
+titles/descriptions) was rendering literal. Reproduced with Playwright (literal text,
+no mjx-container) and root-caused via two in-browser experiments to THREE causes:
+(1) the v3 config (pandoc default URL, from `html-math-method: mathjax`) only set
+`\(\)` delimiters; island data carries `$...$`; (2) MathJax loaded only when the *page*
+had pandoc-level math (pandoc gates the `$math$` script var); (3) the island mounts
+after MathJax's startup typeset with no re-typeset. Fix — single MathJax path, NO second
+renderer (katex rejected: custom macros from `_data/math-macros.yaml` feed MathJax only,
+and two engines fragment rendering): `src/pandoc.ts mathjaxConfig()` now emits
+`inlineMath`/`displayMath` for both `$..$` and `\(..\)` + `processEscapes`, always
+emitted; both templates load the MathJax v3 script unconditionally (version explicit in
+the template now — change there for v4); `islands/lib/mathjax.ts` waits for MathJax then
+typesets, and the collection island re-typesets on hydration + each filter change.
+Verified on the real Writing page (`\OO` → mathcal-O mjx-container). A separate
+delimiter-normalization filter (the ~/.pandoc `convert_math_delimiters.lua` the user
+referenced) is now REDUNDANT for correctness — reading both delimiters already covers
+page (pandoc emits `\(\)`) and island (`$..$`); not added (a redundant second mechanism
+is the same anti-pattern as the rejected two-path approach). Open if the user wants it:
+the filter's display-math→align-environment wrapping is a *separate* feature, unrelated
+to this bug.
 
 REMAINING (next session): **Activities**
 timeline (spike timeline.toml, 340 lines); **nav** restructure (CV·Papers·Notes·Talks·
