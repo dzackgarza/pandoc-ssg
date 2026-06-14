@@ -30,14 +30,19 @@ function mathjaxConfig(macros: Record<string, string>): string {
   let entries = Object.entries(macros).map(
     ([name, tex]) => `      ${JSON.stringify(name)}: ${JSON.stringify(tex)}`,
   );
-  let macroBlock = entries.join(",\n");
+  let macroLines =
+    entries.length > 0 ? ["    macros: {", entries.join(",\n"), "    },"] : ["    macros: {},"];
   return [
     "<script>",
     "window.MathJax = {",
     "  tex: {",
-    "    macros: {",
-    macroBlock,
-    "    }",
+    // Recognize both $…$ and \(…\) inline (and $$…$$ / \[…\] display) so math
+    // authored in data (island JSON titles/descriptions) typesets the same way
+    // as pandoc-rendered page math — one math path, one set of delimiters.
+    '    inlineMath: [["$", "$"], ["\\\\(", "\\\\)"]],',
+    '    displayMath: [["$$", "$$"], ["\\\\[", "\\\\]"]],',
+    "    processEscapes: true,",
+    ...macroLines,
     "  }",
     "};",
     "</script>",
@@ -57,9 +62,10 @@ export async function renderPage(input: RenderInput): Promise<string> {
     nav: input.nav.map((item) => ({ title: item.title, href: item.href })),
     content_root: resolve(input.contentRoot),
   };
-  if (Object.keys(input.mathMacros).length > 0) {
-    metadata.mathjax_config = mathjaxConfig(input.mathMacros);
-  }
+  // Always emit the MathJax config: the delimiter set is site-wide policy,
+  // needed wherever math can appear (including island data), independent of
+  // whether any macros are defined.
+  metadata.mathjax_config = mathjaxConfig(input.mathMacros);
 
   let metaDir = await mkdtemp(join(tmpdir(), "ssg-meta-"));
   let metaFile = join(metaDir, "meta.yaml");

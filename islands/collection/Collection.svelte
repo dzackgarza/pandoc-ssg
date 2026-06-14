@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { tick } from "svelte";
+  import { typesetMath } from "../lib/mathjax";
+
   // A filterable collection rendered as a quiet list (NOT cards): the Notes
   // index that folds Writing + Talks. Search + category facet + tag facet,
   // restrained per AESTHETIC-GUIDELINES (no shadows/badges/tag-pills/avatars).
@@ -41,6 +44,20 @@
       return matchesCategory && matchesTag && matchesQuery;
     }),
   );
+
+  let listEl: HTMLElement | undefined = $state();
+
+  // Item titles/descriptions can contain math; the list renders client-side
+  // after MathJax's startup pass, so re-typeset it with the page's MathJax
+  // whenever the rendered set changes (hydration, search, facet clicks).
+  $effect(() => {
+    filtered;
+    if (!loaded || listEl === undefined) {
+      return;
+    }
+    let el = listEl;
+    tick().then(() => typesetMath(el));
+  });
 </script>
 
 <div class="collection__controls">
@@ -100,7 +117,7 @@
 {#if !loaded}
   <p class="collection__status">Loading…</p>
 {:else}
-  <ul class="collection__list">
+  <ul class="collection__list" bind:this={listEl}>
     {#each filtered as item}
       <li class="collection__item">
         <span class="collection__title">{item.title}</span>
