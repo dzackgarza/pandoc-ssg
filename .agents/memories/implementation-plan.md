@@ -50,7 +50,30 @@ Resolved: generator/content split shipped — generator is content-free (pushed 
 
 **DONE — site theme (O18).** Moved off the bare/minimal-mistakes look to a restrained mathematical-research aesthetic, grounded in **measured** computed styles from daniellitt.com (not guessed — the prior ChatGPT analysis in AESTHETIC-GUIDELINES.md was rejected as speculation): serif body (self-hosted Noto Serif 16px/1.8, #575757) on off-white #fcfcfc, bold geometric-sans headings (self-hosted Jost, #222), underlined deep-navy #000475 links, ~720px measure, whitespace over rules, quiet components. `pandoc/assets/theme/` (site.css + woff2); build emits design-layer `assets/**` into dist (manifest.generated kind `theme`); templates link the stylesheet. Verified by screenshotting the rendered output, not by assertion. `/quals` deleted entirely (deprecated). Full `check` + browser `verify` are zero-findings.
 
-Known follow-ups (not defects): several migrated pages carry multiple body `# ` section headings rendered as `<h1>` alongside the template title h1 — legitimate content structure, but a future content/template pass could demote body sections to `<h2>` for cleaner hierarchy. Lower priority: `toc` component and non-youtube video providers (vimeo) when content needs them; manifest dependency tracking; review CI workflows.
+Follow-up dispositions (triaged with user 2026-06-15):
+
+- **Body headings → REAL task.** Several migrated pages carry body `# ` section
+  headings rendered as `<h1>` alongside the template title h1 (two competing h1s).
+  Agreed solution (user): demote all body headings by one level **at render**, via
+  pandoc `shift-heading-level-by: 1` in the defaults — not a content/per-page edit.
+  Leaves the template `$title$` as the sole h1; body `#`→h2, `##`→h3, etc. Implement
+  with a test + rendered verification; blog interaction with the O25 TOC (toc-depth 3)
+  must be checked since shifting moves authored `##` to h3.
+- **`toc` component → HALLUCINATED request (struck).** Never specified anywhere (not in
+  the design doc, not an obligation); surfaced only as a stray word in an earlier plan
+  line. An in-page TOC for ordinary pages is pure pandoc metadata — `toc: true` in
+  `page.yaml` + a `$table-of-contents$` slot in `page.html` (exactly the O25 blog
+  mechanism) — NOT a component. The only thing a component would add is arbitrary
+  in-body TOC placement, which no content needs. Do not build a `toc` component.
+- **Non-YouTube video providers (vimeo) → HALLUCINATED request (struck).** No content
+  uses vimeo; the `video` component (O17) is YouTube-only by design and that is
+  sufficient. Add a provider only if real content ever requires it.
+- **"Site-name home link" → non-issue (resolved).** Original flag was reachability of
+  `/`; the `Home` nav item (in `navigation.toml`) already makes `/` reachable. The
+  template has no masthead/wordmark element, and omitting one is consistent with the
+  restrained aesthetic. Not a task.
+
+Genuine lower-priority backlog: manifest dependency tracking; review CI workflows.
 
 ## IN PROGRESS — pull spike (garza-academic-hub) organizational decisions (2026-06-14)
 
