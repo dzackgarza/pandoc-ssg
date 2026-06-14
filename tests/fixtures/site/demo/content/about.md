@@ -5,9 +5,13 @@ site:
   schema: page.v1
 ---
 
-## Section
+# Section
 
 This page has *emphasis* and inline math $E = mc^2$ in the body.
+
+## Subsection
+
+Nested prose under the section.
 
 A displayed equation:
 

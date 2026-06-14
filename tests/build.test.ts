@@ -113,6 +113,18 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     expect(html).toContain("<em>emphasis</em>");
   });
 
+  test("O5: body headings shift down one level so the metadata title is the only h1", async () => {
+    const html = await readFile(join(outDir, "about", "index.html"), "utf8");
+    // The page is authored naturally — title in frontmatter, "# Section" and
+    // "## Subsection" in the body. At compile time the template injects the
+    // metadata title as the sole <h1> and the body is shifted down one level.
+    const h1Matches = html.match(/<h1[\s>]/g);
+    expect(h1Matches === null ? 0 : h1Matches.length).toBe(1);
+    expect(html).toContain(">About</h1>");
+    expect(html).toContain('<h2 id="section">Section</h2>');
+    expect(html).toContain('<h3 id="subsection">Subsection</h3>');
+  });
+
   test("O5: inline math is wrapped for MathJax", async () => {
     const html = await readFile(join(outDir, "about", "index.html"), "utf8");
     expect(html).toContain('<span class="math inline">');
