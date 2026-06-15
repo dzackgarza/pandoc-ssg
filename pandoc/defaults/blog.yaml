@@ -11,8 +11,11 @@ template: ${.}/../templates/blog.html
 filters:
   - ${.}/../filters/transclude.lua
   # Tag amsthm fenced divs (:::{.theorem}, :::{.remark}, …) with a `proofenv`
-  # class so the stylesheet can label + style them. Lives in ~/.pandoc.
+  # class so the stylesheet can style them. Lives in ~/.pandoc.
   - ${PANDOC_DIR}/filters/convert_amsthm_envs.lua
+  # Prepend a real, selectable label ("Definition.", …) to the start of each
+  # env — not a CSS ::before (non-selectable, mis-placed for loose-inline divs).
+  - ${.}/../filters/amsthm_label.lua
   # Compile \begin{tikzcd}/\begin{tikzpicture} RawBlocks to inline SVG (LaTeX ->
   # pdf2svg, hash-cached). Lives in ~/.pandoc (the author's canonical figure
   # toolchain); the build sets PANDOC_DIR so it finds its template + styles.

@@ -696,37 +696,16 @@ mjx-container[display="true"] {
 .conjecture, .observation, .proof, .note {
   margin: 1.3rem 0;
 }
-.theorem > :first-child::before, .lemma > :first-child::before,
-.proposition > :first-child::before, .corollary > :first-child::before,
-.definition > :first-child::before, .remark > :first-child::before,
-.example > :first-child::before, .exercise > :first-child::before,
-.question > :first-child::before, .problem > :first-child::before,
-.warning > :first-child::before, .warnings > :first-child::before,
-.fact > :first-child::before, .claim > :first-child::before,
-.conjecture > :first-child::before, .observation > :first-child::before,
-.proof > :first-child::before, .note > :first-child::before {
+/* The label is a real <span class="thmlabel"> injected by amsthm_label.lua at
+   the start of the content — selectable, and always correctly placed. */
+.thmlabel {
   font-family: var(--display);
   font-weight: 600;
   color: var(--ink);
-  margin-right: 0.45rem;
 }
-.theorem > :first-child::before { content: "Theorem."; }
-.lemma > :first-child::before { content: "Lemma."; }
-.proposition > :first-child::before { content: "Proposition."; }
-.corollary > :first-child::before { content: "Corollary."; }
-.definition > :first-child::before { content: "Definition."; }
-.remark > :first-child::before { content: "Remark."; }
-.example > :first-child::before { content: "Example."; }
-.exercise > :first-child::before { content: "Exercise."; }
-.question > :first-child::before { content: "Question."; }
-.problem > :first-child::before { content: "Problem."; }
-.warning > :first-child::before, .warnings > :first-child::before { content: "Warning."; }
-.fact > :first-child::before { content: "Fact."; }
-.claim > :first-child::before { content: "Claim."; }
-.conjecture > :first-child::before { content: "Conjecture."; }
-.observation > :first-child::before { content: "Observation."; }
-.proof > :first-child::before { content: "Proof."; font-style: italic; }
-.note > :first-child::before { content: "Note."; }
+.proof .thmlabel {
+  font-style: italic;
+}
 
 /* Asserted statements get a quiet left rule to set them apart from prose. */
 .theorem, .lemma, .proposition, .corollary, .definition, .conjecture,
