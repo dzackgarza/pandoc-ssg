@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import envPaths from "env-paths";
 import { parse } from "smol-toml";
 import { z } from "zod";
 import { BuildError } from "./errors.ts";
@@ -69,13 +69,13 @@ const appConfigShape = z.object({
   mathjax_macro_manifest: z.string(),
 });
 
-/** Absolute path to the generator's XDG config file. */
+/**
+ * Absolute path to the generator's XDG config file. env-paths owns the XDG Base
+ * Directory spec (reading XDG_CONFIG_HOME at call time); suffix:"" keeps the dir
+ * a plain "pandoc-ssg", not the default "-nodejs"-suffixed name.
+ */
 function appConfigPath(): string {
-  const base =
-    process.env.XDG_CONFIG_HOME === undefined || process.env.XDG_CONFIG_HOME === ""
-      ? join(homedir(), ".config")
-      : process.env.XDG_CONFIG_HOME;
-  return join(base, "pandoc-ssg", "config.toml");
+  return join(envPaths("pandoc-ssg", { suffix: "" }).config, "config.toml");
 }
 
 /**

@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import matter from "gray-matter";
 import { parse as parseHtml } from "node-html-parser";
@@ -380,16 +380,11 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
 }
 
 /** POSIX paths of every file under `root`, recursively (relative to `root`). */
-async function walkRel(root: string, prefix = ""): Promise<string[]> {
+async function walkRel(root: string): Promise<string[]> {
+  let glob = new Bun.Glob("**/*");
   let out: string[] = [];
-  let entries = await readdir(root, { withFileTypes: true });
-  for (const e of entries) {
-    let rel = prefix === "" ? e.name : `${prefix}/${e.name}`;
-    if (e.isDirectory()) {
-      out.push(...(await walkRel(join(root, e.name), rel)));
-    } else {
-      out.push(rel);
-    }
+  for await (const rel of glob.scan({ cwd: root, dot: true, onlyFiles: true })) {
+    out.push(rel);
   }
   return out;
 }
