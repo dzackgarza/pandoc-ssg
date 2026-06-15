@@ -39,6 +39,18 @@ describe("O10: transclusion splices parsed blocks", () => {
     expect(html).toContain('<span class="math inline">');
   });
 
+  test("transcluded single-backslash math parses (matches the page reader)", () => {
+    // Archived notes (the real transclusion targets) author display math as
+    // \[...\] and inline as \(...\). transclude must parse the included file
+    // with tex_math_single_backslash, or these mangle into literal prose
+    // (the live derived-AG defect). Inline \(\theta_tr\) -> math-inline span.
+    expect(html).toContain("\\(\\theta_{\\mathrm{tr}}\\)");
+    // Display \[...\] -> math-display span (normalize wraps align*), not literal.
+    expect(html).toContain('<span class="math display">');
+    expect(html).toContain("\\omega_{\\mathrm{tr}} = \\theta_{\\mathrm{tr}}");
+    expect(html).not.toContain("[\n\\omega");
+  });
+
   test("the include placeholder div is consumed", () => {
     expect(html).not.toContain('class="include"');
     expect(html).not.toContain('path="_includes/abstract.md"');
