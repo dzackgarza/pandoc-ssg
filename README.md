@@ -9,6 +9,35 @@ site lives in its own repository, which depends on this one and points the CLI
 at its `content/` directory. See `Static-Site-Generator-Design.md` for the full
 design.
 
+## Requirements
+
+The build shells out to system tools and reads the author's canonical math and
+figure assets live (so they are never vendored and always current):
+
+| Tool | Used for | Needed by |
+| --- | --- | --- |
+| **Bun** | runs the CLI (`bunx github:dzackgarza/pandoc-ssg`) | always |
+| **pandoc 3.6+** | document rendering, templates, math, AST filters | always |
+| **uv** | runs the bundled MathJax macro extractor (`pandoc/bin/extract_mathjax_macros.py`) | always (any page) |
+| **pdflatex** + **pdf2svg** | compile `\begin{tikzcd}` / `\begin{tikzpicture}` blocks to inline SVG | pages with TikZ diagrams |
+| **playwright** + chromium | `verify` / the `deploy` gate (browser checks) | `verify`, `deploy` |
+| **vite** + **svelte** | bundle interactive islands (blog-index, collection) | pages using those components |
+
+`playwright`, `vite`, and `svelte` are optional peer deps of the content repo
+(install with `bun add -d playwright && bunx playwright install chromium`, etc.).
+
+### The `~/.pandoc` tree (live, not vendored)
+
+Macros and diagrams are regenerated from the author's `~/.pandoc` tree on every
+build — there is no stored copy. That tree must be present and provides:
+
+- **MathJax macros** — `styles/macros/mathjax-sources.txt` (the manifest declaring
+  which `.tex` files feed MathJax; the default for `--mathjax-macros`) plus the
+  `.tex` files it lists. The build extracts the macro set from these each run.
+- **TikZ diagrams** — `filters/tikzcd.lua`, `templates/standalone-tikz.tex`, and
+  the TikZ styles under `styles/`. The build sets `PANDOC_DIR=~/.pandoc` so the
+  filter resolves them; rendered SVGs are hash-cached in `figures/rendered/`.
+
 ## Using it from a content repo
 
 A content repo is the editable surface — pages, `_data`, assets, standalone
@@ -36,7 +65,10 @@ pandoc-ssg new post "Title" [--content DIR]
 
 Defaults: `--content ./content`, `--out ./dist`, and `--pandoc` resolves to the
 design layer bundled with this package. A content repo may override `--pandoc`
-to supply its own templates/filters/defaults.
+to supply its own templates/filters/defaults. `--mathjax-macros` defaults to
+`~/.pandoc/styles/macros/mathjax-sources.txt` (the macro manifest — see
+Requirements). `deploy` browser-verifies the built tree and refuses to publish if
+any page has a rendering defect.
 
 ## Content layout
 
