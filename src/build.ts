@@ -1,5 +1,5 @@
 import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import matter from "gray-matter";
 import { parse as parseHtml } from "node-html-parser";
 import type { Tags } from "yaml";
@@ -179,8 +179,6 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   // Excerpt is filled at posts.json time from the rendered HTML (pandoc owns the
   // markdown parse), so it is absent during this classification pass.
   let blogPosts: Omit<PostMeta, "excerpt">[] = [];
-  let usesBlogIndex = false;
-  let collectionKeys = new Set<string>();
 
   for (const file of classified) {
     if (file.class !== "page") {
@@ -218,12 +216,6 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
         categories: meta.categories === undefined ? [] : meta.categories,
         dateLong: formatDate(meta.date),
       });
-    }
-    if (raw.includes('type="blog-index"')) {
-      usesBlogIndex = true;
-    }
-    for (const key of collectionKeysIn(raw)) {
-      collectionKeys.add(key);
     }
   }
 
@@ -285,6 +277,25 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
       extraMeta: postCtx.get(page.route.url),
     });
     rendered.set(page.route.output, html);
+  }
+
+  // Which island mounts the filter actually emitted — read off the rendered
+  // HTML (pandoc parsed the component fences), not by re-scanning raw markdown.
+  // Unknown collection keys are still validated against items.yaml below.
+  let usesBlogIndex = false;
+  let collectionKeys = new Set<string>();
+  for (const html of rendered.values()) {
+    let root = parseHtml(html);
+    if (root.querySelector("#blog-index") !== null) {
+      usesBlogIndex = true;
+    }
+    for (const mount of root.querySelectorAll("[data-collection]")) {
+      let src = mount.getAttribute("data-collection");
+      if (src !== undefined) {
+        // "/_collections/<key>.json" → "<key>"
+        collectionKeys.add(basename(src, ".json"));
+      }
+    }
   }
 
   // ---- write phase: stage into a temp dir, then atomically swap into outDir ----
@@ -366,29 +377,6 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   await rename(staging, outDir);
 
   return manifest;
-}
-
-/**
- * The items.yaml keys referenced by `type="collection"` component fences in a
- * page's raw markdown (O20). Tolerant of attribute order within the fence.
- */
-function collectionKeysIn(raw: string): string[] {
-  let keys: string[] = [];
-  let fences = raw.match(/\{[^}]*\.component[^}]*\}/g);
-  if (fences === null) {
-    return keys;
-  }
-  for (const fence of fences) {
-    if (!fence.includes('type="collection"')) {
-      continue;
-    }
-    let m = /\bitems="([^"]+)"/.exec(fence);
-    if (m === null) {
-      continue;
-    }
-    keys.push(m[1] as string);
-  }
-  return keys;
 }
 
 /** POSIX paths of every file under `root`, recursively (relative to `root`). */
