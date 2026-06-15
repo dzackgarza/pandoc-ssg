@@ -8,6 +8,7 @@
     url: string;
     tags: string[];
     categories: string[];
+    excerpt: string;
   }
 
   let { postsUrl }: { postsUrl: string } = $props();
@@ -104,6 +105,12 @@
           {#each post.tags as tag}
             <span class="blog-index__item-tag">{tag}</span>
           {/each}
+          {#if post.excerpt}
+            <p class="blog-index__excerpt">
+              {post.excerpt}
+              <a class="blog-index__more" href={post.url}>Read more…</a>
+            </p>
+          {/if}
         </li>
       {/each}
     </ul>

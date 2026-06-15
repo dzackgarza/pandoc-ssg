@@ -29,6 +29,65 @@ interface PostMeta {
   url: string;
   tags: string[];
   categories: string[];
+  /** plain-text teaser (first prose paragraph) for the blog listing */
+  excerpt: string;
+}
+
+/**
+ * A plain-text excerpt: the first prose paragraph of a post body, with fenced
+ * divs / headings / blockquotes / display math / raw HTML skipped and inline
+ * markdown + math stripped. Truncated to ~50 words for the blog listing.
+ */
+function extractExcerpt(body: string): string {
+  let para: string[] = [];
+  let depth = 0;
+  let inDisplay = false;
+  for (const line of body.split("\n")) {
+    const t = line.trim();
+    if (t.startsWith(":::")) {
+      depth = t === ":::" ? Math.max(0, depth - 1) : depth + 1;
+      continue;
+    }
+    if (depth > 0) {
+      continue;
+    }
+    if (t.startsWith("$$")) {
+      inDisplay = !inDisplay;
+      continue;
+    }
+    if (inDisplay) {
+      continue;
+    }
+    if (t === "") {
+      if (para.length > 0) {
+        break;
+      }
+      continue;
+    }
+    if (
+      t === "---" ||
+      t.startsWith("#") ||
+      t.startsWith(">") ||
+      t.startsWith("<") ||
+      t.startsWith("\\[")
+    ) {
+      continue;
+    }
+    if (t.startsWith("\\begin")) {
+      continue;
+    }
+    para.push(t);
+  }
+  let text = para
+    .join(" ")
+    .replace(/\$[^$]*\$/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = text.split(" ");
+  return words.length > 50 ? `${words.slice(0, 50).join(" ")}…` : text;
 }
 
 /**
@@ -166,6 +225,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
         url,
         tags: meta.tags === undefined ? [] : meta.tags,
         categories: meta.categories === undefined ? [] : meta.categories,
+        excerpt: extractExcerpt(matter(raw, matterOptions).content),
       });
     }
     if (raw.includes('type="blog-index"')) {

@@ -17,6 +17,7 @@ interface PostMeta {
   url: string;
   tags: string[];
   categories: string[];
+  excerpt: string;
 }
 
 /** All file paths (POSIX, dir-relative) under `root`, recursively. */
@@ -65,6 +66,8 @@ describe("O16: blog-index island build output", () => {
       url: "/blog/2026-03-15-second/",
       tags: ["algebra", "notes"],
       categories: ["Notes"],
+      // the first prose paragraph of the post body, for the listing teaser
+      excerpt: "The most recent post.",
     });
   });
 

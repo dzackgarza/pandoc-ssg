@@ -54,7 +54,11 @@
   --line: #e6e6e6;
   --serif: "Noto Serif", Georgia, "Times New Roman", serif;
   --display: "Jost", "Futura", "Century Gothic", system-ui, sans-serif;
-  --measure: 720px;
+  /* Reading measures, grounded in measured widths on daniellitt.com: the
+     homepage/index prose is ~789px (not narrow), and blog posts run ~950px —
+     mathematical posts read like preprints/manuscripts and want that density. */
+  --measure: 800px;
+  --measure-post: 940px;
 }
 
 *,
@@ -103,6 +107,10 @@ main {
   max-width: var(--measure);
   margin: 2.5rem auto 5rem;
   padding: 0 1.5rem;
+}
+/* Blog posts read like manuscripts — a wider, denser measure than index prose. */
+main.post {
+  max-width: var(--measure-post);
 }
 
 p {
@@ -365,8 +373,19 @@ mjx-container[display="true"] {
   margin: 1.5rem 0 0;
 }
 .blog-index__item {
-  margin-bottom: 1.1rem;
+  margin-bottom: 1.8rem;
   line-height: 1.4;
+}
+.blog-index__excerpt {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+.blog-index__more {
+  font-family: var(--display);
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 .blog-index__link {
   font-family: var(--display);
@@ -627,13 +646,14 @@ mjx-container[display="true"] {
 }
 
 /* Wide screens: the post becomes a centered [TOC | body] grid — the body keeps
-   the 720px measure and the TOC sits in a quiet sticky sidebar beside it (no
-   box, no dark chrome, unlike the imported pushy panel). */
-@media (min-width: 1080px) {
+   the manuscript measure and the TOC sits in a quiet sticky sidebar beside it
+   (no box, no dark chrome, unlike the imported pushy panel). The breakpoint is
+   wide enough that the TOC + body + gap fit without overflow. */
+@media (min-width: 1280px) {
   main.post--with-toc {
     max-width: none;
     display: grid;
-    grid-template-columns: minmax(0, 14rem) var(--measure);
+    grid-template-columns: minmax(0, 13rem) minmax(0, var(--measure-post));
     gap: 2.5rem;
     justify-content: center;
     /* the TOC column must stretch to the article's height so the sticky
