@@ -213,11 +213,19 @@ describe("O25: blog posts render a depth-3 table of contents; ordinary pages do 
     await rm(outDir, { recursive: true, force: true });
   });
 
-  test("the post emits a post-toc nav linking its headings to in-page anchors", () => {
+  test("the post emits a post-toc linking its headings to in-page anchors", () => {
     expect(postHtml).toContain('class="post-toc"');
     expect(postHtml).toContain('href="#first-section"');
     expect(postHtml).toContain('href="#subsection-a"');
     expect(postHtml).toContain('href="#second-section"');
+  });
+
+  test("the post-toc is a collapsible sidebar (details/summary + sidebar layout)", () => {
+    // forward-ported as a restrained collapsible sticky sidebar (CSS) — the
+    // markup carries the disclosure + the layout hook the stylesheet targets.
+    expect(postHtml).toContain('class="post post--with-toc"');
+    expect(postHtml).toContain("<details");
+    expect(postHtml).toContain("<summary>Contents</summary>");
   });
 
   test("a level-4 heading renders in the body but is excluded from the depth-3 TOC", () => {

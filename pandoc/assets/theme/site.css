@@ -586,12 +586,22 @@ mjx-container[display="true"] {
 /* ---------------------------------------------------------------------------
  * post-toc (O25) — a restrained in-page table of contents for a blog post.
  * ------------------------------------------------------------------------- */
+/* Default (narrow): an inline collapsible disclosure above the post. */
 .post-toc {
-  margin: 0 0 2.5rem;
-  padding: 0.9rem 1.2rem;
+  margin: 0 0 2rem;
+  padding: 0.8rem 1.1rem;
   background: #f5f5f3;
   border-radius: 4px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+}
+.post-toc summary {
+  font-family: var(--display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  margin-bottom: 0.5rem;
 }
 .post-toc ul {
   list-style: none;
@@ -599,11 +609,12 @@ mjx-container[display="true"] {
   padding-left: 0;
 }
 .post-toc ul ul {
-  padding-left: 1.1rem;
-  margin: 0.15rem 0;
+  padding-left: 0.9rem;
+  margin: 0.1rem 0;
 }
 .post-toc li {
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
 }
 .post-toc a {
   font-family: var(--display);
@@ -613,6 +624,34 @@ mjx-container[display="true"] {
 .post-toc a:hover {
   color: var(--link);
   text-decoration: underline;
+}
+
+/* Wide screens: the post becomes a centered [TOC | body] grid — the body keeps
+   the 720px measure and the TOC sits in a quiet sticky sidebar beside it (no
+   box, no dark chrome, unlike the imported pushy panel). */
+@media (min-width: 1080px) {
+  main.post--with-toc {
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 14rem) var(--measure);
+    gap: 2.5rem;
+    justify-content: center;
+    align-items: start;
+  }
+  main.post--with-toc > article {
+    min-width: 0;
+  }
+  .post-toc {
+    margin: 0;
+    padding: 0;
+    background: none;
+  }
+  .post-toc > details {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow: auto;
+  }
 }
 
 /* ---- responsive ---- */

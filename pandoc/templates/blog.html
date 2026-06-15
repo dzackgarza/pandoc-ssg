@@ -16,15 +16,18 @@ $for(nav)$
 <a href="$nav.href$">$nav.title$</a>
 $endfor$
 </nav>
-<main>
+<main class="post$if(toc)$ post--with-toc$endif$">
+$if(toc)$
+<aside class="post-toc" role="doc-toc">
+<details open>
+<summary>Contents</summary>
+$table-of-contents$
+</details>
+</aside>
+$endif$
 <article>
 <h1>$title$</h1>
 $if(date)$<p class="post-date">$date$</p>$endif$
-$if(toc)$
-<nav class="post-toc" role="doc-toc">
-$table-of-contents$
-</nav>
-$endif$
 $body$
 </article>
 </main>
