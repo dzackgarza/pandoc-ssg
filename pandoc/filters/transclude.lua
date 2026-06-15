@@ -55,7 +55,11 @@ local function expand_include(el)
   local raw = fh:read("a")
   fh:close()
 
-  return pandoc.read(raw, "markdown").blocks
+  -- Parse the included file with the same math delimiters as the page reader
+  -- (defaults/*.yaml `from:`). Default "markdown" already enables tex_math_dollars
+  -- and fenced_divs; add tex_math_single_backslash so included notes authored with
+  -- \[...\] / \(...\) parse as math instead of mangling into literal prose.
+  return pandoc.read(raw, "markdown+tex_math_single_backslash").blocks
 end
 
 function Pandoc(doc)

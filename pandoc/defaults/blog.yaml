@@ -1,4 +1,4 @@
-from: markdown+yaml_metadata_block+fenced_divs+tex_math_dollars
+from: markdown+yaml_metadata_block+fenced_divs+tex_math_dollars+tex_math_single_backslash
 to: html5
 wrap: none
 standalone: true
