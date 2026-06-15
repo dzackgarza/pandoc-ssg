@@ -636,7 +636,10 @@ mjx-container[display="true"] {
     grid-template-columns: minmax(0, 14rem) var(--measure);
     gap: 2.5rem;
     justify-content: center;
-    align-items: start;
+    /* the TOC column must stretch to the article's height so the sticky
+       details inside it has room to stay put while the body scrolls (with
+       align-items:start the column is only as tall as the TOC and scrolls off). */
+    align-items: stretch;
   }
   main.post--with-toc > article {
     min-width: 0;
