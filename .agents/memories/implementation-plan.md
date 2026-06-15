@@ -310,3 +310,33 @@ now resolve). 169 generator tests green. Note: a transient `console-error`
 (YouTube iframe compute-pressure permissions policy) appeared once in verify, did
 NOT recur on isolated re-runs — env noise, not engineered around (per
 [[transient-failures-rerun-dont-engineer]]).
+
+## Single-backslash math delimiters + a process lesson — DONE + DEPLOYED (2026-06-15)
+
+User caught a bug I missed: the live derived-AG page rendered display equations as
+literal mangled prose ("[ (X, K(_m, 1)) .]" — `\[\underline{\Map}(X,K(\GG_m,1))\]`
+with `\[`→`[`, macros dropped). **Process failure:** I had claimed "verify clean"
+after checking only structural signals (heading levels, macro injection, leftover
+`\control`, landmarks) — I never read the rendered prose/math. The QC gate is BLIND
+to this failure mode: unparsed math mangles to plain text with no `span.math`, no
+`mjx-container`, no leftover `\control` (pandoc strips the macros), so nothing fires.
+
+Root cause (two paths, both fixed RED→GREEN): the readers only had
+`tex_math_dollars` (`$`/`$$`), so `\[...\]`/`\(...\)` weren't parsed as math. The
+notes (authored for the user's own pandoc pipeline) use single-backslash delimiters.
+Fix: `defaults/{page,blog}.yaml from: += tex_math_single_backslash` (direct page
+math) AND — the path the live notes actually hit — `transclude.lua` now reads
+included files with `pandoc.read(raw, "markdown+tex_math_single_backslash")` (it had
+hard-coded plain `"markdown"`). Verified on the real note: Picard passage is now a
+`math display` span (align*-wrapped) with macros preserved; site-wide scan = 0
+surviving literal math delimiters, browser verify 0 findings. Also fixed: the verify
+console-error filter now skips "Permissions policy violation" (YouTube-iframe
+compute-pressure noise that was intermittently flaking the deploy gate — same class
+as the net::/404 exclusion). Generator `d0739f7`; content re-pinned `e0eba22`;
+deployed via the gating `ssg deploy`.
+
+**Lesson (durable):** the math-render QC gate (O27) catches undefined macros and
+unrendered spans, but CANNOT detect math that pandoc mangled into prose (no
+signal). The guard for that class is the reader config + regression tests, NOT the
+gate. And: actually READ rendered page content before claiming a page renders — a
+green gate over a narrow signal set is not "the page looks right."
