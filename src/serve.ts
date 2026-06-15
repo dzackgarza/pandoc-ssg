@@ -10,36 +10,6 @@ export interface RunningServer {
   stop(): void;
 }
 
-/** Extension → content-type. Unknown extensions fall back to octet-stream. */
-let CONTENT_TYPES: Record<string, string> = {
-  html: "text/html",
-  css: "text/css",
-  js: "text/javascript",
-  json: "application/json",
-  woff2: "font/woff2",
-  woff: "font/woff",
-  svg: "image/svg+xml",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  pdf: "application/pdf",
-  txt: "text/plain",
-  md: "text/markdown",
-};
-
-function contentTypeFor(path: string): string {
-  let dot = path.lastIndexOf(".");
-  if (dot === -1) {
-    return "application/octet-stream";
-  }
-  let ext = path.slice(dot + 1).toLowerCase();
-  let mapped = CONTENT_TYPES[ext];
-  if (mapped === undefined) {
-    return "application/octet-stream";
-  }
-  return mapped;
-}
-
 /**
  * Resolve a decoded request pathname to the candidate file paths (relative to
  * outDir) to try, in order. Returns an empty list for traversal attempts so
@@ -102,10 +72,8 @@ export function startServer(opts: ServeOptions): RunningServer {
         return new Response("Not Found", { status: 404 });
       }
 
-      let file = Bun.file(resolved);
-      return new Response(file, {
-        headers: { "content-type": contentTypeFor(resolved) },
-      });
+      // Bun sets Content-Type from the file extension (its built-in MIME db).
+      return new Response(Bun.file(resolved));
     },
   });
 

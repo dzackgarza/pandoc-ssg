@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Manifest } from "./types.ts";
 
@@ -8,16 +8,11 @@ export interface BrokenLink {
 }
 
 /** All `.html` file paths (POSIX, dist-relative) under `root`, recursively. */
-async function htmlFiles(root: string, prefix = ""): Promise<string[]> {
+async function htmlFiles(root: string): Promise<string[]> {
+  let glob = new Bun.Glob("**/*.html");
   let out: string[] = [];
-  let entries = await readdir(root, { withFileTypes: true });
-  for (const e of entries) {
-    let rel = prefix === "" ? e.name : `${prefix}/${e.name}`;
-    if (e.isDirectory()) {
-      out.push(...(await htmlFiles(join(root, e.name), rel)));
-    } else if (e.name.endsWith(".html")) {
-      out.push(rel);
-    }
+  for await (const rel of glob.scan({ cwd: root, dot: true, onlyFiles: true })) {
+    out.push(rel);
   }
   return out;
 }
@@ -65,20 +60,6 @@ function decodePath(path: string): string {
   return decodeURIComponent(path);
 }
 
-/** Strip `#fragment` and `?query` from a target. */
-function stripFragmentAndQuery(target: string): string {
-  let path = target;
-  let hash = path.indexOf("#");
-  if (hash !== -1) {
-    path = path.slice(0, hash);
-  }
-  let query = path.indexOf("?");
-  if (query !== -1) {
-    path = path.slice(0, query);
-  }
-  return path;
-}
-
 /**
  * Resolve an internal `/`-prefixed path against the built tree:
  *   `/p/`     → `distDir/p/index.html`
@@ -113,7 +94,8 @@ export async function checkLinks(distDir: string, manifest: Manifest): Promise<B
       if (!isInternal(raw)) {
         continue;
       }
-      let path = decodePath(stripFragmentAndQuery(raw));
+      // The URL builtin owns splitting off the ?query and #fragment.
+      let path = decodePath(new URL(raw, "http://_").pathname);
       if (path === "") {
         continue;
       }
