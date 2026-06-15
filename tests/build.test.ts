@@ -276,6 +276,18 @@ describe("O28: tikzcd blocks render to inline SVG (not dropped)", () => {
     expect(html).toContain('class="theorem proofenv"');
     expect(html).toContain('class="remark proofenv"');
   });
+
+  test("O30: the env label is a real selectable element at the very start of the content", () => {
+    // The fixture's definition holds loose-inline content (text + math + a
+    // diagram → pandoc emits Plain, no <p>). A CSS ::before label is
+    // non-selectable and lands before the first inline ELEMENT (the math span),
+    // not the start. The label must be a real element injected at the start.
+    expect(html).toContain('<span class="thmlabel">Definition.</span>');
+    const labelAt = html.indexOf('class="thmlabel">Definition.');
+    const bodyAt = html.indexOf("For an object");
+    expect(labelAt).toBeGreaterThan(0);
+    expect(labelAt).toBeLessThan(bodyAt);
+  });
 });
 
 describe("generator config (XDG) is required, never defaulted", () => {

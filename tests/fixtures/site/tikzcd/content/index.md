@@ -13,8 +13,11 @@ A simple commutative square:
 A \arrow[r, "f"] & B
 \end{tikzcd}
 
-:::{.definition}
-A *widget* is an object with a distinguished arrow.
+:::{.definition title="Widgets"}
+For an object $x$, a *widget* is a diagram
+\begin{tikzcd}
+x \arrow[r, "u"] & y
+\end{tikzcd}
 :::
 
 :::{.theorem}
