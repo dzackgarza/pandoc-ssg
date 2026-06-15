@@ -282,11 +282,20 @@ describe("O28: tikzcd blocks render to inline SVG (not dropped)", () => {
     // diagram → pandoc emits Plain, no <p>). A CSS ::before label is
     // non-selectable and lands before the first inline ELEMENT (the math span),
     // not the start. The label must be a real element injected at the start.
-    expect(html).toContain('<span class="thmlabel">Definition.</span>');
-    const labelAt = html.indexOf('class="thmlabel">Definition.');
+    expect(html).toContain('<span class="thmlabel">Definition 1.1.</span>');
+    const labelAt = html.indexOf('class="thmlabel">Definition 1.1.');
     const bodyAt = html.indexOf("For an object");
     expect(labelAt).toBeGreaterThan(0);
     expect(labelAt).toBeLessThan(bodyAt);
+  });
+
+  test("O31: amsthm envs are numbered section.counter within the body section", () => {
+    // The fixture's three envs (definition, theorem, remark) all sit under the
+    // single body section "# A diagram", so they number 1.1, 1.2, 1.3. The
+    // counter resets per section; proof envs stay unnumbered.
+    expect(html).toContain('<span class="thmlabel">Definition 1.1.</span>');
+    expect(html).toContain('<span class="thmlabel">Theorem 1.2.</span>');
+    expect(html).toContain('<span class="thmlabel">Remark 1.3.</span>');
   });
 });
 
