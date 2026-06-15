@@ -236,6 +236,36 @@ describe("O25: blog posts render a depth-3 table of contents; ordinary pages do 
   });
 });
 
+describe("O28: tikzcd blocks render to inline SVG (not dropped)", () => {
+  let html: string;
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await freshOutDir();
+    await build({
+      contentDir: join(FIXTURES, "tikzcd", "content"),
+      pandocDir: PANDOC_DIR,
+      outDir,
+      macroManifest: MACRO_MANIFEST,
+    });
+    html = await readFile(join(outDir, "index.html"), "utf8");
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("the \\begin{tikzcd} block becomes an inlined <svg>, not dropped prose", () => {
+    // Without the tikzcd filter, pandoc parses \begin{tikzcd} as a raw-LaTeX
+    // RawBlock and the HTML writer silently drops it. The filter must compile it
+    // (LaTeX -> SVG) and inline the result.
+    expect(html).toContain('class="tikzcd');
+    expect(html).toContain("<svg");
+    // the literal tikzcd source must NOT survive as text
+    expect(html).not.toContain("begin{tikzcd}");
+  });
+});
+
 describe("O3: fail-fast schema validation leaves no partial output", () => {
   test("broken page rejects with kind=schema naming the file, dist stays empty", async () => {
     const outDir = await freshOutDir();
