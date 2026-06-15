@@ -132,7 +132,7 @@ describe("O16: blog-index island hydrates and filters in the browser", () => {
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), "ssg-island-br-"));
     await build({ contentDir: BLOG_CONTENT, pandocDir: PANDOC_DIR, outDir });
-    server = startServer({ outDir });
+    server = await startServer({ outDir });
     browser = await chromium.launch({ headless: true });
     page = await browser.newPage();
     await page.goto(`http://localhost:${server.port}/`, { waitUntil: "domcontentloaded" });

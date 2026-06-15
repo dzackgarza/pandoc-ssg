@@ -72,7 +72,7 @@ describe("O15: browser verification catches runtime defects", () => {
       await mkdir(dir, { recursive: true });
       await writeFile(join(dir, "index.html"), html, "utf8");
     }
-    server = startServer({ outDir });
+    server = await startServer({ outDir });
     findings = await verifySite({
       baseUrl: `http://localhost:${server.port}`,
       manifest: manifestFor(Object.keys(PAGES)),

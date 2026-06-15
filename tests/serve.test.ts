@@ -16,7 +16,7 @@ describe("O13: preview server over a built dist tree", () => {
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), "ssg-serve-"));
     await build({ contentDir: DEMO_CONTENT, pandocDir: PANDOC_DIR, outDir });
-    server = startServer({ outDir });
+    server = await startServer({ outDir });
   });
 
   afterAll(async () => {
@@ -80,7 +80,7 @@ describe("O13: serve resolves files under a relative outDir (CLI invocation)", (
     origCwd = process.cwd();
     process.chdir(tmp);
     // exactly how the CLI invokes it: a relative, "./"-prefixed output dir
-    server = startServer({ outDir: "./dist" });
+    server = await startServer({ outDir: "./dist" });
   });
 
   afterAll(async () => {

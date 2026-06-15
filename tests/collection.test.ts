@@ -89,7 +89,7 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), "ssg-coll-br-"));
     await build({ contentDir: CONTENT, pandocDir: PANDOC_DIR, outDir });
-    server = startServer({ outDir });
+    server = await startServer({ outDir });
     browser = await chromium.launch({ headless: true });
     page = await browser.newPage();
     await page.goto(`http://localhost:${server.port}/`, { waitUntil: "domcontentloaded" });

@@ -1,4 +1,5 @@
-import { join, normalize } from "node:path";
+import { createServer } from "node:http";
+import sirv from "sirv";
 
 export interface ServeOptions {
   outDir: string;
@@ -11,82 +12,35 @@ export interface RunningServer {
 }
 
 /**
- * Resolve a decoded request pathname to the candidate file paths (relative to
- * outDir) to try, in order. Returns an empty list for traversal attempts so
- * the caller can answer 404 without ever touching the filesystem.
- *
- * - `/`        → ["index.html"]
- * - `/p/`      → ["p/index.html"]
- * - `/p`       → ["p", "p/index.html"]   (file first, then directory index)
- * - `/file.ext`→ ["file.ext"]
+ * Static preview server over a built dist tree. sirv owns the static serving —
+ * directory-index resolution, content types, and path-traversal protection;
+ * `dev: true` disables caching so a rebuilt file is served fresh. Resolves once
+ * the server is listening (so `port` is bound).
  */
-function candidatesFor(pathname: string): string[] {
-  if (pathname.includes("..")) {
-    return [];
-  }
-  // strip the leading slash; "" means the site root
-  let rel = pathname.startsWith("/") ? pathname.slice(1) : pathname;
-  if (rel === "") {
-    return ["index.html"];
-  }
-  if (rel.endsWith("/")) {
-    return [`${rel}index.html`];
-  }
-  return [rel, `${rel}/index.html`];
-}
+export function startServer(opts: ServeOptions): Promise<RunningServer> {
+  let serve = sirv(opts.outDir, { dev: true });
+  let server = createServer((req, res) =>
+    serve(req, res, () => {
+      res.statusCode = 404;
+      res.end("Not Found");
+    }),
+  );
 
-async function resolveFile(outDir: string, candidates: string[]): Promise<string | undefined> {
-  for (const candidate of candidates) {
-    let full = join(outDir, candidate);
-    // Defense in depth: a resolved path must stay inside outDir.
-    let normalized = normalize(full);
-    if (normalized !== outDir && !normalized.startsWith(`${outDir}/`)) {
-      continue;
-    }
-    if (await Bun.file(full).exists()) {
-      return full;
-    }
-  }
-  return undefined;
-}
-
-export function startServer(opts: ServeOptions): RunningServer {
-  // Normalize once so the containment guard compares like-for-like: the CLI
-  // passes a relative, "./"-prefixed dir ("dist"), and join() strips the "./",
-  // so an un-normalized outDir would never match its own resolved children.
-  let outDir = normalize(opts.outDir);
-  let listenPort = opts.port === undefined ? 0 : opts.port;
-
-  let server = Bun.serve({
-    port: listenPort,
-    async fetch(req: Request): Promise<Response> {
-      if (req.method !== "GET") {
-        return new Response("Method Not Allowed", { status: 405 });
+  return new Promise((resolve, reject) => {
+    server.on("error", reject);
+    server.listen(opts.port === undefined ? 0 : opts.port, () => {
+      let address = server.address();
+      if (address === null || typeof address === "string") {
+        server.close();
+        reject(new Error("preview server did not report a bound TCP port"));
+        return;
       }
-
-      let pathname = decodeURIComponent(new URL(req.url).pathname);
-      let candidates = candidatesFor(pathname);
-      let resolved = await resolveFile(outDir, candidates);
-
-      if (resolved === undefined) {
-        return new Response("Not Found", { status: 404 });
-      }
-
-      // Bun sets Content-Type from the file extension (its built-in MIME db).
-      return new Response(Bun.file(resolved));
-    },
+      resolve({
+        port: address.port,
+        stop: () => {
+          server.close();
+        },
+      });
+    });
   });
-
-  let boundPort = server.port;
-  if (boundPort === undefined) {
-    server.stop(true);
-    throw new Error("Bun.serve did not report a bound port");
-  }
-
-  return {
-    port: boundPort,
-    stop(): void {
-      server.stop(true);
-    },
-  };
 }

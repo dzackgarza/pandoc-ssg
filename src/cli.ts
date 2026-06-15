@@ -139,7 +139,7 @@ async function verifyOut(
   outDir: string,
   manifest: Awaited<ReturnType<typeof build>>,
 ): Promise<Awaited<ReturnType<typeof verifySite>>> {
-  let server = startServer({ outDir });
+  let server = await startServer({ outDir });
   try {
     return await verifySite({ baseUrl: `http://localhost:${server.port}`, manifest });
   } finally {
@@ -180,7 +180,7 @@ async function runServe(flags: Map<string, string>): Promise<number> {
   let outDir = flagOr(flags, "out", "dist");
   let portFlag = flags.get("port");
   let port = portFlag === undefined ? undefined : Number(portFlag);
-  let server = startServer({ outDir, port });
+  let server = await startServer({ outDir, port });
   process.stdout.write(`serving ${outDir} at http://localhost:${server.port}/\n`);
   // Block until the process is terminated; the server keeps handling requests.
   return new Promise<number>(() => {});
