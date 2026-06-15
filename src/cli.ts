@@ -30,11 +30,11 @@ import matter from "gray-matter";
 import { build } from "./build.ts";
 import { deploySite } from "./deploy.ts";
 import { BuildError } from "./errors.ts";
-import { checkLinks } from "./links.ts";
+import { checkLinks, checkServedLinks } from "./links.ts";
 import { validatePageMeta } from "./schemas.ts";
 import { startServer } from "./serve.ts";
 import { validateSite } from "./validate.ts";
-import { verifySite } from "./verify.ts";
+import { type VerifyFinding, verifySite } from "./verify.ts";
 
 /** The design layer (defaults, templates, filters) bundled with the generator. */
 let BUNDLED_PANDOC = join(import.meta.dir, "..", "pandoc");
@@ -134,14 +134,29 @@ function reportFindings(findings: Awaited<ReturnType<typeof verifySite>>): void 
   }
 }
 
-/** Serve the built tree and browser-verify every route; stops the server. */
+/**
+ * Live preflight: serve the built tree over HTTP and validate it against that
+ * running server — browser-verify every route AND lychee-check every link
+ * (internal against the server, external against the real internet). Both are a
+ * single findings list so the deploy gate is one check. Stops the server.
+ */
 async function verifyOut(
   outDir: string,
   manifest: Awaited<ReturnType<typeof build>>,
-): Promise<Awaited<ReturnType<typeof verifySite>>> {
+): Promise<VerifyFinding[]> {
   let server = await startServer({ outDir });
   try {
-    return await verifySite({ baseUrl: `http://localhost:${server.port}`, manifest });
+    let baseUrl = `http://localhost:${server.port}`;
+    let [browserFindings, brokenLinks] = await Promise.all([
+      verifySite({ baseUrl, manifest }),
+      checkServedLinks(baseUrl, manifest),
+    ]);
+    let linkFindings: VerifyFinding[] = brokenLinks.map((b) => ({
+      url: b.sourcePage,
+      issue: "broken-link",
+      detail: b.target,
+    }));
+    return [...browserFindings, ...linkFindings];
   } finally {
     server.stop();
   }
@@ -162,9 +177,10 @@ async function runDeploy(positionals: string[], flags: Map<string, string>): Pro
   }
   let opts = buildOpts(flags);
   let manifest = await build(opts);
-  // Deploy gate: browser-verify the built tree and refuse to publish if any page
-  // has a rendering defect (undefined macro, unrendered math, missing landmark,
-  // broken script). Broken pages must never reach the live web root.
+  // Deploy gate: serve the built tree and validate it live — browser-verify
+  // every page (undefined macro, unrendered math, missing landmark, broken
+  // script) and lychee-check every link (internal + external) over HTTP. Refuse
+  // to publish on any finding; broken pages/links must never reach the web root.
   let findings = await verifyOut(opts.outDir, manifest);
   if (findings.length > 0) {
     reportFindings(findings);

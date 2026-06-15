@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { type BrokenLink, checkServedLinks } from "../src/links.ts";
 import { type RunningServer, startServer } from "../src/serve.ts";
 import type { Manifest } from "../src/types.ts";
 import { type VerifyFinding, verifySite } from "../src/verify.ts";
@@ -125,5 +126,40 @@ describe("O15: browser verification catches runtime defects", () => {
   test("a well-formed page with rendered math is NOT flagged for undefined macros", () => {
     // Glyph-only container (no leftover backslash control sequence) is correct math.
     expect(forUrl("/good/")).toEqual([]);
+  });
+});
+
+describe("O12: live link validation against the served site (lychee, over HTTP)", () => {
+  let outDir: string;
+  let server: RunningServer;
+  let broken: BrokenLink[];
+
+  beforeAll(async () => {
+    outDir = await mkdtemp(join(tmpdir(), "ssg-servedlinks-"));
+    await mkdir(join(outDir, "good"), { recursive: true });
+    await writeFile(join(outDir, "good", "index.html"), page("<h1>ok</h1>"), "utf8");
+    // a page linking to a real route (/good/) and a missing one (/nope/)
+    await mkdir(join(outDir, "linker"), { recursive: true });
+    await writeFile(
+      join(outDir, "linker", "index.html"),
+      page('<a href="/good/">ok</a> <a href="/nope/">bad</a>'),
+      "utf8",
+    );
+    server = await startServer({ outDir });
+    broken = await checkServedLinks(
+      `http://localhost:${server.port}`,
+      manifestFor(["good", "linker"]),
+    );
+  }, 60000);
+
+  afterAll(async () => {
+    server.stop();
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("flags a broken internal link fetched over HTTP, not the valid one", () => {
+    let targets = broken.map((b) => b.target);
+    expect(targets.some((t) => t.startsWith("/nope"))).toBe(true);
+    expect(targets.some((t) => t.startsWith("/good"))).toBe(false);
   });
 });
