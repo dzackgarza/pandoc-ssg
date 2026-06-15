@@ -35,28 +35,20 @@ interface PostMeta {
   dateLong: string;
 }
 
-let MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+let dateFormatter = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  timeZone: "UTC",
+});
 
-/** Format an ISO `YYYY-MM-DD` date as a friendly "Month D, YYYY". */
+/**
+ * Format a schema-validated ISO `YYYY-MM-DD` date as "Month D, YYYY". The
+ * frontmatter schema already guarantees the YYYY-MM-DD shape, so an invalid
+ * value here throws (RangeError) rather than degrading silently.
+ */
 function formatDate(iso: string): string {
-  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (m === null) {
-    return iso;
-  }
-  return `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
+  return dateFormatter.format(new Date(iso));
 }
 
 /**
