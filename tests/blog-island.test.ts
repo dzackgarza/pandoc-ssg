@@ -160,7 +160,12 @@ describe("O16: blog-index island hydrates and filters in the browser", () => {
   });
 
   test("a tag filter shows only posts carrying that tag", async () => {
-    await page.getByRole("button", { name: "algebra", exact: true }).click();
+    // Scope to the filter bar: item tags are now clickable buttons too, so the
+    // bare name "algebra" matches several buttons.
+    await page
+      .locator(".blog-index__tags")
+      .getByRole("button", { name: "algebra", exact: true })
+      .click();
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 2");
     expect(await visibleTitles()).toEqual(["Second Post", "Old Post"]);
     // reset the tag facet for the next test

@@ -5,6 +5,7 @@
   interface Post {
     title: string;
     date: string;
+    dateLong: string;
     url: string;
     tags: string[];
     categories: string[];
@@ -13,11 +14,22 @@
 
   let { postsUrl }: { postsUrl: string } = $props();
 
+  // Filters are URL-addressable: ?tag=, ?category=, ?q= deep-link into a
+  // pre-filtered listing (a chip anywhere on the site links to /blog/?tag=…),
+  // and changing a filter rewrites the URL so the view is shareable.
+  function searchParam(name: string): string {
+    let v = new URLSearchParams(location.search).get(name);
+    return v === null ? "" : v;
+  }
+  function searchParamOrNull(name: string): string | null {
+    return new URLSearchParams(location.search).get(name);
+  }
+
   let posts = $state<Post[]>([]);
   let loaded = $state(false);
-  let query = $state("");
-  let activeTag = $state<string | null>(null);
-  let activeCategory = $state<string | null>(null);
+  let query = $state(searchParam("q"));
+  let activeTag = $state<string | null>(searchParamOrNull("tag"));
+  let activeCategory = $state<string | null>(searchParamOrNull("category"));
 
   $effect(() => {
     // No catch: a failed fetch rejects and surfaces as an uncaught rejection,
@@ -30,6 +42,22 @@
       });
   });
 
+  $effect(() => {
+    // Mirror the active filters into the URL (shareable, back-button friendly).
+    let params = new URLSearchParams();
+    if (query !== "") {
+      params.set("q", query);
+    }
+    if (activeTag !== null) {
+      params.set("tag", activeTag);
+    }
+    if (activeCategory !== null) {
+      params.set("category", activeCategory);
+    }
+    let qs = params.toString();
+    history.replaceState(null, "", qs === "" ? location.pathname : `${location.pathname}?${qs}`);
+  });
+
   let allTags = $derived([...new Set(posts.flatMap((p) => p.tags))].sort());
   let allCategories = $derived([...new Set(posts.flatMap((p) => p.categories))].sort());
 
@@ -37,7 +65,13 @@
     posts.filter((p) => {
       let matchesTag = activeTag === null || p.tags.includes(activeTag);
       let matchesCategory = activeCategory === null || p.categories.includes(activeCategory);
-      let matchesQuery = query === "" || p.title.toLowerCase().includes(query.toLowerCase());
+      let q = query.toLowerCase();
+      // Search spans title, excerpt, and tags — not the title alone.
+      let matchesQuery =
+        query === "" ||
+        p.title.toLowerCase().includes(q) ||
+        p.excerpt.toLowerCase().includes(q) ||
+        p.tags.some((t) => t.toLowerCase().includes(q));
       return matchesTag && matchesCategory && matchesQuery;
     }),
   );
@@ -101,10 +135,25 @@
       {#each filtered as post}
         <li class="blog-index__item" data-tags={post.tags.join(",")}>
           <a class="blog-index__link" href={post.url}>{post.title}</a>
-          <time class="blog-index__date" datetime={post.date}>{post.date}</time>
-          {#each post.tags as tag}
-            <span class="blog-index__item-tag">{tag}</span>
-          {/each}
+          <time class="blog-index__date" datetime={post.date}>{post.dateLong}</time>
+          <span class="blog-index__item-terms">
+            {#each post.tags as tag}
+              <button
+                type="button"
+                class="blog-index__item-tag"
+                class:is-active={activeTag === tag}
+                onclick={() => (activeTag = tag)}>{tag}</button
+              >
+            {/each}
+            {#each post.categories as category}
+              <button
+                type="button"
+                class="blog-index__item-tag blog-index__item-cat"
+                class:is-active={activeCategory === category}
+                onclick={() => (activeCategory = category)}>{category}</button
+              >
+            {/each}
+          </span>
           {#if post.excerpt}
             <p class="blog-index__excerpt">
               {post.excerpt}

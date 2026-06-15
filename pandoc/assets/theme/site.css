@@ -473,10 +473,29 @@ mjx-container[display="true"] {
   font-size: 0.8rem;
   color: var(--muted);
 }
+.blog-index__item-terms {
+  margin-left: 0.5rem;
+}
 .blog-index__item-tag {
+  font-family: var(--display);
   font-size: 0.72rem;
   color: var(--muted);
-  margin-left: 0.5rem;
+  margin-left: 0.4rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.blog-index__item-tag::before {
+  content: "#";
+  opacity: 0.5;
+}
+.blog-index__item-cat::before {
+  content: "";
+}
+.blog-index__item-tag:hover,
+.blog-index__item-tag.is-active {
+  color: var(--ink);
 }
 .blog-index__status {
   color: var(--muted);
