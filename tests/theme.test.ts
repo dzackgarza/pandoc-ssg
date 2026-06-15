@@ -30,23 +30,17 @@ describe("O18: theme assets are emitted and linked", () => {
     await rm(outDir, { recursive: true, force: true });
   });
 
-  test("emits the stylesheet into dist/assets/theme/", async () => {
+  test("emits the override stylesheet into dist/assets/theme/", async () => {
+    // site.css is now a thin override on top of Tufte CSS (linked in the
+    // template); it carries the bespoke island/amsthm layer, not base type.
     const css = await readFile(join(outDir, "assets", "theme", "site.css"), "utf8");
-    expect(css).toContain("@font-face");
     expect(css).toContain(".blog-index");
+    expect(css).toContain(".thmlabel");
   });
 
-  test("emits the self-hosted fonts byte-identical", async () => {
-    const src = join(PANDOC_DIR, "assets", "theme", "fonts", "noto-serif-latin-400-normal.woff2");
-    const dest = join(outDir, "assets", "theme", "fonts", "noto-serif-latin-400-normal.woff2");
-    const [a, b] = await Promise.all([readFile(src), readFile(dest)]);
-    expect(b.equals(a)).toBe(true);
-  });
-
-  test("records emitted theme assets in the manifest with kind 'theme'", () => {
+  test("records the emitted theme stylesheet in the manifest with kind 'theme'", () => {
     const theme = manifest.generated.filter((g) => g.kind === "theme").map((g) => g.output);
     expect(theme).toContain("assets/theme/site.css");
-    expect(theme).toContain("assets/theme/fonts/noto-serif-latin-400-normal.woff2");
   });
 
   test("every page links the stylesheet", () => {
