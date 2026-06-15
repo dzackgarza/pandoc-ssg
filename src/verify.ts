@@ -147,9 +147,15 @@ async function verifyPage(
     findings.push({ url, issue: "undefined-macro", detail: leftover.slice(0, 8).join(" ") });
   }
   for (const text of consoleErrors) {
-    // A 404 on a third-party image/font is a link concern, not a page defect,
-    // and external links are out of scope; keep only genuine script-level errors.
-    if (text.includes("Failed to load resource") || text.includes("net::")) {
+    // Third-party noise that is not a page defect: a 404 on an external
+    // image/font subresource, or an embedded frame (e.g. a YouTube player) using
+    // a feature the host page does not grant ("Permissions policy violation",
+    // e.g. compute-pressure). Keep only genuine script-level errors from the page.
+    if (
+      text.includes("Failed to load resource") ||
+      text.includes("net::") ||
+      text.includes("Permissions policy violation")
+    ) {
       continue;
     }
     findings.push({ url, issue: "console-error", detail: text });

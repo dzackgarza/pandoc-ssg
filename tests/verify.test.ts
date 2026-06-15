@@ -18,6 +18,13 @@ function page(body: string): string {
 const PAGES: Record<string, string> = {
   good: page("<h1>fine</h1>"),
   console: page('<h1>e</h1><script>console.error("boom")</script>'),
+  // Third-party embeds (YouTube) log a "Permissions policy violation" when they
+  // use a feature the host page does not grant (e.g. compute-pressure). This is
+  // frame noise, not a page defect — like the net::/404 subresource noise already
+  // excluded — and must not gate the build.
+  permpolicy: page(
+    '<h1>e</h1><script>console.error("[Violation] Permissions policy violation: compute-pressure is not allowed in this document.")</script>',
+  ),
   throwpage: page('<h1>e</h1><script>throw new Error("kaboom")</script>'),
   markup: page("<p>{% include x %}</p>"),
   // legitimate displayed code (LaTeX) that merely contains "{%" — not un-migrated
@@ -83,6 +90,10 @@ describe("O15: browser verification catches runtime defects", () => {
 
   test("a console error is reported", () => {
     expect(forUrl("/console/")).toContain("console-error");
+  });
+
+  test("a third-party permissions-policy violation is NOT flagged as a console error", () => {
+    expect(forUrl("/permpolicy/")).not.toContain("console-error");
   });
 
   test("an uncaught exception is reported as a page error", () => {
