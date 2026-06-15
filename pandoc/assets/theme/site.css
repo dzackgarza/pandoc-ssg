@@ -59,6 +59,8 @@
      mathematical posts read like preprints/manuscripts and want that density. */
   --measure: 800px;
   --measure-post: 940px;
+  /* tikzcd diagram width, as a fraction of the column — configurable here. */
+  --tikz-width: 75%;
 }
 
 *,
@@ -747,7 +749,7 @@ mjx-container[display="true"] {
 }
 .tikzcd svg {
   display: block;
-  width: 100%;
+  width: var(--tikz-width);
   height: auto;
   margin: 0 auto;
 }
