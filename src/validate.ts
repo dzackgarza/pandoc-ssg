@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parse } from "node-html-parser";
 import type { Manifest } from "./types.ts";
 
 export interface PageIssue {
@@ -48,13 +49,18 @@ export async function validateSite(distDir: string, manifest: Manifest): Promise
 
 function pageIssues(html: string): string[] {
   let found: string[] = [];
+  // Doctype + leftover-markup are checks on the literal serialization (a parser
+  // normalizes the doctype away and these template-engine sigils are plain text
+  // that escaped into output), so they stay string scans.
   if (!html.trimStart().toLowerCase().startsWith("<!doctype html")) {
     found.push("missing-doctype");
   }
-  if (!/<main[\s>]/i.test(html)) {
+  let root = parse(html);
+  if (root.querySelector("main") === null) {
     found.push("missing-main");
   }
-  if (!hasNonEmptyTitle(html)) {
+  let title = root.querySelector("title");
+  if (title === null || title.text.trim() === "") {
     found.push("empty-title");
   }
   if (html.includes("{%")) {
@@ -64,16 +70,4 @@ function pageIssues(html: string): string[] {
     found.push("leftover-kramdown");
   }
   return found;
-}
-
-function hasNonEmptyTitle(html: string): boolean {
-  let match = html.match(/<title>([\s\S]*?)<\/title>/i);
-  if (match === null) {
-    return false;
-  }
-  let inner = match[1];
-  if (inner === undefined) {
-    return false;
-  }
-  return inner.trim() !== "";
 }

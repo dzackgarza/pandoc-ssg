@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parse } from "node-html-parser";
 import type { Manifest } from "./types.ts";
 
 export interface BrokenLink {
@@ -17,17 +18,18 @@ async function htmlFiles(root: string): Promise<string[]> {
   return out;
 }
 
-/** Extract every `href="..."` / `src="..."` attribute value from HTML. */
+/** Extract every `href` / `src` attribute value from HTML, via a real parser. */
 function extractTargets(html: string): string[] {
   let out: string[] = [];
-  let re = /(?:href|src)\s*=\s*"([^"]*)"/gi;
-  let m: RegExpExecArray | null = re.exec(html);
-  while (m !== null) {
-    let value = m[1];
-    if (value !== undefined) {
-      out.push(value);
+  for (const el of parse(html).querySelectorAll("[href], [src]")) {
+    let href = el.getAttribute("href");
+    if (href !== undefined) {
+      out.push(href);
     }
-    m = re.exec(html);
+    let src = el.getAttribute("src");
+    if (src !== undefined) {
+      out.push(src);
+    }
   }
   return out;
 }

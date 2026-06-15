@@ -1,3 +1,4 @@
+import { parse } from "node:path/posix";
 import { BuildError } from "./errors.ts";
 import type { PassthroughEntry, RouteEntry } from "./types.ts";
 
@@ -7,20 +8,18 @@ import type { PassthroughEntry, RouteEntry } from "./types.ts";
  *   foo.md              → "/foo/"
  *   a/b/index.md        → "/a/b/"
  *   a/b/c.md            → "/a/b/c/"
- * A validated `site.route` override replaces the inferred URL.
+ * A validated `site.route` override replaces the inferred URL. node:path/posix
+ * owns splitting the dir from the extension-stripped name.
  */
 export function routeForPage(relPath: string, routeOverride?: string): string {
   if (routeOverride !== undefined) {
     return routeOverride;
   }
-  let withoutExt = relPath.replace(/\.md$/, "");
-  if (withoutExt === "index") {
-    return "/";
+  let { dir, name } = parse(relPath);
+  if (name === "index") {
+    return dir === "" ? "/" : `/${dir}/`;
   }
-  if (withoutExt.endsWith("/index")) {
-    return `/${withoutExt.slice(0, -"/index".length)}/`;
-  }
-  return `/${withoutExt}/`;
+  return dir === "" ? `/${name}/` : `/${dir}/${name}/`;
 }
 
 /** "/" → "index.html"; "/a/b/" → "a/b/index.html" (outDir-relative). */

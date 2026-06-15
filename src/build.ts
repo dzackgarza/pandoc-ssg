@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import matter from "gray-matter";
+import { parse as parseHtml } from "node-html-parser";
 import type { Tags } from "yaml";
 import * as YAML from "yaml";
 import { z } from "zod";
@@ -52,60 +53,30 @@ function formatDate(iso: string): string {
 }
 
 /**
- * A plain-text excerpt: the first prose paragraph of a post body, with fenced
- * divs / headings / blockquotes / display math / raw HTML skipped and inline
- * markdown + math stripped. Truncated to ~50 words for the blog listing.
+ * A plain-text excerpt for the blog listing: the text of the first prose
+ * paragraph of the *rendered* post (pandoc already parsed the markdown), with
+ * the post header and inline math removed, truncated to ~50 words. Body prose
+ * is a direct child of <article>; the date/chips live in <header>, so removing
+ * the header leaves the first real paragraph.
  */
-function extractExcerpt(body: string): string {
-  let para: string[] = [];
-  let depth = 0;
-  let inDisplay = false;
-  for (const line of body.split("\n")) {
-    const t = line.trim();
-    if (t.startsWith(":::")) {
-      depth = t === ":::" ? Math.max(0, depth - 1) : depth + 1;
-      continue;
-    }
-    if (depth > 0) {
-      continue;
-    }
-    if (t.startsWith("$$")) {
-      inDisplay = !inDisplay;
-      continue;
-    }
-    if (inDisplay) {
-      continue;
-    }
-    if (t === "") {
-      if (para.length > 0) {
-        break;
-      }
-      continue;
-    }
-    if (
-      t === "---" ||
-      t.startsWith("#") ||
-      t.startsWith(">") ||
-      t.startsWith("<") ||
-      t.startsWith("\\[")
-    ) {
-      continue;
-    }
-    if (t.startsWith("\\begin")) {
-      continue;
-    }
-    para.push(t);
+function extractExcerpt(renderedHtml: string): string {
+  let article = parseHtml(renderedHtml).querySelector("article");
+  if (article === null) {
+    return "";
   }
-  let text = para
-    .join(" ")
-    .replace(/\$[^$]*\$/g, " ")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const words = text.split(" ");
-  return words.length > 50 ? `${words.slice(0, 50).join(" ")}…` : text;
+  let header = article.querySelector("header");
+  if (header !== null) {
+    header.remove();
+  }
+  for (const math of article.querySelectorAll(".math")) {
+    math.remove();
+  }
+  let p = article.querySelector("p");
+  if (p === null) {
+    return "";
+  }
+  let words = p.text.replace(/\s+/g, " ").trim().split(" ");
+  return words.length > 50 ? `${words.slice(0, 50).join(" ")}…` : words.join(" ");
 }
 
 /**
@@ -205,7 +176,9 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
 
   let pages: PlannedPage[] = [];
   let passthrough = passthroughEntries(classified);
-  let blogPosts: PostMeta[] = [];
+  // Excerpt is filled at posts.json time from the rendered HTML (pandoc owns the
+  // markdown parse), so it is absent during this classification pass.
+  let blogPosts: Omit<PostMeta, "excerpt">[] = [];
   let usesBlogIndex = false;
   let collectionKeys = new Set<string>();
 
@@ -243,7 +216,6 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
         url,
         tags: meta.tags === undefined ? [] : meta.tags,
         categories: meta.categories === undefined ? [] : meta.categories,
-        excerpt: extractExcerpt(matter(raw, matterOptions).content),
         dateLong: formatDate(meta.date),
       });
     }
@@ -350,7 +322,17 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     let postsOutput = "blog/posts.json";
     let postsDest = join(staging, postsOutput);
     await mkdir(dirname(postsDest), { recursive: true });
-    let sorted = [...blogPosts].sort((a, b) => b.date.localeCompare(a.date));
+    let sorted: PostMeta[] = [...blogPosts]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((post) => {
+        // Every post was rendered into `rendered` above (its output key is
+        // outputPathForRoute(url) by construction); undefined would be a bug.
+        let html = rendered.get(outputPathForRoute(post.url));
+        if (html === undefined) {
+          throw new Error(`no rendered HTML for post ${post.url}`);
+        }
+        return { ...post, excerpt: extractExcerpt(html) };
+      });
     await writeFile(postsDest, JSON.stringify(sorted, null, 2), "utf8");
     generated.push({ output: postsOutput, kind: "data" });
 
