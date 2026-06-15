@@ -157,8 +157,9 @@ describe("CLI check (O12)", () => {
     ]);
 
     expect(r.exitCode).not.toBe(0);
-    // The broken target is structured contract data (O12), like O3's filename.
-    expect(r.stdout + r.stderr).toContain("/missing/page/");
+    // The broken target is structured contract data (O12); lychee reports the
+    // resolved path with the trailing slash normalized off.
+    expect(r.stdout + r.stderr).toContain("/missing/page");
   });
 
   test("check on a clean site exits 0", async () => {

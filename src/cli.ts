@@ -118,7 +118,7 @@ async function runCheck(flags: Map<string, string>): Promise<number> {
   for (const issue of issues) {
     process.stderr.write(`page issue: ${issue.issue} (in ${issue.page})\n`);
   }
-  let broken = await checkLinks(opts.outDir, manifest);
+  let broken = await checkLinks(opts.outDir);
   for (const link of broken) {
     process.stderr.write(`broken link: ${link.target} (in ${link.sourcePage})\n`);
   }

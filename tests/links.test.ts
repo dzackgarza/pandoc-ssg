@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
 import { checkLinks } from "../src/links.ts";
-import type { Manifest } from "../src/types.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -20,11 +19,10 @@ function freshOutDir(): Promise<string> {
 
 describe("O12: internal link integrity", () => {
   let outDir: string;
-  let manifest: Manifest;
 
   beforeAll(async () => {
     outDir = await freshOutDir();
-    manifest = await build({
+    await build({
       contentDir: LINKS_CONTENT,
       pandocDir: PANDOC_DIR,
       outDir,
@@ -36,18 +34,18 @@ describe("O12: internal link integrity", () => {
   });
 
   test("reports exactly the broken internal link, ignoring good and external", async () => {
-    let broken = await checkLinks(outDir, manifest);
-    expect(broken).toEqual([{ sourcePage: "index.html", target: "/nope/" }]);
+    let broken = await checkLinks(outDir);
+    // lychee reports the resolved path with the trailing slash normalized off.
+    expect(broken).toEqual([{ sourcePage: "index.html", target: "/nope" }]);
   });
 });
 
 describe("nav is config-driven: the build does not gate nav targets; integrity is O12's job", () => {
   let outDir: string;
-  let manifest: Manifest;
 
   beforeAll(async () => {
     outDir = await freshOutDir();
-    manifest = await build({
+    await build({
       contentDir: NAV_TARGETS_CONTENT,
       pandocDir: PANDOC_DIR,
       outDir,
@@ -65,9 +63,9 @@ describe("nav is config-driven: the build does not gate nav targets; integrity i
   });
 
   test("the link checker flags a genuinely broken nav target but not the asset or route targets", async () => {
-    let broken = await checkLinks(outDir, manifest);
+    let broken = await checkLinks(outDir);
     let targets = broken.map((b) => b.target);
-    expect(targets).toContain("/nope/");
+    expect(targets).toContain("/nope");
     expect(targets).not.toContain("/assets/cv.pdf");
     expect(targets).not.toContain("/");
   });
@@ -75,11 +73,10 @@ describe("nav is config-driven: the build does not gate nav targets; integrity i
 
 describe("O12: fully-valid site reports no broken links", () => {
   let outDir: string;
-  let manifest: Manifest;
 
   beforeAll(async () => {
     outDir = await freshOutDir();
-    manifest = await build({
+    await build({
       contentDir: DEMO_CONTENT,
       pandocDir: PANDOC_DIR,
       outDir,
@@ -91,18 +88,17 @@ describe("O12: fully-valid site reports no broken links", () => {
   });
 
   test("demo site has no broken internal links", async () => {
-    let broken = await checkLinks(outDir, manifest);
+    let broken = await checkLinks(outDir);
     expect(broken).toEqual([]);
   });
 });
 
 describe("O12: percent-encoded paths resolve against the real file", () => {
   let outDir: string;
-  let manifest: Manifest;
 
   beforeAll(async () => {
     outDir = await freshOutDir();
-    manifest = await build({
+    await build({
       contentDir: ENCODED_CONTENT,
       pandocDir: PANDOC_DIR,
       outDir,
@@ -115,7 +111,7 @@ describe("O12: percent-encoded paths resolve against the real file", () => {
 
   test("a link with %20 to a file named with a space is not reported broken", async () => {
     // /assets/My%20File.html must resolve to dist/assets/My File.html, which exists
-    let broken = await checkLinks(outDir, manifest);
+    let broken = await checkLinks(outDir);
     expect(broken).toEqual([]);
   });
 });
