@@ -302,3 +302,18 @@ browser-verifies the built tree and **aborts (exit 1, nothing published)** on an
 verify finding — broken pages cannot reach the live web root.
 
 Linked: [requirements](requirements.md), [architecture](architecture.md).
+
+## O28 — tikzcd/tikzpicture diagrams render to inline SVG
+
+q.uiver/tikz diagrams are authored as `\begin{tikzcd}...\end{tikzcd}` (and
+`\begin{tikzpicture}`) blocks. Pandoc parses them as raw-LaTeX RawBlocks that the
+HTML writer silently drops, so the diagrams vanish. The build runs the author's
+canonical `~/.pandoc/filters/tikzcd.lua` (added to the defaults filter chain after
+transclude, referenced live via `${HOME}`), which compiles each block (pdflatex →
+pdf2svg, hash-cached in `~/.pandoc/figures/rendered/`) and inlines the SVG
+(`<div><span class="tikzcd">…<svg>…</svg></span></div>`). `pandoc.ts` sets
+`PANDOC_DIR=~/.pandoc` in the pandoc subprocess so the filter finds its standalone
+template + TikZ styles. Build dependency: `pdflatex` + `pdf2svg`. The filter got a
+one-line pandoc-3.6 compat fix (render the Doc from `template.apply` to a string).
+
+Linked: [requirements](requirements.md), [architecture](architecture.md).
