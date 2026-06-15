@@ -63,6 +63,20 @@ function mathjaxConfig(macros: Record<string, string | [string, number]>): strin
   ].join("\n");
 }
 
+/** Map nav items (with optional href + nested children) to plain template metadata. */
+function navToMeta(items: NavItem[]): Record<string, unknown>[] {
+  return items.map((item) => {
+    let m: Record<string, unknown> = { title: item.title };
+    if (item.href !== undefined) {
+      m.href = item.href;
+    }
+    if (item.children !== undefined) {
+      m.children = navToMeta(item.children);
+    }
+    return m;
+  });
+}
+
 /**
  * Render one page to standalone HTML (O5) by invoking the system pandoc
  * with the page type's defaults file and template. Pandoc failures throw
@@ -73,7 +87,7 @@ export async function renderPage(input: RenderInput): Promise<string> {
   let defaultsPath = join(input.pandocDir, "defaults", defaultsName);
 
   let metadata: Record<string, unknown> = {
-    nav: input.nav.map((item) => ({ title: item.title, href: item.href })),
+    nav: navToMeta(input.nav),
     content_root: resolve(input.contentRoot),
     ...(input.extraMeta === undefined ? {} : input.extraMeta),
   };

@@ -68,8 +68,11 @@ export interface Manifest {
 
 export interface NavItem {
   title: string;
-  href: string;
+  /** Absent on a pure dropdown parent (a label whose only job is to group children). */
+  href?: string;
   weight: number;
+  /** Nested entries, for dropdown menus. Arbitrary depth. */
+  children?: NavItem[];
 }
 
 export interface BuildOptions {

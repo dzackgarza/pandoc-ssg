@@ -12,3 +12,13 @@ weight = 20
 title = "Example"
 href = "https://example.com/"
 weight = 30
+
+# A pure-dropdown parent (no href): groups children into a nav menu.
+[[main]]
+title = "More"
+weight = 40
+
+  [[main.children]]
+  title = "Wiki"
+  href = "https://example.org/wiki/"
+  weight = 10

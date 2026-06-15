@@ -105,6 +105,56 @@ body > nav a:hover {
   text-decoration: underline;
 }
 
+/* ---- nav dropdowns: a JS-free <details> menu, inline with the other links ---- */
+.nav-dropdown {
+  display: inline-block;
+  position: relative;
+}
+.nav-dropdown > summary {
+  display: inline;
+  margin: 0 0.6rem;
+  color: var(--link);
+  cursor: pointer;
+  list-style: none;
+}
+.nav-dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+.nav-dropdown > summary::after {
+  content: " \25BE";
+  font-size: 0.8em;
+  opacity: 0.6;
+}
+.nav-dropdown > summary:hover {
+  text-decoration: underline;
+}
+.nav-dropdown__menu {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  margin-top: 0.45rem;
+  padding: 0.45rem 0;
+  min-width: 7rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  z-index: 10;
+}
+.nav-dropdown__menu a {
+  margin: 0;
+  padding: 0.35rem 1rem;
+  text-align: left;
+  white-space: nowrap;
+}
+.nav-dropdown__menu a:hover {
+  background: var(--line);
+  text-decoration: none;
+}
+
 /* ---- main reading column ---- */
 main {
   max-width: var(--measure);

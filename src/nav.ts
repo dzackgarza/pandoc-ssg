@@ -5,19 +5,33 @@ import { z } from "zod";
 import { BuildError } from "./errors.ts";
 import type { NavItem } from "./types.ts";
 
+let navItemShape: z.ZodType<NavItem> = z.lazy(() =>
+  z
+    .object({
+      title: z.string(),
+      href: z.string().optional(),
+      weight: z.number(),
+      children: z.array(navItemShape).optional(),
+    })
+    .strict()
+    .refine(
+      (n) => n.href !== undefined || (n.children !== undefined && n.children.length > 0),
+      "nav item needs an href or children",
+    ),
+);
+
 let navShape = z.object({
-  main: z
-    .array(
-      z
-        .object({
-          title: z.string(),
-          href: z.string(),
-          weight: z.number(),
-        })
-        .strict(),
-    )
-    .optional(),
+  main: z.array(navItemShape).optional(),
 });
+
+/** Sort each level by weight, recursively through children. */
+function sortNav(items: NavItem[]): NavItem[] {
+  return [...items]
+    .sort((a, b) => a.weight - b.weight)
+    .map((item) =>
+      item.children === undefined ? item : { ...item, children: sortNav(item.children) },
+    );
+}
 
 /**
  * Load content/_data/navigation.toml ([[main]] entries). Missing file means
@@ -49,5 +63,5 @@ export async function loadNavigation(contentDir: string): Promise<NavItem[]> {
   }
 
   let items = parsed.data.main === undefined ? [] : parsed.data.main;
-  return [...items].sort((a, b) => a.weight - b.weight);
+  return sortNav(items);
 }

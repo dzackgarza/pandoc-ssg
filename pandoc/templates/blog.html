@@ -13,7 +13,16 @@ $endif$
 <body>
 <nav>
 $for(nav)$
+$if(nav.children)$
+<details class="nav-dropdown">
+<summary>$nav.title$</summary>
+<div class="nav-dropdown__menu">
+$for(nav.children)$<a href="$nav.children.href$">$nav.children.title$</a>$endfor$
+</div>
+</details>
+$else$
 <a href="$nav.href$">$nav.title$</a>
+$endif$
 $endfor$
 </nav>
 <main class="post$if(toc)$ post--with-toc$endif$">

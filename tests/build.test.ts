@@ -195,6 +195,15 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     expect(html).toContain("About");
     expect(html).toContain("Example");
   });
+
+  test("O7: a nav item with children renders a dropdown menu, not a flat link", async () => {
+    const html = await readFile(join(outDir, "about", "index.html"), "utf8");
+    // The "More" parent has no href — it must render as a <details> dropdown
+    // wrapping its children, not as a bare anchor.
+    expect(html).toContain('<details class="nav-dropdown">');
+    expect(html).toContain("<summary>More</summary>");
+    expect(html).toContain('href="https://example.org/wiki/"');
+  });
 });
 
 describe("O25: blog posts render a depth-3 table of contents; ordinary pages do not", () => {
