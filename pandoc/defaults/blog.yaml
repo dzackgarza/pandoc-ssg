@@ -13,6 +13,6 @@ filters:
   # Compile \begin{tikzcd}/\begin{tikzpicture} RawBlocks to inline SVG (LaTeX ->
   # pdf2svg, hash-cached). Lives in ~/.pandoc (the author's canonical figure
   # toolchain); the build sets PANDOC_DIR so it finds its template + styles.
-  - ${HOME}/.pandoc/filters/tikzcd.lua
+  - ${PANDOC_DIR}/filters/tikzcd.lua
   - ${.}/../filters/components.lua
   - ${.}/../filters/normalize_math.lua

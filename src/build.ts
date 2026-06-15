@@ -5,7 +5,7 @@ import type { Tags } from "yaml";
 import * as YAML from "yaml";
 import { z } from "zod";
 import { classifyFiles } from "./classify.ts";
-import { loadSiteConfig } from "./config.ts";
+import { loadAppConfig, loadSiteConfig } from "./config.ts";
 import { BuildError } from "./errors.ts";
 import { buildIsland } from "./islands.ts";
 import { loadNavigation } from "./nav.ts";
@@ -184,10 +184,8 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
 
   let nav = await loadNavigation(contentDir);
 
-  let mathMacros =
-    opts.macroManifest === undefined
-      ? {}
-      : await generateMathMacros(opts.macroManifest, pandocDir);
+  let appConfig = await loadAppConfig();
+  let mathMacros = await generateMathMacros(appConfig.mathjaxMacroManifest, pandocDir);
   let items = await loadItems(contentDir);
 
   // Render every page (pandoc) before any write so a failure aborts cleanly.
@@ -202,6 +200,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
       mathMacros,
       items,
       contentRoot: contentDir,
+      pandocHome: appConfig.pandocHome,
     });
     rendered.set(page.route.output, html);
   }

@@ -13,9 +13,6 @@ const REPO = path.resolve(import.meta.dir, "..");
 const CLI = path.join(REPO, "src", "cli.ts");
 const FIXTURES = path.join(REPO, "tests", "fixtures", "cli");
 const PANDOC_DIR = path.join(REPO, "pandoc");
-// Hermetic macro source so CLI builds extract from a fixture, not the live
-// ~/.pandoc manifest the production default points at.
-const MACRO_MANIFEST = path.join(REPO, "tests", "fixtures", "macros", "manifest.txt");
 
 interface RunResult {
   exitCode: number;
@@ -81,10 +78,7 @@ describe("CLI build (O9)", () => {
       "--content",
       contentDir,
       "--pandoc",
-      PANDOC_DIR,
-      "--mathjax-macros",
-      MACRO_MANIFEST,
-      "--out",
+      PANDOC_DIR,      "--out",
       outDir,
     ]);
 
@@ -102,10 +96,7 @@ describe("CLI build (O9)", () => {
       "--content",
       contentDir,
       "--pandoc",
-      PANDOC_DIR,
-      "--mathjax-macros",
-      MACRO_MANIFEST,
-      "--out",
+      PANDOC_DIR,      "--out",
       outDir,
     ]);
 
@@ -161,10 +152,7 @@ describe("CLI check (O12)", () => {
       "--content",
       contentDir,
       "--pandoc",
-      PANDOC_DIR,
-      "--mathjax-macros",
-      MACRO_MANIFEST,
-      "--out",
+      PANDOC_DIR,      "--out",
       outDir,
     ]);
 
@@ -182,10 +170,7 @@ describe("CLI check (O12)", () => {
       "--content",
       contentDir,
       "--pandoc",
-      PANDOC_DIR,
-      "--mathjax-macros",
-      MACRO_MANIFEST,
-      "--out",
+      PANDOC_DIR,      "--out",
       outDir,
     ]);
 
@@ -202,10 +187,7 @@ describe("CLI serve (O13)", () => {
       "--content",
       contentDir,
       "--pandoc",
-      PANDOC_DIR,
-      "--mathjax-macros",
-      MACRO_MANIFEST,
-      "--out",
+      PANDOC_DIR,      "--out",
       outDir,
     ]);
     expect(built.exitCode).toBe(0);
@@ -256,10 +238,7 @@ describe("CLI deploy gate (O15)", () => {
       "--content",
       contentDir,
       "--pandoc",
-      PANDOC_DIR,
-      "--mathjax-macros",
-      MACRO_MANIFEST,
-      "--out",
+      PANDOC_DIR,      "--out",
       outDir,
     ]);
 
@@ -296,10 +275,7 @@ describe("CLI scaffold-then-build round trip (O9)", () => {
       "--content",
       contentDir,
       "--pandoc",
-      PANDOC_DIR,
-      "--mathjax-macros",
-      MACRO_MANIFEST,
-      "--out",
+      PANDOC_DIR,      "--out",
       outDir,
     ]);
     expect(built.exitCode).toBe(0);

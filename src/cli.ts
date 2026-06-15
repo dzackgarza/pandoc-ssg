@@ -25,7 +25,6 @@
  * Exits 0 on success; nonzero with the BuildError report on stderr.
  */
 import { mkdir, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import matter from "gray-matter";
 import { build } from "./build.ts";
@@ -41,25 +40,19 @@ import { verifySite } from "./verify.ts";
 let BUNDLED_PANDOC = join(import.meta.dir, "..", "pandoc");
 
 /**
- * Canonical MathJax macro manifest: the live, author-maintained declaration of
- * which LaTeX macro files feed MathJax. This is the bundled opinionated default;
- * `--mathjax-macros` overrides it. The build extracts macros from it every run
- * and fails loudly if it is absent — macros are never vendored.
+ * Common build options shared by build/check/verify/deploy. The MathJax macro
+ * manifest and the pandoc tree are NOT flags — the build reads them from the
+ * static XDG config (`~/.config/pandoc-ssg/config.toml`).
  */
-let DEFAULT_MACRO_MANIFEST = join(homedir(), ".pandoc", "styles", "macros", "mathjax-sources.txt");
-
-/** Common build options shared by build/check/verify/deploy. */
 function buildOpts(flags: Map<string, string>): {
   contentDir: string;
   pandocDir: string;
   outDir: string;
-  macroManifest: string;
 } {
   return {
     contentDir: flagOr(flags, "content", "content"),
     pandocDir: flagOr(flags, "pandoc", BUNDLED_PANDOC),
     outDir: flagOr(flags, "out", "dist"),
-    macroManifest: flagOr(flags, "mathjax-macros", DEFAULT_MACRO_MANIFEST),
   };
 }
 

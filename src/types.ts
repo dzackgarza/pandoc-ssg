@@ -79,11 +79,4 @@ export interface BuildOptions {
   pandocDir: string;
   /** absolute path of the output tree (dist/) */
   outDir: string;
-  /**
-   * Path to the canonical MathJax macro manifest (declares which LaTeX macro
-   * files feed MathJax). The build runs the bundled extractor on it live, so
-   * macros always reflect the source — never a vendored copy. Omitted only by
-   * tests that do not exercise macros (then no site macros are injected).
-   */
-  macroManifest?: string;
 }

@@ -26,16 +26,27 @@ figure assets live (so they are never vendored and always current):
 `playwright`, `vite`, and `svelte` are optional peer deps of the content repo
 (install with `bun add -d playwright && bunx playwright install chromium`, etc.).
 
+### Configuration (`~/.config/pandoc-ssg/config.toml`)
+
+The macro and diagram sources are **static config, not flags**. The build reads
+`$XDG_CONFIG_HOME/pandoc-ssg/config.toml` (default `~/.config/pandoc-ssg/config.toml`)
+and fails loudly if it is missing or incomplete — there is no runtime default:
+
+```toml
+pandoc_home = "/home/you/.pandoc"
+mathjax_macro_manifest = "/home/you/.pandoc/styles/macros/mathjax-sources.txt"
+```
+
 ### The `~/.pandoc` tree (live, not vendored)
 
-Macros and diagrams are regenerated from the author's `~/.pandoc` tree on every
-build — there is no stored copy. That tree must be present and provides:
+Macros and diagrams are regenerated from the author's pandoc tree (`pandoc_home`)
+on every build — there is no stored copy. That tree must provide:
 
-- **MathJax macros** — `styles/macros/mathjax-sources.txt` (the manifest declaring
-  which `.tex` files feed MathJax; the default for `--mathjax-macros`) plus the
-  `.tex` files it lists. The build extracts the macro set from these each run.
+- **MathJax macros** — the manifest at `mathjax_macro_manifest` (declares which
+  `.tex` files feed MathJax) plus the `.tex` files it lists. The build extracts
+  the macro set from these each run.
 - **TikZ diagrams** — `filters/tikzcd.lua`, `templates/standalone-tikz.tex`, and
-  the TikZ styles under `styles/`. The build sets `PANDOC_DIR=~/.pandoc` so the
+  the TikZ styles under `styles/`. The build sets `PANDOC_DIR=pandoc_home` so the
   filter resolves them; rendered SVGs are hash-cached in `figures/rendered/`.
 
 ## Using it from a content repo
@@ -65,10 +76,10 @@ pandoc-ssg new post "Title" [--content DIR]
 
 Defaults: `--content ./content`, `--out ./dist`, and `--pandoc` resolves to the
 design layer bundled with this package. A content repo may override `--pandoc`
-to supply its own templates/filters/defaults. `--mathjax-macros` defaults to
-`~/.pandoc/styles/macros/mathjax-sources.txt` (the macro manifest — see
-Requirements). `deploy` browser-verifies the built tree and refuses to publish if
-any page has a rendering defect.
+to supply its own templates/filters/defaults. The MathJax macro manifest and the
+pandoc tree are read from the static config (see Requirements), not flags.
+`deploy` browser-verifies the built tree and refuses to publish if any page has a
+rendering defect.
 
 ## Content layout
 

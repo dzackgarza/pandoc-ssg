@@ -1,5 +1,5 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import * as YAML from "yaml";
 import { BuildError } from "./errors.ts";
@@ -24,6 +24,8 @@ export interface RenderInput {
   items: Record<string, unknown>;
   /** absolute content root; transclusion rejects includes resolving outside it */
   contentRoot: string;
+  /** the author's pandoc tree (PANDOC_DIR); resolves the tikzcd filter's template + styles */
+  pandocHome: string;
 }
 
 /**
@@ -103,8 +105,8 @@ export async function renderPage(input: RenderInput): Promise<string> {
         stdout: "pipe",
         stderr: "pipe",
         // The tikzcd filter resolves its standalone template + TikZ styles from
-        // PANDOC_DIR; point it at the author's canonical ~/.pandoc tree.
-        env: { ...process.env, PANDOC_DIR: join(homedir(), ".pandoc") },
+        // PANDOC_DIR; the defaults reference ${PANDOC_DIR}/filters/tikzcd.lua.
+        env: { ...process.env, PANDOC_DIR: input.pandocHome },
       },
     );
 

@@ -1,0 +1,3 @@
+[test]
+# Set XDG_CONFIG_HOME to a hermetic generator config before tests (see tests/setup.ts).
+preload = ["./tests/setup.ts"]

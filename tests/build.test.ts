@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
+import { loadAppConfig } from "../src/config.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -10,9 +11,6 @@ const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 const DEMO_CONTENT = join(FIXTURES, "demo", "content");
 const BAD_SCHEMA_CONTENT = join(FIXTURES, "bad-schema", "content");
 const BLOG_TOC_CONTENT = join(FIXTURES, "blog-toc", "content");
-// Hermetic macro source (manifest + .tex) — the build extracts MathJax macros
-// from it live, exactly as the real build reads ~/.pandoc's manifest.
-const MACRO_MANIFEST = join(import.meta.dir, "fixtures", "macros", "manifest.txt");
 
 function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-out-"));
@@ -51,7 +49,6 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
       contentDir: DEMO_CONTENT,
       pandocDir: PANDOC_DIR,
       outDir,
-      macroManifest: MACRO_MANIFEST,
     });
   });
 
@@ -246,7 +243,6 @@ describe("O28: tikzcd blocks render to inline SVG (not dropped)", () => {
       contentDir: join(FIXTURES, "tikzcd", "content"),
       pandocDir: PANDOC_DIR,
       outDir,
-      macroManifest: MACRO_MANIFEST,
     });
     html = await readFile(join(outDir, "index.html"), "utf8");
   });
@@ -263,6 +259,18 @@ describe("O28: tikzcd blocks render to inline SVG (not dropped)", () => {
     expect(html).toContain("<svg");
     // the literal tikzcd source must NOT survive as text
     expect(html).not.toContain("begin{tikzcd}");
+  });
+});
+
+describe("generator config (XDG) is required, never defaulted", () => {
+  test("a missing ~/.config/pandoc-ssg/config.toml fails loudly with kind=config", async () => {
+    const saved = process.env.XDG_CONFIG_HOME;
+    const empty = await mkdtemp(join(tmpdir(), "ssg-noconfig-"));
+    process.env.XDG_CONFIG_HOME = empty;
+    // No fallback: macros/pandoc-tree are config, so an absent config is a build error.
+    await expect(loadAppConfig()).rejects.toMatchObject({ name: "BuildError", kind: "config" });
+    process.env.XDG_CONFIG_HOME = saved === undefined ? "" : saved;
+    await rm(empty, { recursive: true, force: true });
   });
 });
 
