@@ -46,7 +46,7 @@
 }
 
 :root {
-  --bg: #fcfcfc;
+  --bg: #faf9f6;
   --text: #575757;
   --ink: #222222;
   --muted: #8a8a8a;
@@ -70,7 +70,8 @@
 }
 
 html {
-  font-size: 16px;
+  /* base 15px matches the reference body size; everything else is rem-relative */
+  font-size: 15px;
 }
 
 body {
@@ -113,6 +114,79 @@ main {
 /* Blog posts read like manuscripts — a wider, denser measure than index prose. */
 main.post {
   max-width: var(--measure-post);
+}
+
+/* ---- post header: title, friendly date, tag/category chips ---- */
+.post-header {
+  margin: 0 0 2.4rem;
+}
+.post-header h1 {
+  margin-bottom: 0.5rem;
+}
+.post-date {
+  font-family: var(--display);
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin: 0;
+}
+.post-terms {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+}
+.term {
+  display: inline-block;
+  font-family: var(--display);
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.32rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.term:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+.term--category {
+  border-style: dashed;
+}
+
+/* ---- prev/next post navigation ---- */
+.post-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin: 3.5rem 0 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.post-nav__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 45%;
+  text-decoration: none;
+  color: var(--text);
+}
+.post-nav__next {
+  margin-left: auto;
+  text-align: right;
+}
+.post-nav__dir {
+  font-family: var(--display);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.post-nav__title {
+  color: var(--ink);
+}
+.post-nav__link:hover .post-nav__title {
+  color: var(--link);
 }
 
 p {
@@ -730,13 +804,6 @@ mjx-container[display="true"] {
 }
 .proof .thmlabel {
   font-style: italic;
-}
-
-/* Asserted statements get a quiet left rule to set them apart from prose. */
-.theorem, .lemma, .proposition, .corollary, .definition, .conjecture,
-.claim, .fact {
-  border-left: 2px solid var(--line);
-  padding: 0.15rem 0 0.15rem 1rem;
 }
 
 /* -------------------------------------------------------------------------

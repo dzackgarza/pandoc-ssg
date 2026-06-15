@@ -14,6 +14,7 @@ const BLOG_CONTENT = join(FIXTURES, "blog-island", "content");
 interface PostMeta {
   title: string;
   date: string;
+  dateLong: string;
   url: string;
   tags: string[];
   categories: string[];
@@ -63,6 +64,8 @@ describe("O16: blog-index island build output", () => {
     expect(posts[0]).toEqual({
       title: "Second Post",
       date: "2026-03-15",
+      // friendly date for the listing, derived from the ISO date by formatDate
+      dateLong: "March 15, 2026",
       url: "/blog/2026-03-15-second/",
       tags: ["algebra", "notes"],
       categories: ["Notes"],

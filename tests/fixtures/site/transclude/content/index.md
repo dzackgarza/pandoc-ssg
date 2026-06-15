@@ -7,7 +7,7 @@ site:
 
 Before the include.
 
-::: {.include path="_includes/abstract.md"}
+:::{.include path="_includes/abstract.md"}
 :::
 
 After the include.

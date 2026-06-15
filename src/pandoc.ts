@@ -26,6 +26,12 @@ export interface RenderInput {
   contentRoot: string;
   /** the author's pandoc tree (PANDOC_DIR); resolves the tikzcd filter's template + styles */
   pandocHome: string;
+  /**
+   * Extra template metadata merged into the pandoc metadata (e.g. a blog post's
+   * friendly `date_long`, `prev`/`next` neighbours, tag/category chips). The
+   * single seam for per-page template data the build computes.
+   */
+  extraMeta?: Record<string, unknown>;
 }
 
 /**
@@ -69,6 +75,7 @@ export async function renderPage(input: RenderInput): Promise<string> {
   let metadata: Record<string, unknown> = {
     nav: input.nav.map((item) => ({ title: item.title, href: item.href })),
     content_root: resolve(input.contentRoot),
+    ...(input.extraMeta === undefined ? {} : input.extraMeta),
   };
   // Always emit the MathJax config: the delimiter set is site-wide policy,
   // needed wherever math can appear (including island data), independent of

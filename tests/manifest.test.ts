@@ -44,6 +44,13 @@ const EXPECTED_ROUTES: RouteEntry[] = [
     schema: "page.v1",
   },
   {
+    source: "blog.md",
+    url: "/blog/",
+    output: "blog/index.html",
+    type: "page",
+    schema: "page.v1",
+  },
+  {
     source: "blog/2026-06-12-hello.md",
     url: "/blog/2026-06-12-hello/",
     output: "blog/2026-06-12-hello/index.html",

@@ -15,8 +15,7 @@ These are the distilled, binding requirements.
 - Navigation is content-owned data (`content/_data/navigation.toml`), validated against the route manifest.
 - MathJax with a single site-wide macro source (`content/_data/math-macros.yaml`).
 - `site-manifest.json` is the single contract consumed by everything downstream (sitemap, link checks, tests, preview).
-- CLI for progressive disclosure: `build`, `new post`, etc.
-  — scaffolds valid files, runs the same compiler path.
+- CLI for progressive disclosure: `build`, `new post`, etc. — scaffolds valid files, runs the same compiler path.
 - Components via pandoc fenced divs + Lua filters; transclusion via Lua filter splicing parsed AST blocks.
 
 See [proof-obligations](proof-obligations.md), [architecture](architecture.md), [implementation-plan](implementation-plan.md).

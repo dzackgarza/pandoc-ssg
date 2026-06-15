@@ -31,6 +31,32 @@ interface PostMeta {
   categories: string[];
   /** plain-text teaser (first prose paragraph) for the blog listing */
   excerpt: string;
+  /** friendly date, e.g. "November 28, 2020" */
+  dateLong: string;
+}
+
+let MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** Format an ISO `YYYY-MM-DD` date as a friendly "Month D, YYYY". */
+function formatDate(iso: string): string {
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m === null) {
+    return iso;
+  }
+  return `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
 }
 
 /**
@@ -226,6 +252,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
         tags: meta.tags === undefined ? [] : meta.tags,
         categories: meta.categories === undefined ? [] : meta.categories,
         excerpt: extractExcerpt(matter(raw, matterOptions).content),
+        dateLong: formatDate(meta.date),
       });
     }
     if (raw.includes('type="blog-index"')) {
@@ -248,6 +275,36 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let mathMacros = await generateMathMacros(appConfig.mathjaxMacroManifest, pandocDir);
   let items = await loadItems(contentDir);
 
+  // Per-post template metadata (friendly date, prev/next neighbours, tag/category
+  // chips), keyed by route url. One source feeds the post page here; PostMeta
+  // feeds the listing island. Newest-first order makes prev = older, next = newer.
+  let byDate = [...blogPosts].sort((a, b) => b.date.localeCompare(a.date));
+  let postCtx = new Map<string, Record<string, unknown>>();
+  for (const [i, post] of byDate.entries()) {
+    let newer = byDate[i - 1];
+    let older = byDate[i + 1];
+    let terms = [
+      ...post.tags.map((t) => ({
+        name: t,
+        kind: "tag",
+        href: `/blog/?tag=${encodeURIComponent(t)}`,
+      })),
+      ...post.categories.map((c) => ({
+        name: c,
+        kind: "category",
+        href: `/blog/?category=${encodeURIComponent(c)}`,
+      })),
+    ];
+    let ctx: Record<string, unknown> = { date_long: post.dateLong, post_terms: terms };
+    if (newer !== undefined) {
+      ctx.next = { url: newer.url, title: newer.title };
+    }
+    if (older !== undefined) {
+      ctx.prev = { url: older.url, title: older.title };
+    }
+    postCtx.set(post.url, ctx);
+  }
+
   // Render every page (pandoc) before any write so a failure aborts cleanly.
   let rendered = new Map<string, string>();
   for (const page of pages) {
@@ -261,6 +318,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
       items,
       contentRoot: contentDir,
       pandocHome: appConfig.pandocHome,
+      extraMeta: postCtx.get(page.route.url),
     });
     rendered.set(page.route.output, html);
   }

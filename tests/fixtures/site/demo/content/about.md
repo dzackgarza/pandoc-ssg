@@ -19,8 +19,7 @@ $$
 x^2 + y^2 = z^2
 $$
 
-The archived notes author math with single-backslash delimiters: inline
-\(\zeta_{\mathrm{sb}}\) and display
+The archived notes author math with single-backslash delimiters: inline \(\zeta_{\mathrm{sb}}\) and display
 
 \[
 \xi_{\mathrm{sb}} = \alpha
