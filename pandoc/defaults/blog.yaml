@@ -10,6 +10,9 @@ html-math-method:
 template: ${.}/../templates/blog.html
 filters:
   - ${.}/../filters/transclude.lua
+  # Tag amsthm fenced divs (:::{.theorem}, :::{.remark}, …) with a `proofenv`
+  # class so the stylesheet can label + style them. Lives in ~/.pandoc.
+  - ${PANDOC_DIR}/filters/convert_amsthm_envs.lua
   # Compile \begin{tikzcd}/\begin{tikzpicture} RawBlocks to inline SVG (LaTeX ->
   # pdf2svg, hash-cached). Lives in ~/.pandoc (the author's canonical figure
   # toolchain); the build sets PANDOC_DIR so it finds its template + styles.

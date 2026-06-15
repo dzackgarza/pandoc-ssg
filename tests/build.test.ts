@@ -268,6 +268,14 @@ describe("O28: tikzcd blocks render to inline SVG (not dropped)", () => {
     // the literal tikzcd source must NOT survive as text
     expect(html).not.toContain("begin{tikzcd}");
   });
+
+  test("O29: amsthm fenced divs are tagged proofenv so the stylesheet can label them", () => {
+    // :::{.definition}/:::{.theorem}/:::{.remark} must be recognized by the
+    // amsthm filter (which adds `proofenv`); the env class drives the CSS label.
+    expect(html).toContain('class="definition proofenv"');
+    expect(html).toContain('class="theorem proofenv"');
+    expect(html).toContain('class="remark proofenv"');
+  });
 });
 
 describe("generator config (XDG) is required, never defaulted", () => {
