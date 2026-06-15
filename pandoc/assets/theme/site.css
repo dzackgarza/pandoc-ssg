@@ -612,6 +612,24 @@ mjx-container[display="true"] {
   margin-bottom: 1.3rem;
   line-height: 1.5;
 }
+/* Optional uniform thumbnail: a quiet fixed-size crop to the left, not a card. */
+.collection__item--thumbed {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.collection__thumb {
+  flex: none;
+  width: 104px;
+  height: 68px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.collection__body {
+  flex: 1;
+  min-width: 0;
+}
 .collection__title {
   font-family: var(--display);
   font-size: 1.05rem;

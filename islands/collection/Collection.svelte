@@ -11,6 +11,8 @@
     description: string;
     links: { label: string; href: string }[];
     tags: string[];
+    image?: string;
+    alt?: string;
   }
 
   let { dataUrl }: { dataUrl: string } = $props();
@@ -119,17 +121,27 @@
 {:else}
   <ul class="collection__list" bind:this={listEl}>
     {#each filtered as item}
-      <li class="collection__item">
-        <span class="collection__title">{item.title}</span>
-        {#if item.category}<span class="collection__cat">{item.category}</span>{/if}
-        {#if item.description}<p class="collection__desc">{item.description}</p>{/if}
-        {#if item.links.length > 0}
-          <span class="collection__links">
-            {#each item.links as link}
-              <a class="collection__link" href={link.href}>{link.label}</a>
-            {/each}
-          </span>
+      <li class="collection__item" class:collection__item--thumbed={item.image}>
+        {#if item.image}
+          <img
+            class="collection__thumb"
+            src={item.image}
+            alt={item.alt === undefined ? "" : item.alt}
+            loading="lazy"
+          />
         {/if}
+        <div class="collection__body">
+          <span class="collection__title">{item.title}</span>
+          {#if item.category}<span class="collection__cat">{item.category}</span>{/if}
+          {#if item.description}<p class="collection__desc">{item.description}</p>{/if}
+          {#if item.links.length > 0}
+            <span class="collection__links">
+              {#each item.links as link}
+                <a class="collection__link" href={link.href}>{link.label}</a>
+              {/each}
+            </span>
+          {/if}
+        </div>
       </li>
     {/each}
   </ul>

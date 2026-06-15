@@ -9,6 +9,8 @@ notes:
   - title: A-infinity Categories and the Fukaya Category
     category: Talks
     description: UGA Symplectic Reading Seminar, September 2022.
+    image: /talks/fukaya/thumb.png
+    alt: A Fukaya category diagram
     tags: [topology, category-theory]
     links:
       - label: PDF

@@ -139,4 +139,17 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
     expect(await links.nth(0).getAttribute("href")).toBe("/talks/fukaya/fukaya.pdf");
     expect(await links.nth(1).getAttribute("href")).toBe("/talks/fukaya/fukaya.html");
   });
+
+  test("renders an item's image as a thumbnail, and omits it for image-less items", async () => {
+    const withImg = page.locator(".collection__item", {
+      hasText: "A-infinity Categories and the Fukaya Category",
+    });
+    const thumb = withImg.locator(".collection__thumb");
+    expect(await thumb.count()).toBe(1);
+    expect(await thumb.getAttribute("src")).toBe("/talks/fukaya/thumb.png");
+    expect(await thumb.getAttribute("alt")).toBe("A Fukaya category diagram");
+    // an item with no image field renders no thumbnail (clean omission)
+    const noImg = page.locator(".collection__item", { hasText: "Algebraic Number Theory" });
+    expect(await noImg.locator(".collection__thumb").count()).toBe(0);
+  });
 });
