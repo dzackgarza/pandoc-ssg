@@ -78,10 +78,23 @@ export async function checkServedLinks(baseUrl: string, manifest: Manifest): Pro
   if (inputs.length === 0) {
     return [];
   }
-  let proc = Bun.spawn(["lychee", "--format", "json", "--no-progress", ...inputs], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  let proc = Bun.spawn(
+    [
+      "lychee",
+      "--format",
+      "json",
+      "--no-progress",
+      // 401/403/429 mean the target exists but blocks/limits automated checkers
+      // (login walls, Cloudflare, rate limits) — not a dead link. Only genuine
+      // failures (404, DNS, refused) should gate the deploy.
+      "--accept",
+      "200..=299,401,403,429",
+      "--max-retries",
+      "2",
+      ...inputs,
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  );
   let [out, err, exitCode] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
