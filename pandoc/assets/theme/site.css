@@ -544,10 +544,8 @@ mjx-container[display="true"] {
   font-size: 0.9rem;
 }
 .post-toc summary {
-  font-family: var(--display);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.85rem;
+  font-style: italic;
   color: var(--muted);
   cursor: pointer;
   margin-bottom: 0.5rem;
@@ -567,7 +565,6 @@ mjx-container[display="true"] {
   line-height: 1.4;
 }
 .post-toc a {
-  font-family: var(--display);
   color: var(--ink);
   text-decoration: none;
 }
