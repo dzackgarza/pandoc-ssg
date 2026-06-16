@@ -632,8 +632,7 @@ mjx-container[display="true"] {
   margin: 1.3rem 0;
 }
 .thmlabel {
-  font-family: var(--display);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
 }
 .proof .thmlabel {
