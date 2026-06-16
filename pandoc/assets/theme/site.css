@@ -24,6 +24,35 @@
   box-sizing: border-box;
 }
 
+/* h4–h6: Tufte styles only h1–h3, so deeper headings fall to tiny browser
+   defaults — below the 1.4rem prose. With shift-heading-level-by: 1 the author's
+   `###`/`####` become h4/h5, so continue the italic et-book scale, keeping h4
+   above body text. */
+h4 {
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  margin-top: 1.8rem;
+  margin-bottom: 1rem;
+}
+h5 {
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.3rem;
+  line-height: 1.2;
+  margin-top: 1.6rem;
+  margin-bottom: 0.9rem;
+}
+h6 {
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  margin-top: 1.4rem;
+  margin-bottom: 0.8rem;
+}
+
 /* ---- top navigation: small, quiet, centered, navy ---- */
 body > nav {
   max-width: 1100px;
