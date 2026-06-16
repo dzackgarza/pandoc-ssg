@@ -50,7 +50,9 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
       pandocDir: PANDOC_DIR,
       outDir,
     });
-  });
+    // The demo runs the tikzcd filter (LaTeX -> pdf2svg per figure) — the build
+    // is inherently ~5-6s, past bun's default 5000ms hook timeout. Give headroom.
+  }, 30000);
 
   afterAll(async () => {
     await rm(outDir, { recursive: true, force: true });

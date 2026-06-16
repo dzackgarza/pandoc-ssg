@@ -97,7 +97,9 @@ describe("O14: a real built site validates clean", () => {
   beforeAll(async () => {
     dir = await freshDir();
     manifest = await build({ contentDir: DEMO_CONTENT, pandocDir: PANDOC_DIR, outDir: dir });
-  });
+    // The demo runs the tikzcd filter (LaTeX -> pdf2svg per figure) — inherently
+    // ~5-6s, past bun's default 5000ms hook timeout. Give headroom.
+  }, 30000);
 
   afterAll(async () => {
     await rm(dir, { recursive: true, force: true });
