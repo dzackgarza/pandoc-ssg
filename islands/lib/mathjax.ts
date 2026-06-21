@@ -11,39 +11,55 @@ interface MathJaxGlobal {
   typesetClear?: (elements: Element[]) => void;
 }
 
-function mathJax(): MathJaxGlobal | undefined {
-  return (globalThis as { MathJax?: MathJaxGlobal }).MathJax;
+function mathJax(): MathJaxGlobal | false {
+  let mj = (globalThis as { MathJax?: MathJaxGlobal }).MathJax;
+  if (!mj) {
+    return false;
+  }
+  return mj;
+}
+
+function readyMathJax(): NonNullable<MathJaxGlobal["typesetPromise"]> | false {
+  let mj = mathJax();
+  if (mj && typeof mj.typesetPromise === "function") {
+    return mj.typesetPromise.bind(mj);
+  }
+  return false;
 }
 
 /** Resolve once MathJax has finished loading; reject if it never does. */
-function whenReady(timeoutMs = 10000): Promise<NonNullable<MathJaxGlobal["typesetPromise"]>> {
-  return new Promise((resolve, reject) => {
-    let elapsed = 0;
-    const step = 50;
-    const poll = () => {
-      const mj = mathJax();
-      if (mj !== undefined && typeof mj.typesetPromise === "function") {
-        resolve(mj.typesetPromise.bind(mj));
-        return;
+function whenReady(timeoutMs: number): Promise<NonNullable<MathJaxGlobal["typesetPromise"]>> {
+  return new Promise((resolve, reject): boolean => {
+    let deadline = performance.now() + timeoutMs;
+    let poll = (): boolean => {
+      let typeset = readyMathJax();
+      if (typeset) {
+        resolve(typeset);
+        return true;
       }
-      elapsed += step;
-      if (elapsed >= timeoutMs) {
+      if (performance.now() >= deadline) {
         reject(
           new Error(
             "typesetMath: window.MathJax.typesetPromise never became available — the page must load MathJax",
           ),
         );
-        return;
+        return true;
       }
-      setTimeout(poll, step);
+      requestAnimationFrame(poll);
+      return true;
     };
     poll();
+    return true;
   });
 }
 
 /** Re-typeset the math in `el` once MathJax is ready. */
-export async function typesetMath(el: Element): Promise<void> {
-  const typeset = await whenReady();
-  mathJax()?.typesetClear?.([el]);
+export async function typesetMath(el: Element, timeoutMs: number): Promise<boolean> {
+  let typeset = await whenReady(timeoutMs);
+  let mj = mathJax();
+  if (mj && typeof mj.typesetClear === "function") {
+    mj.typesetClear([el]);
+  }
   await typeset([el]);
+  return true;
 }

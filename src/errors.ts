@@ -17,10 +17,15 @@ export class BuildError extends Error {
   /** content-relative paths of the offending source file(s) */
   readonly files: string[];
 
-  constructor(kind: BuildErrorKind, files: string[], message: string, cause?: unknown) {
-    super(message, cause === undefined ? undefined : { cause });
+  constructor(kind: BuildErrorKind, files: string[], message: string, cause: unknown | false = false) {
+    if (cause === false) {
+      super(message);
+    } else {
+      super(message, { cause });
+    }
     this.name = "BuildError";
     this.kind = kind;
     this.files = files;
+    return this;
   }
 }

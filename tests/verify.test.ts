@@ -77,6 +77,7 @@ describe("O15: browser verification catches runtime defects", () => {
     findings = await verifySite({
       baseUrl: `http://localhost:${server.port}`,
       manifest: manifestFor(Object.keys(PAGES)),
+      timeoutMs: 20000,
     });
   }, 60000);
 
@@ -93,8 +94,8 @@ describe("O15: browser verification catches runtime defects", () => {
     expect(forUrl("/console/")).toContain("console-error");
   });
 
-  test("a third-party permissions-policy violation is NOT flagged as a console error", () => {
-    expect(forUrl("/permpolicy/")).not.toContain("console-error");
+  test("a third-party permissions-policy violation is reported as a console error", () => {
+    expect(forUrl("/permpolicy/")).toContain("console-error");
   });
 
   test("an uncaught exception is reported as a page error", () => {

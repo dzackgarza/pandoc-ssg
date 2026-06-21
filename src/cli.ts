@@ -28,6 +28,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import matter from "gray-matter";
 import { build } from "./build.ts";
+import { loadSiteConfig } from "./config.ts";
 import { deploySite } from "./deploy.ts";
 import { BuildError } from "./errors.ts";
 import { checkLinks, checkServedLinks } from "./links.ts";
@@ -59,7 +60,17 @@ function buildOpts(flags: Map<string, string>): {
 /** Flag value, or a fallback when the flag is absent. */
 function flagOr(flags: Map<string, string>, name: string, fallback: string): string {
   let value = flags.get(name);
-  return value === undefined ? fallback : value;
+  if (typeof value === "string") {
+    return value;
+  }
+  return fallback;
+}
+
+function portFromFlag(portFlag: string | undefined): number {
+  if (portFlag === undefined) {
+    return 0;
+  }
+  return Number(portFlag);
 }
 
 /** Collect repeated `--flag value` pairs from argv into a flag map. */
@@ -115,23 +126,27 @@ async function runCheck(flags: Map<string, string>): Promise<number> {
   let opts = buildOpts(flags);
   let manifest = await build(opts);
   let issues = await validateSite(opts.outDir, manifest);
-  for (const issue of issues) {
+  issues.forEach((issue) => {
     process.stderr.write(`page issue: ${issue.issue} (in ${issue.page})\n`);
-  }
+    return true;
+  });
   let broken = await checkLinks(opts.outDir);
-  for (const link of broken) {
+  broken.forEach((link) => {
     process.stderr.write(`broken link: ${link.target} (in ${link.sourcePage})\n`);
-  }
+    return true;
+  });
   return issues.length + broken.length === 0 ? 0 : 1;
 }
 
 /** Write each verification finding to stderr. */
-function reportFindings(findings: Awaited<ReturnType<typeof verifySite>>): void {
-  for (const f of findings) {
+function reportFindings(findings: Awaited<ReturnType<typeof verifySite>>): boolean {
+  findings.forEach((f) => {
     process.stderr.write(
       `verify: ${f.issue} on ${f.url}${f.detail === "" ? "" : ` — ${f.detail}`}\n`,
     );
-  }
+    return true;
+  });
+  return true;
 }
 
 /**
@@ -145,10 +160,11 @@ async function verifyOut(
   manifest: Awaited<ReturnType<typeof build>>,
 ): Promise<VerifyFinding[]> {
   let server = await startServer({ outDir });
+  let findings: VerifyFinding[] = [];
   try {
     let baseUrl = `http://localhost:${server.port}`;
     let [browserFindings, brokenLinks] = await Promise.all([
-      verifySite({ baseUrl, manifest }),
+      verifySite({ baseUrl, manifest, timeoutMs: 20000 }),
       checkServedLinks(baseUrl, manifest),
     ]);
     let linkFindings: VerifyFinding[] = brokenLinks.map((b) => ({
@@ -156,10 +172,11 @@ async function verifyOut(
       issue: "broken-link",
       detail: b.target,
     }));
-    return [...browserFindings, ...linkFindings];
+    findings = [...browserFindings, ...linkFindings];
   } finally {
     server.stop();
   }
+  return findings;
 }
 
 async function runVerify(flags: Map<string, string>): Promise<number> {
@@ -172,7 +189,7 @@ async function runVerify(flags: Map<string, string>): Promise<number> {
 
 async function runDeploy(positionals: string[], flags: Map<string, string>): Promise<number> {
   let deployDir = positionals[0];
-  if (deployDir === undefined) {
+  if (typeof deployDir === "undefined") {
     throw new BuildError("config", [], "missing deploy target directory: ssg deploy DIR");
   }
   let opts = buildOpts(flags);
@@ -195,19 +212,20 @@ async function runDeploy(positionals: string[], flags: Map<string, string>): Pro
 async function runServe(flags: Map<string, string>): Promise<number> {
   let outDir = flagOr(flags, "out", "dist");
   let portFlag = flags.get("port");
-  let port = portFlag === undefined ? undefined : Number(portFlag);
+  let port = portFromFlag(portFlag);
   let server = await startServer({ outDir, port });
   process.stdout.write(`serving ${outDir} at http://localhost:${server.port}/\n`);
   // Block until the process is terminated; the server keeps handling requests.
-  return new Promise<number>(() => {});
+  return await new Promise<number>((): boolean => true);
 }
 
 async function runNewPost(positionals: string[], flags: Map<string, string>): Promise<number> {
   let title = positionals[0];
-  if (title === undefined) {
+  if (typeof title === "undefined") {
     throw new BuildError("scaffold", [], "missing post title");
   }
   let contentDir = flagOr(flags, "content", "content");
+  let pandocDir = flagOr(flags, "pandoc", BUNDLED_PANDOC);
   let date = today();
   let relPath = join("blog", `${date}-${slugify(title)}.md`);
   let target = join(contentDir, relPath);
@@ -218,7 +236,8 @@ async function runNewPost(positionals: string[], flags: Map<string, string>): Pr
     date,
   });
   let validate = matter(frontmatter);
-  validatePageMeta(relPath, validate.data, "blog-post.v1");
+  let config = await loadSiteConfig(contentDir, pandocDir);
+  validatePageMeta(relPath, validate.data, "blog-post.v1", config.schemas);
 
   if (await Bun.file(target).exists()) {
     throw new BuildError("scaffold", [relPath], `post already exists: ${relPath}`);
@@ -255,28 +274,35 @@ async function dispatch(argv: string[]): Promise<number> {
   if (subcommand === "new") {
     let [kind, ...newRest] = rest;
     if (kind !== "post") {
-      throw new BuildError("scaffold", [], `unknown 'new' target: ${String(kind)}`);
+      return await Promise.reject(
+        new BuildError("scaffold", [], `unknown 'new' target: ${String(kind)}`),
+      );
     }
     let { flags, positionals } = parseFlags(newRest);
     return await runNewPost(positionals, flags);
   }
 
-  throw new BuildError("config", [], `unknown subcommand: ${String(subcommand)}`);
+  return await Promise.reject(
+    new BuildError("config", [], `unknown subcommand: ${String(subcommand)}`),
+  );
 }
 
 export async function main(argv: string[]): Promise<number> {
   // Single boundary renderer: a thrown BuildError becomes a stderr report and a
   // nonzero return; any other exception propagates (crash) rather than being swallowed.
+  let status = 0;
   try {
-    return await dispatch(argv);
+    status = await dispatch(argv);
   } catch (err) {
     if (err instanceof BuildError) {
       let files = err.files.length > 0 ? `\n${err.files.join("\n")}` : "";
       process.stderr.write(`${err.kind} error: ${err.message}${files}\n`);
-      return 1;
+      status = 1;
+    } else {
+      return await Promise.reject(err);
     }
-    throw err;
   }
+  return status;
 }
 
 if (import.meta.main) {

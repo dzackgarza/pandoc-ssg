@@ -11,8 +11,8 @@ import type { PassthroughEntry, RouteEntry } from "./types.ts";
  * A validated `site.route` override replaces the inferred URL. node:path/posix
  * owns splitting the dir from the extension-stripped name.
  */
-export function routeForPage(relPath: string, routeOverride?: string): string {
-  if (routeOverride !== undefined) {
+export function routeForPage(relPath: string, routeOverride: string | false = false): string {
+  if (routeOverride) {
     return routeOverride;
   }
   let { dir, name } = parse(relPath);
@@ -33,15 +33,15 @@ export function outputPathForRoute(url: string): string {
  * copies) sharing one output path throw BuildError(kind="route-collision")
  * with both sources in `files`.
  */
-export function assertNoCollisions(routes: RouteEntry[], passthrough: PassthroughEntry[]): void {
+export function assertNoCollisions(routes: RouteEntry[], passthrough: PassthroughEntry[]): boolean {
   let seen = new Map<string, string>();
   let entries: { output: string; source: string }[] = [
     ...routes.map((r) => ({ output: r.output, source: r.source })),
     ...passthrough.map((p) => ({ output: p.output, source: p.source })),
   ];
-  for (const { output, source } of entries) {
+  entries.forEach(({ output, source }) => {
     let prior = seen.get(output);
-    if (prior !== undefined) {
+    if (prior) {
       throw new BuildError(
         "route-collision",
         [prior, source],
@@ -49,5 +49,7 @@ export function assertNoCollisions(routes: RouteEntry[], passthrough: Passthroug
       );
     }
     seen.set(output, source);
-  }
+    return true;
+  });
+  return true;
 }

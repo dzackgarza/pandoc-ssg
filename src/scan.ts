@@ -5,9 +5,5 @@
  */
 export async function scanContent(contentDir: string): Promise<string[]> {
   let glob = new Bun.Glob("**/*");
-  let out: string[] = [];
-  for await (const rel of glob.scan({ cwd: contentDir, dot: true, onlyFiles: true })) {
-    out.push(rel);
-  }
-  return out.sort();
+  return (await Array.fromAsync(glob.scan({ cwd: contentDir, dot: true, onlyFiles: true }))).sort();
 }

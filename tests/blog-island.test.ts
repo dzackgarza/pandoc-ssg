@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
+import type { Browser, Page } from "playwright";
 import { build } from "../src/build.ts";
 import { type RunningServer, startServer } from "../src/serve.ts";
 import type { Manifest } from "../src/types.ts";
@@ -119,10 +120,8 @@ describe("O16: blog-index island build output", () => {
 describe("O16: blog-index island hydrates and filters in the browser", () => {
   let outDir: string;
   let server: RunningServer;
-  // biome-ignore lint/suspicious/noExplicitAny: playwright Page type via dynamic dep
-  let page: any;
-  // biome-ignore lint/suspicious/noExplicitAny: playwright Browser type via dynamic dep
-  let browser: any;
+  let page: Page;
+  let browser: Browser;
 
   async function visibleTitles(): Promise<string[]> {
     // allInnerTexts avoids in-page DOM callbacks (no node-side DOM typing).

@@ -58,7 +58,7 @@
       return;
     }
     let el = listEl;
-    tick().then(() => typesetMath(el));
+    tick().then(() => typesetMath(el, 10000));
   });
 </script>
 

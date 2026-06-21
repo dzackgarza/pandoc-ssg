@@ -11,6 +11,19 @@ function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-out-"));
 }
 
+type CapturedRejection = { rejected: true; error: unknown } | { rejected: false };
+
+async function captureRejection(promise: Promise<unknown>): Promise<CapturedRejection> {
+  let result: CapturedRejection;
+  try {
+    await promise;
+    result = { rejected: false };
+  } catch (error) {
+    result = { rejected: true, error };
+  }
+  return result;
+}
+
 /**
  * O10: transclusion. `::: {.include path="..."}` splices the pandoc-parsed
  * blocks of the referenced file, resolved relative to the including file.
@@ -65,13 +78,18 @@ describe("O10: transclusion splices parsed blocks", () => {
 describe("O10: transclusion rejects path escaping content/", () => {
   test("an include escaping the content root rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
-    await expect(
-      build({
-        contentDir: join(FIXTURES, "transclude-escape", "content"),
-        pandocDir: PANDOC_DIR,
-        outDir,
-      }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    expect(
+      await captureRejection(
+        build({
+          contentDir: join(FIXTURES, "transclude-escape", "content"),
+          pandocDir: PANDOC_DIR,
+          outDir,
+        }),
+      ),
+    ).toMatchObject({
+      rejected: true,
+      error: { name: "BuildError", kind: "pandoc" },
+    });
     await rm(outDir, { recursive: true, force: true });
   });
 });

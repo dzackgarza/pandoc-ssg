@@ -3,13 +3,13 @@
 import { mount } from "svelte";
 import Collection from "./Collection.svelte";
 
-let el = document.querySelector(".collection");
-if (el === null) {
+let el = document.querySelector<HTMLElement>(".collection");
+if (!el) {
   throw new Error("collection island: no .collection mount point found");
 }
 
-let dataUrl = (el as HTMLElement).dataset.collection;
-if (dataUrl === undefined) {
+let dataUrl = el.dataset.collection;
+if (!dataUrl) {
   throw new Error("collection island: mount point is missing its data-collection attribute");
 }
 

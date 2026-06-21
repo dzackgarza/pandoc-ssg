@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
+import type { Browser, Page } from "playwright";
 import { build } from "../src/build.ts";
 import { type RunningServer, startServer } from "../src/serve.ts";
 import type { Manifest } from "../src/types.ts";
@@ -77,10 +78,8 @@ describe("O20: collection island build output", () => {
 describe("O20: collection hydrates and filters by category/tag/search", () => {
   let outDir: string;
   let server: RunningServer;
-  // biome-ignore lint/suspicious/noExplicitAny: playwright types via dynamic dep
-  let page: any;
-  // biome-ignore lint/suspicious/noExplicitAny: playwright types via dynamic dep
-  let browser: any;
+  let page: Page;
+  let browser: Browser;
 
   async function titles(): Promise<string[]> {
     return page.locator(".collection__item .collection__title").allInnerTexts();

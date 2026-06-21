@@ -42,7 +42,7 @@ describe("O18: theme stays light under prefers-color-scheme: dark", () => {
       await page.goto(`http://localhost:${server.port}/`, { waitUntil: "load" });
       bodyBgUnderDark = (await page.evaluate(
         "getComputedStyle(document.body).backgroundColor",
-      )) as string;
+      ));
       await page.close();
     } finally {
       await browser.close();

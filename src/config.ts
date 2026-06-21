@@ -4,54 +4,266 @@ import envPaths from "env-paths";
 import { parse } from "smol-toml";
 import { z } from "zod";
 import { BuildError } from "./errors.ts";
-import type { SiteConfig } from "./types.ts";
+import type { PageType, SiteConfig } from "./types.ts";
 
-const defaultConfig: SiteConfig = {
-  passthrough: [],
-  dirTypes: [{ dir: "blog", type: "blog-post" }],
-};
+const dirTypeShape = z.object({ dir: z.string(), type: z.string() }).strict();
+const pageTypeShape = z
+  .object({
+    schema: z.string().min(1),
+    template: z.string().min(1),
+    defaults: z.string().min(1),
+  })
+  .strict();
+const schemaFieldShape = z
+  .object({
+    name: z.string().min(1),
+    type: z.enum(["string", "date", "string[]"]),
+    required: z.boolean(),
+  })
+  .strict();
+const schemaShape = z.object({ fields: z.array(schemaFieldShape).min(1) }).strict();
+const componentHandlerShape = z
+  .object({
+    handler: z.string().min(1),
+    island: z.string().min(1).optional(),
+  })
+  .strict();
+const islandShape = z.object({ entry: z.string().min(1), output: z.string().min(1) }).strict();
+const generatedArtifactShape = z
+  .object({
+    kind: z.enum(["data", "island", "theme"]),
+    source: z.string().min(1).optional(),
+    output: z.string().min(1),
+  })
+  .strict();
 
-const configShape = z.object({
-  passthrough: z.array(z.object({ path: z.string() })).optional(),
-  dirTypes: z.array(z.object({ dir: z.string(), type: z.string() })).optional(),
-});
+const bundledRegistryShape = z
+  .object({
+    pageTypes: z.record(pageTypeShape),
+    schemas: z.record(schemaShape),
+    dirTypes: z.array(dirTypeShape),
+    componentHandlers: z.record(componentHandlerShape),
+    islands: z.record(islandShape),
+    generatedArtifacts: z.array(generatedArtifactShape),
+  })
+  .strict();
+
+const contentConfigShape = z
+  .object({
+    passthrough: z.array(z.object({ path: z.string() }).strict()).optional(),
+    dirTypes: z.array(dirTypeShape).optional(),
+    pageTypes: z.record(pageTypeShape).optional(),
+    schemas: z.record(schemaShape).optional(),
+    componentHandlers: z.record(componentHandlerShape).optional(),
+    islands: z.record(islandShape).optional(),
+    generatedArtifacts: z.array(generatedArtifactShape).optional(),
+  })
+  .strict();
 
 /**
- * Load and validate content/_site.toml. A missing file yields the default
- * config (no passthrough, `blog` → `blog-post` inference). Malformed config
- * throws BuildError(kind="config").
+ * Load and validate the required bundled registry plus content/_site.toml.
+ * The bundled registry owns built-ins; content config may explicitly extend or
+ * override declarations. Malformed registry data throws BuildError(kind="config").
  */
-export async function loadSiteConfig(contentDir: string): Promise<SiteConfig> {
+export async function loadSiteConfig(contentDir: string, pandocDir: string): Promise<SiteConfig> {
+  const bundled = await loadBundledRegistry(pandocDir);
   const configPath = join(contentDir, "_site.toml");
   if (!(await Bun.file(configPath).exists())) {
-    return defaultConfig;
+    return validateRegistry({ ...bundled, passthrough: [] }, join(pandocDir, "registry.toml"));
   }
   const raw = await readFile(configPath, "utf8");
-  return parseSiteConfig(raw);
+  return mergeContentConfig(bundled, parseSiteConfig(raw));
 }
 
-/**
- * Parse and validate the `_site.toml` body. Malformed TOML or a shape
- * mismatch throws BuildError(kind="config"). Missing optional keys fall back
- * to the documented defaults (no passthrough, `blog` → `blog-post`).
- */
-function parseSiteConfig(raw: string): SiteConfig {
-  let table: unknown;
-  try {
-    table = parse(raw);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new BuildError("config", ["_site.toml"], `malformed _site.toml: ${detail}`, err);
+async function loadBundledRegistry(pandocDir: string): Promise<Omit<SiteConfig, "passthrough">> {
+  const path = join(pandocDir, "registry.toml");
+  if (!(await Bun.file(path).exists())) {
+    throw new BuildError("config", [path], `bundled registry not found: ${path}`);
   }
+  const table = parseToml(await readFile(path, "utf8"), path, "bundled registry");
+  const parsed = bundledRegistryShape.safeParse(table);
+  if (!parsed.success) {
+    throw new BuildError("config", [path], parsed.error.message);
+  }
+  return {
+    ...parsed.data,
+    pageTypes: namePageTypes(parsed.data.pageTypes),
+  };
+}
 
-  const parsed = configShape.safeParse(table);
+function parseSiteConfig(raw: string): Partial<SiteConfig> {
+  const table = parseToml(raw, "_site.toml", "_site.toml");
+  const parsed = contentConfigShape.safeParse(table);
   if (!parsed.success) {
     throw new BuildError("config", ["_site.toml"], parsed.error.message);
   }
-  const passthrough = parsed.data.passthrough === undefined ? [] : parsed.data.passthrough;
-  const dirTypes =
-    parsed.data.dirTypes === undefined ? defaultConfig.dirTypes : parsed.data.dirTypes;
-  return { passthrough, dirTypes };
+  let content: Partial<SiteConfig> = {};
+  if (parsed.data.passthrough !== undefined) {
+    content.passthrough = parsed.data.passthrough;
+  }
+  if (parsed.data.dirTypes !== undefined) {
+    content.dirTypes = parsed.data.dirTypes;
+  }
+  if (parsed.data.pageTypes !== undefined) {
+    content.pageTypes = namePageTypes(parsed.data.pageTypes);
+  }
+  if (parsed.data.schemas !== undefined) {
+    content.schemas = parsed.data.schemas;
+  }
+  if (parsed.data.componentHandlers !== undefined) {
+    content.componentHandlers = parsed.data.componentHandlers;
+  }
+  if (parsed.data.islands !== undefined) {
+    content.islands = parsed.data.islands;
+  }
+  if (parsed.data.generatedArtifacts !== undefined) {
+    content.generatedArtifacts = parsed.data.generatedArtifacts;
+  }
+  return content;
+}
+
+function parseToml(raw: string, file: string, label: string): unknown {
+  let table: unknown = {};
+  try {
+    table = parse(raw);
+  } catch (err) {
+    let detail = err instanceof Error ? err.message : String(err);
+    throw new BuildError("config", [file], `malformed ${label}: ${detail}`, err);
+  }
+  return table;
+}
+
+function namePageTypes(pageTypes: Record<string, Omit<PageType, "name">>): Record<string, PageType> {
+  return Object.fromEntries(
+    Object.entries(pageTypes).map(([name, value]) => [name, { name, ...value }]),
+  );
+}
+
+function mergeContentConfig(
+  bundled: Omit<SiteConfig, "passthrough">,
+  content: Partial<SiteConfig>,
+): SiteConfig {
+  const merged: SiteConfig = {
+    passthrough: contentPassthrough(content),
+    dirTypes: mergeDirTypes(bundled.dirTypes, contentDirTypes(content)),
+    pageTypes: { ...bundled.pageTypes, ...contentPageTypes(content) },
+    schemas: { ...bundled.schemas, ...content.schemas },
+    componentHandlers: { ...bundled.componentHandlers, ...content.componentHandlers },
+    islands: { ...bundled.islands, ...content.islands },
+    generatedArtifacts: generatedArtifacts(bundled, content),
+  };
+  return validateRegistry(merged, "_site.toml");
+}
+
+function contentPassthrough(content: Partial<SiteConfig>): SiteConfig["passthrough"] {
+  if (content.passthrough === undefined) {
+    return [];
+  }
+  return content.passthrough;
+}
+
+function contentDirTypes(content: Partial<SiteConfig>): SiteConfig["dirTypes"] {
+  if (content.dirTypes === undefined) {
+    return [];
+  }
+  return content.dirTypes;
+}
+
+function contentPageTypes(content: Partial<SiteConfig>): SiteConfig["pageTypes"] {
+  if (content.pageTypes === undefined) {
+    return {};
+  }
+  return content.pageTypes;
+}
+
+function generatedArtifacts(
+  bundled: Omit<SiteConfig, "passthrough">,
+  content: Partial<SiteConfig>,
+): SiteConfig["generatedArtifacts"] {
+  if (content.generatedArtifacts === undefined) {
+    return bundled.generatedArtifacts;
+  }
+  return [...bundled.generatedArtifacts, ...content.generatedArtifacts];
+}
+
+function mergeDirTypes(
+  bundled: { dir: string; type: string }[],
+  content: { dir: string; type: string }[],
+): { dir: string; type: string }[] {
+  const byDir = new Map<string, { dir: string; type: string }>();
+  bundled.forEach((entry) => {
+    byDir.set(entry.dir, entry);
+    return true;
+  });
+  content.forEach((entry) => {
+    byDir.set(entry.dir, entry);
+    return true;
+  });
+  return [...byDir.values()];
+}
+
+function validateRegistry(config: SiteConfig, file: string): SiteConfig {
+  if (typeof config.pageTypes.page === "undefined") {
+    throw new BuildError("config", [file], 'registry must declare pageTypes.page');
+  }
+  Object.entries(config.pageTypes).forEach(([name, pageType]) => {
+    let schema = config.schemas[pageType.schema];
+    if (typeof schema === "undefined") {
+      throw new BuildError(
+        "config",
+        [file],
+        `page type ${name} references unknown schema ${pageType.schema}`,
+      );
+    }
+    assertRenderableSchema(schema, pageType.schema, file);
+    return true;
+  });
+  config.dirTypes.forEach(({ dir, type }) => {
+    if (typeof config.pageTypes[type] === "undefined") {
+      throw new BuildError(
+        "config",
+        [file],
+        `dirTypes entry ${dir} references unknown page type ${type}`,
+      );
+    }
+    return true;
+  });
+  Object.entries(config.componentHandlers).forEach(([name, handler]) => {
+    if (handler.island && typeof config.islands[handler.island] === "undefined") {
+      throw new BuildError(
+        "config",
+        [file],
+        `component handler ${name} references unknown island ${handler.island}`,
+      );
+    }
+    return true;
+  });
+  return config;
+}
+
+function assertRenderableSchema(
+  schema: SiteConfig["schemas"][string],
+  schemaId: string,
+  file: string,
+): boolean {
+  let hasTitle = false;
+  schema.fields.forEach((field) => {
+    if (field.name === "site") {
+      throw new BuildError("config", [file], `schema ${schemaId} cannot redefine reserved field site`);
+    }
+    if (field.name === "title" && field.type === "string" && field.required) {
+      hasTitle = true;
+    }
+    return true;
+  });
+  if (!hasTitle) {
+    throw new BuildError(
+      "config",
+      [file],
+      `schema ${schemaId} must declare required string field title`,
+    );
+  }
+  return true;
 }
 
 /**
@@ -90,13 +302,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
   if (!(await Bun.file(path).exists())) {
     throw new BuildError("config", [path], `generator config not found: ${path}`);
   }
-  let table: unknown;
-  try {
-    table = parse(await readFile(path, "utf8"));
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new BuildError("config", [path], `malformed generator config: ${detail}`, err);
-  }
+  const table = parseToml(await readFile(path, "utf8"), path, "generator config");
   const parsed = appConfigShape.safeParse(table);
   if (!parsed.success) {
     throw new BuildError("config", [path], parsed.error.message);

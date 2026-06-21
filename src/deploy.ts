@@ -8,7 +8,7 @@ import { BuildError } from "./errors.ts";
  * The trailing slashes make rsync mirror the *contents* of outDir into deployDir.
  * rsync is a required dependency; a missing binary or nonzero exit fails loudly.
  */
-export async function deploySite(outDir: string, deployDir: string): Promise<void> {
+export async function deploySite(outDir: string, deployDir: string): Promise<boolean> {
   await mkdir(deployDir, { recursive: true });
   let proc = Bun.spawn(["rsync", "-a", "--delete", `${outDir}/`, `${deployDir}/`], {
     stdout: "pipe",
@@ -22,4 +22,5 @@ export async function deploySite(outDir: string, deployDir: string): Promise<voi
       `rsync exited ${exitCode} deploying to ${deployDir}: ${stderr}`,
     );
   }
+  return true;
 }

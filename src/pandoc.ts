@@ -1,6 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import * as YAML from "yaml";
 import { BuildError } from "./errors.ts";
 import type { NavItem, PageType } from "./types.ts";
@@ -67,10 +67,10 @@ function mathjaxConfig(macros: Record<string, string | [string, number]>): strin
 function navToMeta(items: NavItem[]): Record<string, unknown>[] {
   return items.map((item) => {
     let m: Record<string, unknown> = { title: item.title };
-    if (item.href !== undefined) {
+    if (item.href) {
       m.href = item.href;
     }
-    if (item.children !== undefined) {
+    if (item.children) {
       m.children = navToMeta(item.children);
     }
     return m;
@@ -83,14 +83,15 @@ function navToMeta(items: NavItem[]): Record<string, unknown>[] {
  * BuildError(kind="pandoc").
  */
 export async function renderPage(input: RenderInput): Promise<string> {
-  let defaultsName = `${basename(input.pageType.template, ".html")}.yaml`;
-  let defaultsPath = join(input.pandocDir, "defaults", defaultsName);
+  let defaultsPath = join(input.pandocDir, input.pageType.defaults);
 
   let metadata: Record<string, unknown> = {
     nav: navToMeta(input.nav),
     content_root: resolve(input.contentRoot),
-    ...(input.extraMeta === undefined ? {} : input.extraMeta),
   };
+  if (input.extraMeta) {
+    metadata = { ...metadata, ...input.extraMeta };
+  }
   // Always emit the MathJax config: the delimiter set is site-wide policy,
   // needed wherever math can appear (including island data), independent of
   // whether any macros are defined.
@@ -111,6 +112,7 @@ export async function renderPage(input: RenderInput): Promise<string> {
 
   await writeFile(metaFile, YAML.stringify(metadata), "utf8");
 
+  let rendered = "";
   try {
     let proc = Bun.spawn(
       [
@@ -144,8 +146,9 @@ export async function renderPage(input: RenderInput): Promise<string> {
         `pandoc exited ${exitCode} on ${input.relPath}: ${stderr.trim()}`,
       );
     }
-    return stdout;
+    rendered = stdout;
   } finally {
     await rm(metaDir, { recursive: true, force: true });
   }
+  return rendered;
 }

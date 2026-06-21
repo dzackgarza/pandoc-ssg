@@ -1,0 +1,3 @@
+[componentHandlers.custom-list]
+handler = "custom-list"
+island = "missing-island"

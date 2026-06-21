@@ -13,6 +13,16 @@ export interface SiteConfig {
   passthrough: { path: string }[];
   /** directory (content-relative prefix) → page type name inference (O8) */
   dirTypes: { dir: string; type: string }[];
+  /** page type registry resolved from the bundled registry plus content overrides */
+  pageTypes: Record<string, PageType>;
+  /** frontmatter schema registry resolved from the bundled registry plus content overrides */
+  schemas: Record<string, SchemaDefinition>;
+  /** declared component handlers; C3 owns dispatch migration */
+  componentHandlers: Record<string, ComponentHandler>;
+  /** declared interactive island entries; C3 owns dispatch migration */
+  islands: Record<string, IslandEntry>;
+  /** generated artifact rules; C4 owns manifest dependency metadata */
+  generatedArtifacts: GeneratedArtifactRule[];
 }
 
 /** A registered page type: schema + template pairing. */
@@ -20,6 +30,35 @@ export interface PageType {
   name: string;
   schema: string;
   template: string;
+  defaults: string;
+}
+
+export type SchemaFieldType = "string" | "date" | "string[]";
+
+export interface SchemaField {
+  name: string;
+  type: SchemaFieldType;
+  required: boolean;
+}
+
+export interface SchemaDefinition {
+  fields: SchemaField[];
+}
+
+export interface ComponentHandler {
+  handler: string;
+  island?: string;
+}
+
+export interface IslandEntry {
+  entry: string;
+  output: string;
+}
+
+export interface GeneratedArtifactRule {
+  kind: GeneratedEntry["kind"];
+  source?: string;
+  output: string;
 }
 
 /** Validated frontmatter common to all pages. */

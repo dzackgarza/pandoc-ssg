@@ -1,14 +1,14 @@
 import { join } from "node:path";
+import type { Options as SvelteOptions } from "@sveltejs/vite-plugin-svelte";
+import type { InlineConfig, PluginOption } from "vite";
 import { BuildError } from "./errors.ts";
 
 // The SSG ships its island sources alongside src/ and pandoc/.
 let ISLANDS_SRC = join(import.meta.dir, "..", "islands");
 
 interface ViteApi {
-  // biome-ignore lint/suspicious/noExplicitAny: vite's build() shape from an optional peer dep
-  viteBuild: (config: any) => Promise<unknown>;
-  // biome-ignore lint/suspicious/noExplicitAny: the svelte plugin factory from an optional peer dep
-  svelte: (opts?: any) => unknown;
+  viteBuild: (config: InlineConfig) => Promise<unknown>;
+  svelte: (opts: Partial<SvelteOptions>) => PluginOption[];
 }
 
 /**
@@ -19,18 +19,30 @@ interface ViteApi {
  * optional dep → BuildError), not error suppression.
  */
 async function loadVite(): Promise<ViteApi> {
+  let result:
+    | { ok: true; vite: typeof import("vite"); plugin: typeof import("@sveltejs/vite-plugin-svelte") }
+    | { ok: false; error: unknown } = {
+    ok: false,
+    error: new Error("vite import did not run"),
+  };
   try {
-    let vite = await import("vite");
-    let plugin = await import("@sveltejs/vite-plugin-svelte");
-    return { viteBuild: vite.build, svelte: plugin.svelte };
-  } catch (err) {
+    result = {
+      ok: true,
+      vite: await import("vite"),
+      plugin: await import("@sveltejs/vite-plugin-svelte"),
+    };
+  } catch (error) {
+    result = { ok: false, error };
+  }
+  if (!result.ok) {
     throw new BuildError(
       "config",
       [],
       "interactive island components need 'vite' and '@sveltejs/vite-plugin-svelte' installed (optional peer deps) to bundle",
-      err,
+      result.error,
     );
   }
+  return { viteBuild: result.vite.build, svelte: result.plugin.svelte };
 }
 
 /**
@@ -46,7 +58,7 @@ export async function buildIsland(name: string, stagingDir: string): Promise<str
   await viteBuild({
     configFile: false,
     logLevel: "silent",
-    plugins: [svelte()],
+    plugins: [svelte({})],
     build: {
       lib: {
         entry: join(ISLANDS_SRC, name, "main.ts"),

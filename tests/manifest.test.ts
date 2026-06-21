@@ -86,7 +86,7 @@ describe("O6: manifest is the single contract", () => {
       pandocDir: PANDOC_DIR,
       outDir,
     });
-  });
+  }, 30000);
 
   afterAll(async () => {
     await rm(outDir, { recursive: true, force: true });

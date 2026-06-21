@@ -16,6 +16,19 @@ function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-out-"));
 }
 
+type CapturedRejection = { rejected: true; error: unknown } | { rejected: false };
+
+async function captureRejection(promise: Promise<unknown>): Promise<CapturedRejection> {
+  let result: CapturedRejection;
+  try {
+    await promise;
+    result = { rejected: false };
+  } catch (error) {
+    result = { rejected: true, error };
+  }
+  return result;
+}
+
 async function exists(p: string): Promise<boolean> {
   try {
     await stat(p);
@@ -316,7 +329,10 @@ describe("generator config (XDG) is required, never defaulted", () => {
     const empty = await mkdtemp(join(tmpdir(), "ssg-noconfig-"));
     process.env.XDG_CONFIG_HOME = empty;
     // No fallback: macros/pandoc-tree are config, so an absent config is a build error.
-    await expect(loadAppConfig()).rejects.toMatchObject({ name: "BuildError", kind: "config" });
+    expect(await captureRejection(loadAppConfig())).toMatchObject({
+      rejected: true,
+      error: { name: "BuildError", kind: "config" },
+    });
     process.env.XDG_CONFIG_HOME = saved === undefined ? "" : saved;
     await rm(empty, { recursive: true, force: true });
   });
@@ -325,12 +341,13 @@ describe("generator config (XDG) is required, never defaulted", () => {
 describe("O3: fail-fast schema validation leaves no partial output", () => {
   test("broken page rejects with kind=schema naming the file, dist stays empty", async () => {
     const outDir = await freshOutDir();
-    await expect(
-      build({ contentDir: BAD_SCHEMA_CONTENT, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({
-      name: "BuildError",
-      kind: "schema",
-      files: ["broken.md"],
+    expect(await captureRejection(build({ contentDir: BAD_SCHEMA_CONTENT, pandocDir: PANDOC_DIR, outDir }))).toMatchObject({
+      rejected: true,
+      error: {
+        name: "BuildError",
+        kind: "schema",
+        files: ["broken.md"],
+      },
     });
 
     const remaining = await walk(outDir);

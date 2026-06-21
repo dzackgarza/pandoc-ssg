@@ -13,22 +13,25 @@ import type { ClassifiedFile, FileClass, SiteConfig } from "./types.ts";
 export async function classifyFiles(
   contentDir: string,
   relPaths: string[],
-  config: SiteConfig,
+  config: Pick<SiteConfig, "passthrough">,
 ): Promise<ClassifiedFile[]> {
-  let result: ClassifiedFile[] = [];
-  for (const relPath of relPaths) {
-    result.push({ relPath, class: await classifyOne(contentDir, relPath, config) });
-  }
-  return result;
+  return await Promise.all(
+    relPaths.map(async (relPath) => ({
+      relPath,
+      class: await classifyOne(contentDir, relPath, config),
+    })),
+  );
 }
 
 async function classifyOne(
   contentDir: string,
   relPath: string,
-  config: SiteConfig,
+  config: Pick<SiteConfig, "passthrough">,
 ): Promise<FileClass> {
-  let segment = relPath.split("/")[0];
-  let firstSegment = segment === undefined ? "" : segment;
+  let firstSegment = relPath.split("/")[0];
+  if (!firstSegment) {
+    throw new Error("content path must not be empty");
+  }
   if (firstSegment.startsWith("_")) {
     return "reserved";
   }

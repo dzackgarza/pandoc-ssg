@@ -1,0 +1,65 @@
+[pageTypes.page]
+schema = "page.v1"
+template = "page.html"
+defaults = "defaults/page.yaml"
+
+[pageTypes."blog-post"]
+schema = "blog-post.v1"
+template = "blog.html"
+defaults = "defaults/blog.yaml"
+
+[schemas."page.v1"]
+fields = [
+  { name = "title", type = "string", required = true },
+]
+
+[schemas."blog-post.v1"]
+fields = [
+  { name = "title", type = "string", required = true },
+  { name = "date", type = "date", required = true },
+  { name = "tags", type = "string[]", required = false },
+  { name = "categories", type = "string[]", required = false },
+]
+
+[[dirTypes]]
+dir = "blog"
+type = "blog-post"
+
+[componentHandlers.feature-row]
+handler = "feature-row"
+
+[componentHandlers."blog-index"]
+handler = "blog-index"
+island = "blog-index"
+
+[componentHandlers.collection]
+handler = "collection"
+island = "collection"
+
+[componentHandlers.timeline]
+handler = "timeline"
+
+[componentHandlers.papers]
+handler = "papers"
+
+[componentHandlers."media-gallery"]
+handler = "media-gallery"
+
+[componentHandlers."link-group"]
+handler = "link-group"
+
+[componentHandlers.video]
+handler = "video"
+
+[islands."blog-index"]
+entry = "islands/blog-index/main.ts"
+output = "assets/islands/blog-index.js"
+
+[islands.collection]
+entry = "islands/collection/main.ts"
+output = "assets/islands/collection.js"
+
+[[generatedArtifacts]]
+kind = "theme"
+source = "assets"
+output = "assets"

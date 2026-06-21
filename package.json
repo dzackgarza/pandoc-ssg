@@ -12,7 +12,7 @@
     "islands"
   ],
   "scripts": {
-    "test": "bun test --coverage --coverage-reporter=lcov --coverage-dir=.",
+    "test": "bun test --coverage --coverage-reporter=lcov --coverage-dir=. tests/build.test.ts tests/classify.test.ts tests/components.test.ts tests/deploy.test.ts tests/links.test.ts tests/manifest.test.ts tests/nav.test.ts tests/registry.test.ts tests/routes.test.ts tests/scan.test.ts tests/schemas.test.ts tests/serve.test.ts tests/theme.test.ts tests/transclude.test.ts tests/validate.test.ts && bun test tests/amsthm-label-font.test.ts && bun test tests/post-toc-font.test.ts && bun test tests/theme-colorscheme.test.ts && bun test tests/collection.test.ts && bun test tests/blog-island.test.ts && bun test tests/verify.test.ts && bun test tests/cli.test.ts",
     "types": "tsc --noEmit"
   },
   "dependencies": {

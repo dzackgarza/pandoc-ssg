@@ -52,6 +52,13 @@ function formatDate(iso: string): string {
   return dateFormatter.format(new Date(iso));
 }
 
+function optionalStringList(value: string[] | undefined): string[] {
+  if (value === undefined) {
+    return [];
+  }
+  return value;
+}
+
 /**
  * A plain-text excerpt for the blog listing: the text of the first prose
  * paragraph of the *rendered* post (pandoc already parsed the markdown), with
@@ -61,18 +68,19 @@ function formatDate(iso: string): string {
  */
 function extractExcerpt(renderedHtml: string): string {
   let article = parseHtml(renderedHtml).querySelector("article");
-  if (article === null) {
+  if (!article) {
     return "";
   }
   let header = article.querySelector("header");
-  if (header !== null) {
+  if (header) {
     header.remove();
   }
-  for (const math of article.querySelectorAll(".math")) {
+  article.querySelectorAll(".math").forEach((math) => {
     math.remove();
-  }
+    return true;
+  });
   let p = article.querySelector("p");
-  if (p === null) {
+  if (!p) {
     return "";
   }
   let words = p.text.replace(/\s+/g, " ").trim().split(" ");
@@ -170,7 +178,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let { contentDir, pandocDir, outDir } = opts;
 
   // ---- validation phase: everything that can fail happens before any write ----
-  let config = await loadSiteConfig(contentDir);
+  let config = await loadSiteConfig(contentDir, pandocDir);
   let relPaths = await scanContent(contentDir);
   let classified = await classifyFiles(contentDir, relPaths, config);
 
@@ -180,7 +188,11 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   // markdown parse), so it is absent during this classification pass.
   let blogPosts: Omit<PostMeta, "excerpt">[] = [];
 
-  for (const file of classified) {
+  for (let fileIndex = 0; fileIndex < classified.length; fileIndex += 1) {
+    let file = classified[fileIndex];
+    if (!file) {
+      throw new Error(`classified file missing at index ${fileIndex}`);
+    }
     if (file.class !== "page") {
       continue;
     }
@@ -188,10 +200,10 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     let raw = await readFile(sourcePath, "utf8");
     let rawMeta = matter(raw, matterOptions).data;
 
-    let pageType = resolvePageType(file.relPath, rawMeta, config.dirTypes);
+    let pageType = resolvePageType(file.relPath, rawMeta, config);
     let explicit = explicitSchema(rawMeta);
-    let schemaId = explicit === undefined ? pageType.schema : explicit;
-    let meta = validatePageMeta(file.relPath, rawMeta, schemaId);
+    let schemaId = explicit ? explicit : pageType.schema;
+    let meta = validatePageMeta(file.relPath, rawMeta, schemaId, config.schemas);
 
     let url = routeForPage(file.relPath, routeOverride(rawMeta));
     let route: RouteEntry = {
@@ -205,15 +217,15 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
 
     if (pageType.name === "blog-post") {
       // blog-post.v1 requires date; assert existence at this boundary.
-      if (meta.date === undefined) {
+      if (!meta.date) {
         throw new BuildError("schema", [file.relPath], "blog-post page missing required date");
       }
       blogPosts.push({
         title: meta.title,
         date: meta.date,
         url,
-        tags: meta.tags === undefined ? [] : meta.tags,
-        categories: meta.categories === undefined ? [] : meta.categories,
+        tags: optionalStringList(meta.tags),
+        categories: optionalStringList(meta.categories),
         dateLong: formatDate(meta.date),
       });
     }
@@ -236,7 +248,11 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   // feeds the listing island. Newest-first order makes prev = older, next = newer.
   let byDate = [...blogPosts].sort((a, b) => b.date.localeCompare(a.date));
   let postCtx = new Map<string, Record<string, unknown>>();
-  for (const [i, post] of byDate.entries()) {
+  for (let i = 0; i < byDate.length; i += 1) {
+    let post = byDate[i];
+    if (!post) {
+      throw new Error(`blog post missing at index ${i}`);
+    }
     let newer = byDate[i - 1];
     let older = byDate[i + 1];
     let terms = [
@@ -252,10 +268,10 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
       })),
     ];
     let ctx: Record<string, unknown> = { date_long: post.dateLong, post_terms: terms };
-    if (newer !== undefined) {
+    if (newer) {
       ctx.next = { url: newer.url, title: newer.title };
     }
-    if (older !== undefined) {
+    if (older) {
       ctx.prev = { url: older.url, title: older.title };
     }
     postCtx.set(post.url, ctx);
@@ -263,7 +279,11 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
 
   // Render every page (pandoc) before any write so a failure aborts cleanly.
   let rendered = new Map<string, string>();
-  for (const page of pages) {
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+    let page = pages[pageIndex];
+    if (!page) {
+      throw new Error(`planned page missing at index ${pageIndex}`);
+    }
     let html = await renderPage({
       sourcePath: page.sourcePath,
       relPath: page.relPath,
@@ -284,49 +304,55 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   // Unknown collection keys are still validated against items.yaml below.
   let usesBlogIndex = false;
   let collectionKeys = new Set<string>();
-  for (const html of rendered.values()) {
+  [...rendered.values()].forEach((html) => {
     let root = parseHtml(html);
-    if (root.querySelector("#blog-index") !== null) {
+    if (root.querySelector("#blog-index")) {
       usesBlogIndex = true;
     }
-    for (const mount of root.querySelectorAll("[data-collection]")) {
+    root.querySelectorAll("[data-collection]").forEach((mount) => {
       let src = mount.getAttribute("data-collection");
-      if (src !== undefined) {
+      if (src) {
         // "/_collections/<key>.json" → "<key>"
         collectionKeys.add(basename(src, ".json"));
       }
-    }
-  }
+      return true;
+    });
+    return true;
+  });
 
   // ---- write phase: stage into a temp dir, then atomically swap into outDir ----
   let staging = `${outDir}.staging-${process.pid}-${Date.now()}`;
   await rm(staging, { recursive: true, force: true });
   await mkdir(staging, { recursive: true });
 
-  for (const [output, html] of rendered) {
+  await Promise.all([...rendered.entries()].map(async ([output, html]) => {
     let dest = join(staging, output);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, html, "utf8");
-  }
+    return true;
+  }));
 
-  for (const entry of passthrough) {
+  await Promise.all(passthrough.map(async (entry) => {
     let src = join(contentDir, entry.source);
     let dest = join(staging, entry.output);
     await mkdir(dirname(dest), { recursive: true });
     await copyFile(src, dest);
-  }
+    return true;
+  }));
 
   // Theme assets (O18): the design layer's stylesheet + self-hosted fonts ship
   // with the generator, so the build emits them into dist/assets/ (pandoc/ is
   // not otherwise copied). Unconditional — every page links the stylesheet.
-  for (const rel of await walkRel(join(pandocDir, "assets"))) {
+  let themeAssetRels = await walkRel(join(pandocDir, "assets"));
+  await Promise.all(themeAssetRels.map(async (rel) => {
     let src = join(pandocDir, "assets", rel);
     let output = `assets/${rel}`;
     let dest = join(staging, output);
     await mkdir(dirname(dest), { recursive: true });
     await copyFile(src, dest);
     generated.push({ output, kind: "theme" });
-  }
+    return true;
+  }));
 
   // Interactive blog-index island (O16): only when a page uses the component.
   if (usesBlogIndex) {
@@ -339,12 +365,12 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
         // Every post was rendered into `rendered` above (its output key is
         // outputPathForRoute(url) by construction); undefined would be a bug.
         let html = rendered.get(outputPathForRoute(post.url));
-        if (html === undefined) {
+        if (!html) {
           throw new Error(`no rendered HTML for post ${post.url}`);
         }
         return { ...post, excerpt: extractExcerpt(html) };
       });
-    await writeFile(postsDest, JSON.stringify(sorted, null, 2), "utf8");
+    await writeFile(postsDest, JSON.stringify(sorted), "utf8");
     generated.push({ output: postsOutput, kind: "data" });
 
     generated.push({ output: await buildIsland("blog-index", staging), kind: "island" });
@@ -353,9 +379,9 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   // Filterable collection islands (O20): emit one JSON per referenced items key,
   // then bundle the shared collection island. Fail loud on an unknown key.
   if (collectionKeys.size > 0) {
-    for (const key of collectionKeys) {
+    await Promise.all([...collectionKeys].map(async (key) => {
       let data = items[key];
-      if (data === undefined) {
+      if (!data) {
         throw new BuildError(
           "config",
           ["_data/items.yaml"],
@@ -365,13 +391,14 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
       let output = `_collections/${key}.json`;
       let dest = join(staging, output);
       await mkdir(dirname(dest), { recursive: true });
-      await writeFile(dest, JSON.stringify(data, null, 2), "utf8");
+      await writeFile(dest, JSON.stringify(data), "utf8");
       generated.push({ output, kind: "data" });
-    }
+      return true;
+    }));
     generated.push({ output: await buildIsland("collection", staging), kind: "island" });
   }
 
-  await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
+  await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest), "utf8");
 
   await rm(outDir, { recursive: true, force: true });
   await rename(staging, outDir);
@@ -382,11 +409,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
 /** POSIX paths of every file under `root`, recursively (relative to `root`). */
 async function walkRel(root: string): Promise<string[]> {
   let glob = new Bun.Glob("**/*");
-  let out: string[] = [];
-  for await (const rel of glob.scan({ cwd: root, dot: true, onlyFiles: true })) {
-    out.push(rel);
-  }
-  return out;
+  return await Array.fromAsync(glob.scan({ cwd: root, dot: true, onlyFiles: true }));
 }
 
 /** True for the file classes copied verbatim into dist ("asset" or "opaque"). */
@@ -404,12 +427,12 @@ function passthroughEntries(classified: ClassifiedFile[]) {
     .map((f) => ({ source: f.relPath, output: f.relPath }));
 }
 
-function explicitSchema(rawMeta: unknown): string | undefined {
+function explicitSchema(rawMeta: unknown): string | false {
   let schema = (rawMeta as { site?: { schema?: unknown } }).site?.schema;
-  return typeof schema === "string" ? schema : undefined;
+  return typeof schema === "string" ? schema : false;
 }
 
-function routeOverride(rawMeta: unknown): string | undefined {
+function routeOverride(rawMeta: unknown): string | false {
   let route = (rawMeta as { site?: { route?: unknown } }).site?.route;
-  return typeof route === "string" ? route : undefined;
+  return typeof route === "string" ? route : false;
 }
