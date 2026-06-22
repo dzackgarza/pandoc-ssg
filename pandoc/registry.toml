@@ -63,10 +63,16 @@ handler = "video"
 [islands."blog-index"]
 entry = "islands/blog-index/main.ts"
 output = "assets/islands/blog-index.js"
+dataOutput = "blog/posts.json"
+dataSource = "blog-posts"
+mount = "blog-index"
 
 [islands.collection]
 entry = "islands/collection/main.ts"
 output = "assets/islands/collection.js"
+dataOutput = "_collections/{key}.json"
+dataSource = "items"
+mount = "collection"
 
 [[generatedArtifacts]]
 kind = "theme"

@@ -1,33 +1,34 @@
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { build as viteBuild } from "vite";
-
-// The SSG ships its island sources alongside src/ and pandoc/.
-let ISLANDS_SRC = join(import.meta.dir, "..", "islands");
+import type { IslandEntry } from "./types.ts";
 
 /**
- * Bundle the SSG-owned Svelte island named `name` (source at
- * `islands/<name>/main.ts`) into a stable, self-contained ES module at
- * `<stagingDir>/assets/islands/<name>.js` (no content hash, so a Lua filter can
- * emit a fixed script src). Returns the dist-relative output path for the
- * manifest's generated entry (O16/O20).
+ * Bundle a registry-declared island into its stable output path. The registry
+ * owns both the entrypoint and dist-relative output path, so built-ins and
+ * content-owned islands use the same path contract.
  */
-export async function buildIsland(name: string, stagingDir: string): Promise<string> {
-  let outDir = join(stagingDir, "assets", "islands");
+export async function buildIsland(
+  island: IslandEntry,
+  stagingDir: string,
+  roots: { contentDir: string; pandocDir: string },
+): Promise<string> {
+  let entry = join(island.source === "content" ? roots.contentDir : roots.pandocDir, island.entry);
+  let outDir = join(stagingDir, dirname(island.output));
   await viteBuild({
     configFile: false,
     logLevel: "silent",
     plugins: [svelte({})],
     build: {
       lib: {
-        entry: join(ISLANDS_SRC, name, "main.ts"),
+        entry,
         formats: ["es"],
-        fileName: () => `${name}.js`,
+        fileName: () => basename(island.output),
       },
       outDir,
       emptyOutDir: false,
       minify: true,
     },
   });
-  return `assets/islands/${name}.js`;
+  return island.output;
 }

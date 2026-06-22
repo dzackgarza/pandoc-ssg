@@ -67,12 +67,17 @@ export interface SchemaDefinition {
 
 export interface ComponentHandler {
   handler: string;
+  module?: RegistryFile;
   island?: string;
 }
 
 export interface IslandEntry {
   entry: string;
   output: string;
+  source?: RegistrySource;
+  dataOutput?: string;
+  dataSource?: "blog-posts" | "items";
+  mount?: string;
 }
 
 export interface GeneratedArtifactRule {

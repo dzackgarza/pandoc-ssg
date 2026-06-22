@@ -100,6 +100,17 @@ Fenced-div components expand from `_data/items.yaml`:
 :::
 ```
 
+Component handlers are registry entries. The bundled registry declares the
+built-ins; a content repo can add `[componentHandlers.<type>]` with either a
+built-in `handler` id or a content-owned Lua `module`. Custom Lua modules return
+a function or `{ render = function(...) }` and receive component attributes,
+`_data/items.yaml`, the content root, and registry metadata.
+
+Interactive islands are also registry entries. `[islands.<name>]` declares the
+entrypoint, output bundle path, optional data output path, data source, and mount
+name; component handlers emit `data-ssg-island="<name>"` to request the bundle and
+any declared generated data artifact.
+
 ## Development
 
 ```

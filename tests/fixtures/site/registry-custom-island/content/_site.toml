@@ -1,0 +1,13 @@
+[componentHandlers."mini-list"]
+handler = "mini-list"
+module = "_components/mini-list.lua"
+source = "content"
+island = "mini-list"
+
+[islands."mini-list"]
+entry = "_islands/mini-list/main.ts"
+output = "assets/islands/mini-list.js"
+source = "content"
+dataOutput = "mini/{key}.json"
+dataSource = "items"
+mount = "mini-list"

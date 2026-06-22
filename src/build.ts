@@ -18,6 +18,7 @@ import type {
   BuildOptions,
   ClassifiedFile,
   GeneratedEntry,
+  IslandEntry,
   Manifest,
   PageMeta,
   PageType,
@@ -187,12 +188,11 @@ interface RenderInputs {
   pandocHome: string;
   postCtx: Map<string, Record<string, unknown>>;
   siteFilters: SiteConfig["filters"];
+  componentHandlers: SiteConfig["componentHandlers"];
+  islands: SiteConfig["islands"];
 }
 
-interface IslandUsage {
-  usesBlogIndex: boolean;
-  collectionKeys: Set<string>;
-}
+type IslandUsage = Map<string, Set<string>>;
 
 /**
  * Full pipeline (O4–O7): scan → classify → validate → route → collision
@@ -227,6 +227,8 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     pandocHome: appConfig.pandocHome,
     postCtx,
     siteFilters: config.filters,
+    componentHandlers: config.componentHandlers,
+    islands: config.islands,
   });
   let islandUsage = discoverIslandUsage(rendered);
 
@@ -237,8 +239,12 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   await writeRenderedPages(staging, rendered);
   await copyPassthroughEntries(contentDir, staging, plan.passthrough);
   await emitThemeAssets(pandocDir, staging, generated);
-  await emitBlogIndex(staging, plan.blogPosts, rendered, generated, islandUsage.usesBlogIndex);
-  await emitCollectionIslands(staging, islandUsage.collectionKeys, items, generated);
+  await emitIslandArtifacts(staging, islandUsage, config.islands, { contentDir, pandocDir }, {
+    blogPosts: plan.blogPosts,
+    rendered,
+    items,
+    generated,
+  });
 
   await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest), "utf8");
   await rm(outDir, { recursive: true, force: true });
@@ -360,6 +366,8 @@ async function renderPlannedPages(
       contentRoot: inputs.contentDir,
       pandocHome: inputs.pandocHome,
       siteFilters: inputs.siteFilters,
+      componentHandlers: inputs.componentHandlers,
+      islands: inputs.islands,
       extraMeta: inputs.postCtx.get(page.route.url),
     });
     rendered.set(page.route.output, html);
@@ -368,23 +376,39 @@ async function renderPlannedPages(
 }
 
 function discoverIslandUsage(rendered: Map<string, string>): IslandUsage {
-  let usesBlogIndex = false;
-  let collectionKeys = new Set<string>();
+  let usage: IslandUsage = new Map();
   [...rendered.values()].forEach((html) => {
     let root = parseHtml(html);
-    if (!usesBlogIndex && root.querySelector("#blog-index") !== null) {
-      usesBlogIndex = true;
+    root.querySelectorAll("[data-ssg-island]").forEach((mount) => {
+      let island = mount.getAttribute("data-ssg-island");
+      if (island) {
+        addIslandUsage(usage, island, mount.getAttribute("data-ssg-data-key") ?? "");
+      }
+      return true;
+    });
+    if (root.querySelector("#blog-index") !== null) {
+      addIslandUsage(usage, "blog-index", "");
     }
     root.querySelectorAll("[data-collection]").forEach((mount) => {
       let src = mount.getAttribute("data-collection");
       if (src) {
-        collectionKeys.add(basename(src, ".json"));
+        addIslandUsage(usage, "collection", basename(src, ".json"));
       }
       return true;
     });
     return true;
   });
-  return { usesBlogIndex, collectionKeys };
+  return usage;
+}
+
+function addIslandUsage(usage: IslandUsage, island: string, dataKey: string): boolean {
+  let keys = usage.get(island);
+  if (!keys) {
+    keys = new Set<string>();
+    usage.set(island, keys);
+  }
+  keys.add(dataKey);
+  return true;
 }
 
 async function writeRenderedPages(staging: string, rendered: Map<string, string>): Promise<boolean> {
@@ -430,23 +454,69 @@ async function emitThemeAssets(
   return true;
 }
 
-async function emitBlogIndex(
+async function emitIslandArtifacts(
   staging: string,
-  blogPosts: Omit<PostMeta, "excerpt">[],
-  rendered: Map<string, string>,
-  generated: GeneratedEntry[],
-  enabled: boolean,
+  usage: IslandUsage,
+  islands: Record<string, IslandEntry>,
+  roots: { contentDir: string; pandocDir: string },
+  data: {
+    blogPosts: Omit<PostMeta, "excerpt">[];
+    rendered: Map<string, string>;
+    items: Record<string, unknown>;
+    generated: GeneratedEntry[];
+  },
 ): Promise<boolean> {
-  if (!enabled) {
+  for (const name of [...usage.keys()].sort()) {
+    let island = islands[name];
+    if (!island) {
+      throw new BuildError("config", ["registry.toml"], `used island ${name} is not registered`);
+    }
+    await emitIslandData(staging, name, island, requiredUsage(usage, name), data);
+    data.generated.push({ output: await buildIsland(island, staging, roots), kind: "island" });
+  }
+  return true;
+}
+
+async function emitIslandData(
+  staging: string,
+  name: string,
+  island: IslandEntry,
+  dataKeys: Set<string>,
+  data: {
+    blogPosts: Omit<PostMeta, "excerpt">[];
+    rendered: Map<string, string>;
+    items: Record<string, unknown>;
+    generated: GeneratedEntry[];
+  },
+): Promise<boolean> {
+  if (!island.dataOutput) {
     return true;
   }
-  let postsOutput = "blog/posts.json";
-  let postsDest = join(staging, postsOutput);
-  await mkdir(dirname(postsDest), { recursive: true });
-  await writeFile(postsDest, JSON.stringify(renderedPostData(blogPosts, rendered)), "utf8");
-  generated.push({ output: postsOutput, kind: "data" });
-  generated.push({ output: await buildIsland("blog-index", staging), kind: "island" });
-  return true;
+  if (island.dataSource === "blog-posts") {
+    await writeGeneratedJson(
+      staging,
+      islandOutput(island.dataOutput, ""),
+      renderedPostData(data.blogPosts, data.rendered),
+      data.generated,
+    );
+    return true;
+  }
+  if (island.dataSource === "items") {
+    let keys = [...dataKeys].filter((key) => key !== "").sort();
+    if (keys.length === 0) {
+      throw new BuildError("config", ["registry.toml"], `island ${name} needs an items data key`);
+    }
+    await Promise.all(keys.map(async (key) => {
+      let itemData = data.items[key];
+      if (typeof itemData === "undefined") {
+        throw new BuildError("config", ["_data/items.yaml"], `${name}: unknown items key '${key}'`);
+      }
+      await writeGeneratedJson(staging, islandOutput(island.dataOutput!, key), itemData, data.generated);
+      return true;
+    }));
+    return true;
+  }
+  throw new BuildError("config", ["registry.toml"], `island ${name} declares dataOutput without dataSource`);
 }
 
 function renderedPostData(
@@ -464,32 +534,29 @@ function renderedPostData(
     });
 }
 
-async function emitCollectionIslands(
+async function writeGeneratedJson(
   staging: string,
-  collectionKeys: Set<string>,
-  items: Record<string, unknown>,
+  output: string,
+  data: unknown,
   generated: GeneratedEntry[],
 ): Promise<boolean> {
-  if (collectionKeys.size > 0) {
-    await Promise.all([...collectionKeys].map(async (key) => {
-      let data = items[key];
-      if (!data) {
-        throw new BuildError(
-          "config",
-          ["_data/items.yaml"],
-          `collection: unknown items key '${key}'`,
-        );
-      }
-      let output = `_collections/${key}.json`;
-      let dest = join(staging, output);
-      await mkdir(dirname(dest), { recursive: true });
-      await writeFile(dest, JSON.stringify(data), "utf8");
-      generated.push({ output, kind: "data" });
-      return true;
-    }));
-    generated.push({ output: await buildIsland("collection", staging), kind: "island" });
-  }
+  let dest = join(staging, output);
+  await mkdir(dirname(dest), { recursive: true });
+  await writeFile(dest, JSON.stringify(data), "utf8");
+  generated.push({ output, kind: "data" });
   return true;
+}
+
+function islandOutput(template: string, key: string): string {
+  return template.replaceAll("{key}", key);
+}
+
+function requiredUsage(usage: IslandUsage, name: string): Set<string> {
+  let dataKeys = usage.get(name);
+  if (!dataKeys) {
+    throw new Error(`island usage missing for ${name}`);
+  }
+  return dataKeys;
 }
 
 function requiredIndex<T>(items: T[], index: number, label: string): T {

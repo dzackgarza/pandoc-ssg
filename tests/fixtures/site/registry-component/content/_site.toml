@@ -1,0 +1,4 @@
+[componentHandlers.callout]
+handler = "callout"
+module = "_components/callout.lua"
+source = "content"

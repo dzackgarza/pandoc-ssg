@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import * as YAML from "yaml";
 import { BuildError } from "./errors.ts";
-import type { NavItem, PageType, RegistryFile } from "./types.ts";
+import type { ComponentHandler, IslandEntry, NavItem, PageType, RegistryFile } from "./types.ts";
 
 export interface RenderInput {
   /** absolute path of the source markdown file */
@@ -22,6 +22,10 @@ export interface RenderInput {
   mathMacros: Record<string, string | [string, number]>;
   /** data backing components (e.g. feature-row collections), from _data/items.yaml */
   items: Record<string, unknown>;
+  /** registry-declared component handlers, passed to the Lua component dispatcher */
+  componentHandlers: Record<string, ComponentHandler>;
+  /** registry-declared island entries, passed to handlers that emit mounts */
+  islands: Record<string, IslandEntry>;
   /** absolute content root; transclusion rejects includes resolving outside it */
   contentRoot: string;
   /** the author's pandoc tree (PANDOC_DIR); resolves the tikzcd filter's template + styles */
@@ -125,6 +129,10 @@ export async function renderPage(input: RenderInput): Promise<string> {
     metadata.items_path = itemsFile;
   }
 
+  let componentsRegistryFile = join(metaDir, "components-registry.json");
+  await writeFile(componentsRegistryFile, JSON.stringify(componentRegistry(input)), "utf8");
+  metadata.components_registry_path = componentsRegistryFile;
+
   await writeFile(metaFile, YAML.stringify(metadata), "utf8");
 
   let rendered = "";
@@ -173,4 +181,34 @@ export async function renderPage(input: RenderInput): Promise<string> {
 
 function registryPath(file: RegistryFile, contentRoot: string, pandocDir: string): string {
   return join(file.source === "content" ? contentRoot : pandocDir, file.path);
+}
+
+function componentRegistry(input: RenderInput): Record<string, unknown> {
+  return {
+    contentRoot: resolve(input.contentRoot),
+    handlers: Object.fromEntries(
+      Object.entries(input.componentHandlers).map(([name, handler]) => [
+        name,
+        {
+          handler: handler.handler,
+          island: handler.island,
+          module: handler.module
+            ? registryPath(handler.module, input.contentRoot, input.pandocDir)
+            : undefined,
+        },
+      ]),
+    ),
+    islands: Object.fromEntries(
+      Object.entries(input.islands).map(([name, island]) => [
+        name,
+        {
+          entry: registryPath({ path: island.entry, source: island.source }, input.contentRoot, input.pandocDir),
+          output: island.output,
+          dataOutput: island.dataOutput,
+          dataSource: island.dataSource,
+          mount: island.mount,
+        },
+      ]),
+    ),
+  };
 }

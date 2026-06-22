@@ -4,7 +4,14 @@ import envPaths from "env-paths";
 import { parse } from "smol-toml";
 import { z } from "zod";
 import { BuildError } from "./errors.ts";
-import type { PageType, RegistryFile, RegistrySource, SiteConfig } from "./types.ts";
+import type {
+  ComponentHandler,
+  IslandEntry,
+  PageType,
+  RegistryFile,
+  RegistrySource,
+  SiteConfig,
+} from "./types.ts";
 
 const dirTypeShape = z.object({ dir: z.string(), type: z.string() }).strict();
 const pageTypeShape = z
@@ -37,10 +44,21 @@ const schemaShape = z.object({ fields: z.array(schemaFieldShape).min(1) }).stric
 const componentHandlerShape = z
   .object({
     handler: z.string().min(1),
+    module: z.string().min(1).optional(),
+    source: z.enum(["pandoc", "content"]).optional(),
     island: z.string().min(1).optional(),
   })
   .strict();
-const islandShape = z.object({ entry: z.string().min(1), output: z.string().min(1) }).strict();
+const islandShape = z
+  .object({
+    entry: z.string().min(1),
+    output: z.string().min(1),
+    source: z.enum(["pandoc", "content"]).optional(),
+    dataOutput: z.string().min(1).optional(),
+    dataSource: z.enum(["blog-posts", "items"]).optional(),
+    mount: z.string().min(1).optional(),
+  })
+  .strict();
 const generatedArtifactShape = z
   .object({
     kind: z.enum(["data", "island", "theme"]),
@@ -86,6 +104,8 @@ type ContentConfigExtension = {
 };
 
 type RawPageType = z.infer<typeof pageTypeShape>;
+type RawComponentHandler = z.infer<typeof componentHandlerShape>;
+type RawIslandEntry = z.infer<typeof islandShape>;
 
 /**
  * Load and validate the required bundled registry plus content/_site.toml.
@@ -119,6 +139,8 @@ async function loadBundledRegistry(pandocDir: string): Promise<Omit<SiteConfig, 
   return {
     ...parsed.data,
     pageTypes: namePageTypes(parsed.data.pageTypes, "pandoc"),
+    componentHandlers: nameComponentHandlers(parsed.data.componentHandlers, "pandoc"),
+    islands: nameIslands(parsed.data.islands, "pandoc"),
     filters: registryFiles(parsed.data.filters ?? [], "pandoc"),
   };
 }
@@ -156,10 +178,10 @@ function contentConfig(data: z.infer<typeof contentConfigShape>): ContentConfigE
     content.schemas = data.schemas;
   }
   if (data.componentHandlers !== undefined) {
-    content.componentHandlers = data.componentHandlers;
+    content.componentHandlers = nameComponentHandlers(data.componentHandlers, "content");
   }
   if (data.islands !== undefined) {
-    content.islands = data.islands;
+    content.islands = nameIslands(data.islands, "content");
   }
   if (data.generatedArtifacts !== undefined) {
     content.generatedArtifacts = data.generatedArtifacts;
@@ -200,6 +222,43 @@ function namePageTypes(
 
 function registryFiles(paths: string[], source: RegistrySource): RegistryFile[] {
   return paths.map((path) => ({ path, source }));
+}
+
+function nameComponentHandlers(
+  handlers: Record<string, RawComponentHandler>,
+  source: RegistrySource,
+): Record<string, ComponentHandler> {
+  return Object.fromEntries(
+    Object.entries(handlers).map(([name, value]) => {
+      const handler: ComponentHandler = { handler: value.handler };
+      if (value.island) {
+        handler.island = value.island;
+      }
+      if (value.module) {
+        handler.module = registryFile(value.module, value.source ?? source);
+      }
+      return [name, handler];
+    }),
+  );
+}
+
+function nameIslands(
+  islands: Record<string, RawIslandEntry>,
+  source: RegistrySource,
+): Record<string, IslandEntry> {
+  return Object.fromEntries(
+    Object.entries(islands).map(([name, value]) => [
+      name,
+      {
+        entry: value.entry,
+        output: value.output,
+        source: value.source ?? source,
+        dataOutput: value.dataOutput,
+        dataSource: value.dataSource,
+        mount: value.mount,
+      },
+    ]),
+  );
 }
 
 function mergeContentConfig(
@@ -292,6 +351,16 @@ async function validateRegistryFiles(
     files.push(registryFile(pageType.defaults, pageType.source));
     files.push(registryFile(pageType.template, pageType.source));
     files.push(...(pageType.filters ?? []));
+    return true;
+  });
+  Object.values(config.componentHandlers).forEach((handler) => {
+    if (handler.module) {
+      files.push(handler.module);
+    }
+    return true;
+  });
+  Object.values(config.islands).forEach((island) => {
+    files.push(registryFile(island.entry, island.source));
     return true;
   });
   files.push(...(config.filters ?? []));

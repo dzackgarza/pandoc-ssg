@@ -140,6 +140,26 @@ describe("C1: registry foundation", () => {
     });
   });
 
+  test("component handlers referencing missing Lua modules fail before rendering", async () => {
+    const outDir = await tempDir("ssg-registry-missing-handler-");
+    expect(
+      await captureRejection(
+        build({
+          contentDir: join(FIXTURES, "registry-missing-component-handler", "content"),
+          pandocDir: PANDOC_DIR,
+          outDir,
+        }),
+      ),
+    ).toMatchObject({
+      rejected: true,
+      error: {
+        name: "BuildError",
+        kind: "config",
+        files: ["_site.toml"],
+      },
+    });
+  });
+
   test("page schemas without required title fail before rendering", async () => {
     const outDir = await tempDir("ssg-registry-schema-no-title-");
     expect(

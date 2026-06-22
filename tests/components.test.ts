@@ -405,3 +405,39 @@ describe("component filter: unknown component type fails the build", () => {
     await rm(outDir, { recursive: true, force: true });
   });
 });
+
+describe("component registry: content-owned Lua handlers", () => {
+  test("a registered custom static component renders without editing the built-in dispatcher", async () => {
+    const outDir = await freshOutDir();
+    await build({
+      contentDir: join(FIXTURES, "registry-component", "content"),
+      pandocDir: PANDOC_DIR,
+      outDir,
+    });
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    expect(html).toContain('class="callout"');
+    expect(html).toContain('data-handler="callout"');
+    expect(html).toContain("<strong>Registry Callout</strong>");
+    expect(html).toContain("<span>From Items</span>");
+    expect(html).not.toContain('type="callout"');
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("a registered custom island component emits registry-declared data and bundle outputs", async () => {
+    const outDir = await freshOutDir();
+    const manifest = await build({
+      contentDir: join(FIXTURES, "registry-custom-island", "content"),
+      pandocDir: PANDOC_DIR,
+      outDir,
+    });
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    const data = JSON.parse(await readFile(join(outDir, "mini", "notes.json"), "utf8"));
+    expect(html).toContain('data-ssg-island="mini-list"');
+    expect(html).toContain('data-mini="/mini/notes.json"');
+    expect(html).toContain('<script type="module" src="/assets/islands/mini-list.js">');
+    expect(data.map((item: { title: string }) => item.title)).toEqual(["One", "Two"]);
+    expect(manifest.generated).toContainEqual({ output: "mini/notes.json", kind: "data" });
+    expect(manifest.generated).toContainEqual({ output: "assets/islands/mini-list.js", kind: "island" });
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
