@@ -17,7 +17,6 @@ export async function buildIsland(
   let outDir = join(stagingDir, dirname(island.output));
   await viteBuild({
     configFile: false,
-    logLevel: "silent",
     plugins: [svelte({})],
     build: {
       lib: {

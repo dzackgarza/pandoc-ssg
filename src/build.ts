@@ -1,5 +1,5 @@
 import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import matter from "gray-matter";
 import { parse as parseHtml } from "node-html-parser";
 import type { Tags } from "yaml";
@@ -87,7 +87,6 @@ function extractExcerpt(renderedHtml: string): string {
   }
   article.querySelectorAll(".math").forEach((math) => {
     math.remove();
-    return true;
   });
   let p = article.querySelector("p");
   if (!p) {
@@ -209,11 +208,23 @@ interface ManifestDependencyContext {
   siteFilters: SiteConfig["filters"];
 }
 
+interface IslandArtifactInputs {
+  blogPosts: Omit<PostMeta, "excerpt">[];
+  rendered: Map<string, string>;
+  items: Record<string, unknown>;
+  dependencies: ManifestDependencyContext;
+}
+
+type PreviousOutput =
+  | { kind: "moved"; backup: string }
+  | { kind: "absent" };
+
 /**
  * Full pipeline (O4–O7): scan → classify → validate → route → collision
  * check → nav validation → render pages via pandoc → copy assets/opaque
  * trees byte-identically → write site-manifest.json into outDir → return
- * the manifest. Any failure throws BuildError and leaves no partial outDir.
+ * the manifest. Any failure throws and leaves the previous outDir in place
+ * until the staged tree is ready to become active.
  */
 export async function build(opts: BuildOptions): Promise<Manifest> {
   let { contentDir, pandocDir, outDir } = opts;
@@ -221,16 +232,11 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let relPaths = await scanContent(contentDir);
   let classified = await classifyFiles(contentDir, relPaths, config);
   let plan = await planBuild(contentDir, classified, config);
-  let generated: GeneratedEntry[] = [];
   let nav = await loadNavigation(contentDir);
   let appConfig = await loadAppConfig();
   let dependencyContext = await manifestDependencyContext(contentDir, pandocDir, appConfig.mathjaxMacroManifest, config);
-  let manifest: Manifest = {
-    schemaVersion: 2,
-    routes: plan.pages.map((page) => routeWithDependencies(page, dependencyContext)),
-    passthrough: plan.passthrough.map((entry) => passthroughWithDependencies(entry)),
-    generated,
-  };
+  let routes = plan.pages.map((page) => routeWithDependencies(page, dependencyContext));
+  let passthrough = plan.passthrough.map((entry) => passthroughWithDependencies(entry));
   let mathMacros = await generateMathMacros(appConfig.mathjaxMacroManifest, pandocDir);
   let items = await loadItems(contentDir);
   let postCtx = buildPostContext(plan.blogPosts);
@@ -252,23 +258,32 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let staging = `${outDir}.staging-${process.pid}-${Date.now()}`;
   await rm(staging, { recursive: true, force: true });
   await mkdir(staging, { recursive: true });
-  await writeRenderedPages(staging, rendered);
-  await copyPassthroughEntries(contentDir, staging, plan.passthrough);
-  await emitThemeAssets(pandocDir, staging, generated);
-  await emitIslandArtifacts(staging, islandUsage, config.islands, { contentDir, pandocDir }, {
-    blogPosts: plan.blogPosts,
-    rendered,
-    items,
-    generated,
-    dependencies: dependencyContext,
-  });
+  try {
+    await writeRenderedPages(staging, rendered);
+    await copyPassthroughEntries(contentDir, staging, plan.passthrough);
+    let themeGenerated = await emitThemeAssets(pandocDir, staging);
+    let islandGenerated = await emitIslandArtifacts(staging, islandUsage, config.islands, { contentDir, pandocDir }, {
+      blogPosts: plan.blogPosts,
+      rendered,
+      items,
+      dependencies: dependencyContext,
+    });
+    let generated = [...themeGenerated, ...islandGenerated].sort((a, b) =>
+      generatedEntryKey(a).localeCompare(generatedEntryKey(b))
+    );
+    let manifest: Manifest = {
+      schemaVersion: 2,
+      routes,
+      passthrough,
+      generated,
+    };
 
-  generated.sort((a, b) => generatedEntryKey(a).localeCompare(generatedEntryKey(b)));
-  await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest), "utf8");
-  await rm(outDir, { recursive: true, force: true });
-  await rename(staging, outDir);
-
-  return manifest;
+    await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest), "utf8");
+    await replaceOutputTree(staging, outDir);
+    return manifest;
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
 }
 
 async function planBuild(
@@ -370,9 +385,9 @@ function appendBlogPost(
   url: string,
   relPath: string,
   pageType: PageType,
-): boolean {
+): void {
   if (pageType.feed !== "blog") {
-    return true;
+    return;
   }
   if (!meta.date) {
     throw new BuildError("schema", [relPath], "blog-post page missing required date");
@@ -386,7 +401,6 @@ function appendBlogPost(
     categories: optionalStringList(meta.categories),
     dateLong: formatDate(meta.date),
   });
-  return true;
 }
 
 function buildPostContext(blogPosts: Omit<PostMeta, "excerpt">[]): Map<string, Record<string, unknown>> {
@@ -449,85 +463,65 @@ async function renderPlannedPages(
 
 function discoverIslandUsage(rendered: Map<string, string>): IslandUsage {
   let usage: IslandUsage = new Map();
-  [...rendered.values()].forEach((html) => {
+  for (const html of rendered.values()) {
     let root = parseHtml(html);
-    root.querySelectorAll("[data-ssg-island]").forEach((mount) => {
+    for (const mount of root.querySelectorAll("[data-ssg-island]")) {
       let island = mount.getAttribute("data-ssg-island");
       if (island) {
         addIslandUsage(usage, island, mount.getAttribute("data-ssg-data-key") ?? "");
       }
-      return true;
-    });
-    if (root.querySelector("#blog-index") !== null) {
-      addIslandUsage(usage, "blog-index", "");
     }
-    root.querySelectorAll("[data-collection]").forEach((mount) => {
-      let src = mount.getAttribute("data-collection");
-      if (src) {
-        addIslandUsage(usage, "collection", basename(src, ".json"));
-      }
-      return true;
-    });
-    return true;
-  });
+  }
   return usage;
 }
 
-function addIslandUsage(usage: IslandUsage, island: string, dataKey: string): boolean {
+function addIslandUsage(usage: IslandUsage, island: string, dataKey: string): void {
   let keys = usage.get(island);
   if (!keys) {
     keys = new Set<string>();
     usage.set(island, keys);
   }
   keys.add(dataKey);
-  return true;
 }
 
-async function writeRenderedPages(staging: string, rendered: Map<string, string>): Promise<boolean> {
+async function writeRenderedPages(staging: string, rendered: Map<string, string>): Promise<void> {
   await Promise.all([...rendered.entries()].map(async ([output, html]) => {
     let dest = join(staging, output);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, html, "utf8");
-    return true;
   }));
-  return true;
 }
 
 async function copyPassthroughEntries(
   contentDir: string,
   staging: string,
   passthrough: PassthroughEntry[],
-): Promise<boolean> {
+): Promise<void> {
   await Promise.all(passthrough.map(async (entry) => {
     let src = join(contentDir, entry.source);
     let dest = join(staging, entry.output);
     await mkdir(dirname(dest), { recursive: true });
     await copyFile(src, dest);
-    return true;
   }));
-  return true;
 }
 
 async function emitThemeAssets(
   pandocDir: string,
   staging: string,
-  generated: GeneratedEntry[],
-): Promise<boolean> {
+): Promise<GeneratedEntry[]> {
   let themeAssetRels = (await walkRel(join(pandocDir, "assets"))).sort();
-  await Promise.all(themeAssetRels.map(async (rel) => {
+  return await Promise.all(themeAssetRels.map(async (rel): Promise<GeneratedEntry> => {
     let src = join(pandocDir, "assets", rel);
     let output = `assets/${rel}`;
     let dest = join(staging, output);
     await mkdir(dirname(dest), { recursive: true });
     await copyFile(src, dest);
-    generated.push({
+    return {
       output,
       kind: "theme",
       dependencies: sortedDependencies([dependency("theme-asset", output, "pandoc")]),
-    });
-    return true;
+    };
   }));
-  return true;
 }
 
 async function emitIslandArtifacts(
@@ -535,21 +529,16 @@ async function emitIslandArtifacts(
   usage: IslandUsage,
   islands: Record<string, IslandEntry>,
   roots: { contentDir: string; pandocDir: string },
-  data: {
-    blogPosts: Omit<PostMeta, "excerpt">[];
-    rendered: Map<string, string>;
-    items: Record<string, unknown>;
-    generated: GeneratedEntry[];
-    dependencies: ManifestDependencyContext;
-  },
-): Promise<boolean> {
+  data: IslandArtifactInputs,
+): Promise<GeneratedEntry[]> {
+  let generated: GeneratedEntry[] = [];
   for (const name of [...usage.keys()].sort()) {
     let island = islands[name];
     if (!island) {
       throw new BuildError("config", ["registry.toml"], `used island ${name} is not registered`);
     }
-    await emitIslandData(staging, name, island, requiredUsage(usage, name), data);
-    data.generated.push({
+    generated.push(...await emitIslandData(staging, name, island, requiredUsage(usage, name), data));
+    generated.push({
       output: await buildIsland(island, staging, roots),
       kind: "island",
       dependencies: sortedDependencies([
@@ -558,7 +547,7 @@ async function emitIslandArtifacts(
       ]),
     });
   }
-  return true;
+  return generated;
 }
 
 async function emitIslandData(
@@ -566,48 +555,42 @@ async function emitIslandData(
   name: string,
   island: IslandEntry,
   dataKeys: Set<string>,
-  data: {
-    blogPosts: Omit<PostMeta, "excerpt">[];
-    rendered: Map<string, string>;
-    items: Record<string, unknown>;
-    generated: GeneratedEntry[];
-    dependencies: ManifestDependencyContext;
-  },
-): Promise<boolean> {
-  if (!island.dataOutput) {
-    return true;
+  data: IslandArtifactInputs,
+): Promise<GeneratedEntry[]> {
+  let dataOutput = island.dataOutput;
+  if (!dataOutput) {
+    if (island.dataSource) {
+      throw new BuildError("config", ["registry.toml"], `island ${name} declares dataSource without dataOutput`);
+    }
+    return [];
   }
   if (island.dataSource === "blog-posts") {
-    await writeGeneratedJson(
+    return [await writeGeneratedJson(
       staging,
-      islandOutput(island.dataOutput, ""),
+      islandOutput(dataOutput, ""),
       renderedPostData(data.blogPosts, data.rendered),
-      data.generated,
       [
         ...data.dependencies.siteConfigDependencies,
         data.dependencies.macroManifestDependency,
         ...data.blogPosts.map((post) => dependency("source-page", post.source, "content")),
       ],
-    );
-    return true;
+    )];
   }
   if (island.dataSource === "items") {
     let keys = [...dataKeys].filter((key) => key !== "").sort();
     if (keys.length === 0) {
       throw new BuildError("config", ["registry.toml"], `island ${name} needs an items data key`);
     }
-    await Promise.all(keys.map(async (key) => {
+    return await Promise.all(keys.map(async (key) => {
       let itemData = data.items[key];
       if (typeof itemData === "undefined") {
         throw new BuildError("config", ["_data/items.yaml"], `${name}: unknown items key '${key}'`);
       }
-      await writeGeneratedJson(staging, islandOutput(island.dataOutput!, key), itemData, data.generated, [
+      return await writeGeneratedJson(staging, islandOutput(dataOutput, key), itemData, [
         ...data.dependencies.siteConfigDependencies,
         dependency("items-data", "_data/items.yaml", "content", key),
       ]);
-      return true;
     }));
-    return true;
   }
   throw new BuildError("config", ["registry.toml"], `island ${name} declares dataOutput without dataSource`);
 }
@@ -632,14 +615,54 @@ async function writeGeneratedJson(
   staging: string,
   output: string,
   data: unknown,
-  generated: GeneratedEntry[],
   dependencies: ManifestDependency[],
-): Promise<boolean> {
+): Promise<GeneratedEntry> {
   let dest = join(staging, output);
   await mkdir(dirname(dest), { recursive: true });
   await writeFile(dest, JSON.stringify(data), "utf8");
-  generated.push({ output, kind: "data", dependencies: sortedDependencies(dependencies) });
-  return true;
+  return { output, kind: "data", dependencies: sortedDependencies(dependencies) };
+}
+
+async function replaceOutputTree(staging: string, outDir: string): Promise<void> {
+  let previous = await movePreviousOutput(outDir, `${outDir}.backup-${process.pid}-${Date.now()}`);
+  try {
+    await rename(staging, outDir);
+  } catch (activationError) {
+    if (previous.kind === "moved") {
+      await restorePreviousOutput(previous.backup, outDir, activationError);
+    }
+    throw activationError;
+  }
+  if (previous.kind === "moved") {
+    await rm(previous.backup, { recursive: true, force: true });
+  }
+}
+
+async function movePreviousOutput(outDir: string, backup: string): Promise<PreviousOutput> {
+  try {
+    await rename(outDir, backup);
+    return { kind: "moved", backup };
+  } catch (error) {
+    if (isNoEntryError(error)) {
+      return { kind: "absent" };
+    }
+    throw error;
+  }
+}
+
+async function restorePreviousOutput(backup: string, outDir: string, activationError: unknown): Promise<void> {
+  try {
+    await rename(backup, outDir);
+  } catch (restoreError) {
+    throw new AggregateError(
+      [activationError, restoreError],
+      `failed to activate staged output at ${outDir}; previous output remains at ${backup}`,
+    );
+  }
+}
+
+function isNoEntryError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
 function islandOutput(template: string, key: string): string {
@@ -682,7 +705,6 @@ function sortedDependencies(dependencies: ManifestDependency[]): ManifestDepende
   let byKey = new Map<string, ManifestDependency>();
   dependencies.forEach((dep) => {
     byKey.set(dependencyKey(dep), dep);
-    return true;
   });
   return [...byKey.values()].sort((a, b) => dependencyKey(a).localeCompare(dependencyKey(b)));
 }
