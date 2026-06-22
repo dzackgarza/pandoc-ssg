@@ -33,7 +33,7 @@ export function outputPathForRoute(url: string): string {
  * copies) sharing one output path throw BuildError(kind="route-collision")
  * with both sources in `files`.
  */
-export function assertNoCollisions(routes: RouteEntry[], passthrough: PassthroughEntry[]): boolean {
+export function assertNoCollisions(routes: RouteEntry[], passthrough: PassthroughEntry[]): void {
   let seen = new Map<string, string>();
   let entries: { output: string; source: string }[] = [
     ...routes.map((r) => ({ output: r.output, source: r.source })),
@@ -50,5 +50,4 @@ export function assertNoCollisions(routes: RouteEntry[], passthrough: Passthroug
     }
     seen.set(output, source);
   }
-  return true;
 }

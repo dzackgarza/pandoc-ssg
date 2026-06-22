@@ -532,12 +532,12 @@ async function emitIslandArtifacts(
   data: IslandArtifactInputs,
 ): Promise<GeneratedEntry[]> {
   let generated: GeneratedEntry[] = [];
-  for (const name of [...usage.keys()].sort()) {
+  for (const [name, dataKeys] of [...usage.entries()].sort(([left], [right]) => left.localeCompare(right))) {
     let island = islands[name];
     if (!island) {
       throw new BuildError("config", ["registry.toml"], `used island ${name} is not registered`);
     }
-    generated.push(...await emitIslandData(staging, name, island, requiredUsage(usage, name), data));
+    generated.push(...await emitIslandData(staging, name, island, dataKeys, data));
     generated.push({
       output: await buildIsland(island, staging, roots),
       kind: "island",
@@ -667,14 +667,6 @@ function isNoEntryError(error: unknown): boolean {
 
 function islandOutput(template: string, key: string): string {
   return template.replaceAll("{key}", key);
-}
-
-function requiredUsage(usage: IslandUsage, name: string): Set<string> {
-  let dataKeys = usage.get(name);
-  if (!dataKeys) {
-    throw new Error(`island usage missing for ${name}`);
-  }
-  return dataKeys;
 }
 
 function dependency(
