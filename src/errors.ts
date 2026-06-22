@@ -16,10 +16,8 @@ export type BuildErrorKind =
  */
 export class BuildError extends Error {
   readonly kind: BuildErrorKind;
-  readonly code: BuildErrorKind;
   /** content-relative paths of the offending source file(s) */
   readonly files: string[];
-  readonly details: { files: string[] };
 
   constructor(kind: BuildErrorKind, files: string[], message: string, cause?: unknown) {
     if (cause === undefined) {
@@ -29,9 +27,7 @@ export class BuildError extends Error {
     }
     this.name = "BuildError";
     this.kind = kind;
-    this.code = kind;
     this.files = files;
-    this.details = { files };
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { resolvePageType, validatePageMeta } from "../src/content/schemas.ts";
+import { BuildError } from "../src/errors.ts";
 import type { SiteConfig } from "../src/types.ts";
 
 const TEST_SCHEMAS: SiteConfig["schemas"] = {
@@ -43,17 +44,10 @@ function configWith(dirTypes: SiteConfig["dirTypes"]): SiteConfig {
   return { ...TEST_CONFIG, dirTypes };
 }
 
-type CapturedThrow = { threw: true; error: unknown } | { threw: false };
-
-function captureThrow(action: () => unknown): CapturedThrow {
-  let result: CapturedThrow;
-  try {
-    action();
-    result = { threw: false };
-  } catch (error) {
-    result = { threw: true, error };
-  }
-  return result;
+async function expectBuildError(action: () => unknown, expected: { kind: string; files?: string[] }): Promise<void> {
+  const rejection = Promise.resolve().then(action);
+  await expect(rejection).rejects.toThrow(BuildError);
+  await expect(rejection).rejects.toMatchObject({ name: "BuildError", ...expected });
 }
 
 // O3: validatePageMeta — page.v1.
@@ -69,52 +63,32 @@ test("validatePageMeta accepts a minimal page.v1 and returns the typed meta", ()
   expect(meta.site.page).toBe(true);
 });
 
-test("validatePageMeta rejects page.v1 missing title with schema error naming the file", () => {
-  expect(
-    captureThrow(() => validatePageMeta("about.md", { site: { page: true } }, "page.v1", TEST_SCHEMAS)),
-  ).toMatchObject({
-    threw: true,
-    error: {
-      name: "BuildError",
-      kind: "schema",
-      files: ["about.md"],
-    },
-  });
+test("validatePageMeta rejects page.v1 missing title with schema error naming the file", async () => {
+  await expectBuildError(
+    () => validatePageMeta("about.md", { site: { page: true } }, "page.v1", TEST_SCHEMAS),
+    { kind: "schema", files: ["about.md"] },
+  );
 });
 
-test("validatePageMeta rejects an unknown top-level key with a schema error", () => {
-  expect(
-    captureThrow(() =>
+test("validatePageMeta rejects an unknown top-level key with a schema error", async () => {
+  await expectBuildError(
+    () =>
       validatePageMeta(
         "about.md",
         { title: "About", site: { page: true }, banner: "x" },
         "page.v1",
         TEST_SCHEMAS,
       ),
-    ),
-  ).toMatchObject({
-    threw: true,
-    error: {
-      name: "BuildError",
-      kind: "schema",
-      files: ["about.md"],
-    },
-  });
+    { kind: "schema", files: ["about.md"] },
+  );
 });
 
-test("validatePageMeta rejects an unknown schema id with a schema error", () => {
-  expect(
-    captureThrow(() =>
+test("validatePageMeta rejects an unknown schema id with a schema error", async () => {
+  await expectBuildError(
+    () =>
       validatePageMeta("about.md", { title: "About", site: { page: true } }, "page.v999", TEST_SCHEMAS),
-    ),
-  ).toMatchObject({
-    threw: true,
-    error: {
-      name: "BuildError",
-      kind: "schema",
-      files: ["about.md"],
-    },
-  });
+    { kind: "schema", files: ["about.md"] },
+  );
 });
 
 // O3: validatePageMeta — blog-post.v1.
@@ -136,44 +110,30 @@ test("validatePageMeta accepts a blog-post.v1 with ISO date and string tags", ()
   expect(meta.tags).toEqual(["algebraic-geometry", "teaching"]);
 });
 
-test("validatePageMeta rejects blog-post.v1 with a non-ISO date string", () => {
-  expect(
-    captureThrow(() =>
+test("validatePageMeta rejects blog-post.v1 with a non-ISO date string", async () => {
+  await expectBuildError(
+    () =>
       validatePageMeta(
         "blog/foo.md",
         { title: "Example post", site: { page: true }, date: "June 12, 2026" },
         "blog-post.v1",
         TEST_SCHEMAS,
       ),
-    ),
-  ).toMatchObject({
-    threw: true,
-    error: {
-      name: "BuildError",
-      kind: "schema",
-      files: ["blog/foo.md"],
-    },
-  });
+    { kind: "schema", files: ["blog/foo.md"] },
+  );
 });
 
-test("validatePageMeta rejects blog-post.v1 missing the required date", () => {
-  expect(
-    captureThrow(() =>
+test("validatePageMeta rejects blog-post.v1 missing the required date", async () => {
+  await expectBuildError(
+    () =>
       validatePageMeta(
         "blog/foo.md",
         { title: "Example post", site: { page: true } },
         "blog-post.v1",
         TEST_SCHEMAS,
       ),
-    ),
-  ).toMatchObject({
-    threw: true,
-    error: {
-      name: "BuildError",
-      kind: "schema",
-      files: ["blog/foo.md"],
-    },
-  });
+    { kind: "schema", files: ["blog/foo.md"] },
+  );
 });
 
 // O3: validatePageMeta — site.route shape.
@@ -198,44 +158,30 @@ test("validatePageMeta accepts a site.route bounded by leading and trailing slas
   expect(meta.site.route).toBe("/activities/goats-2020/");
 });
 
-test("validatePageMeta rejects a site.route missing its leading slash", () => {
-  expect(
-    captureThrow(() =>
+test("validatePageMeta rejects a site.route missing its leading slash", async () => {
+  await expectBuildError(
+    () =>
       validatePageMeta(
         "about.md",
         { title: "About", site: { page: true, route: "about/" } },
         "page.v1",
         TEST_SCHEMAS,
       ),
-    ),
-  ).toMatchObject({
-    threw: true,
-    error: {
-      name: "BuildError",
-      kind: "schema",
-      files: ["about.md"],
-    },
-  });
+    { kind: "schema", files: ["about.md"] },
+  );
 });
 
-test("validatePageMeta rejects a site.route missing its trailing slash", () => {
-  expect(
-    captureThrow(() =>
+test("validatePageMeta rejects a site.route missing its trailing slash", async () => {
+  await expectBuildError(
+    () =>
       validatePageMeta(
         "about.md",
         { title: "About", site: { page: true, route: "/about" } },
         "page.v1",
         TEST_SCHEMAS,
       ),
-    ),
-  ).toMatchObject({
-    threw: true,
-    error: {
-      name: "BuildError",
-      kind: "schema",
-      files: ["about.md"],
-    },
-  });
+    { kind: "schema", files: ["about.md"] },
+  );
 });
 
 // O8: resolvePageType.
@@ -299,20 +245,14 @@ test("resolvePageType picks the longest matching directory prefix", () => {
   });
 });
 
-test("resolvePageType rejects an unknown explicit site.type with a schema error", () => {
-  expect(
-    captureThrow(() =>
+test("resolvePageType rejects an unknown explicit site.type with a schema error", async () => {
+  await expectBuildError(
+    () =>
       resolvePageType(
         "about.md",
         { title: "About", site: { page: true, type: "no-such-type" } },
         configWith([{ dir: "blog", type: "blog-post" }]),
       ),
-    ),
-  ).toMatchObject({
-    threw: true,
-    error: {
-      name: "BuildError",
-      kind: "schema",
-    },
-  });
+    { kind: "schema" },
+  );
 });

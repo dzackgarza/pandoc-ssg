@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
+import { BuildError } from "../src/errors.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -15,17 +16,12 @@ async function tempDir(prefix: string): Promise<string> {
   return dir;
 }
 
-type CapturedRejection = { rejected: true; error: unknown } | { rejected: false };
-
-async function captureRejection(promise: Promise<unknown>): Promise<CapturedRejection> {
-  let result: CapturedRejection;
-  try {
-    await promise;
-    result = { rejected: false };
-  } catch (error) {
-    result = { rejected: true, error };
-  }
-  return result;
+async function expectBuildError(
+  promise: Promise<unknown>,
+  expected: { kind: string; files: string[] },
+): Promise<void> {
+  await expect(promise).rejects.toThrow(BuildError);
+  await expect(promise).rejects.toMatchObject({ name: "BuildError", ...expected });
 }
 
 afterEach(async () => {
@@ -82,142 +78,86 @@ describe("C1: registry foundation", () => {
 
   test("malformed content registry page types fail before rendering", async () => {
     const outDir = await tempDir("ssg-registry-bad-");
-    expect(
-      await captureRejection(
-        build({
-          contentDir: join(FIXTURES, "registry-malformed", "content"),
-          pandocDir: PANDOC_DIR,
-          outDir,
-        }),
-      ),
-    ).toMatchObject({
-      rejected: true,
-      error: {
-        name: "BuildError",
-        kind: "config",
-        files: ["_site.toml"],
-      },
-    });
+    await expectBuildError(
+      build({
+        contentDir: join(FIXTURES, "registry-malformed", "content"),
+        pandocDir: PANDOC_DIR,
+        outDir,
+      }),
+      { kind: "config", files: ["_site.toml"] },
+    );
   });
 
   test("unknown registry filter paths fail before rendering", async () => {
     const outDir = await tempDir("ssg-registry-missing-filter-");
-    expect(
-      await captureRejection(
-        build({
-          contentDir: join(FIXTURES, "registry-missing-filter", "content"),
-          pandocDir: PANDOC_DIR,
-          outDir,
-        }),
-      ),
-    ).toMatchObject({
-      rejected: true,
-      error: {
-        name: "BuildError",
-        kind: "config",
-        files: ["_site.toml"],
-      },
-    });
+    await expectBuildError(
+      build({
+        contentDir: join(FIXTURES, "registry-missing-filter", "content"),
+        pandocDir: PANDOC_DIR,
+        outDir,
+      }),
+      { kind: "config", files: ["_site.toml"] },
+    );
   });
 
   test("component handlers referencing unknown islands fail before rendering", async () => {
     const outDir = await tempDir("ssg-registry-bad-island-");
-    expect(
-      await captureRejection(
-        build({
-          contentDir: join(FIXTURES, "registry-unknown-island", "content"),
-          pandocDir: PANDOC_DIR,
-          outDir,
-        }),
-      ),
-    ).toMatchObject({
-      rejected: true,
-      error: {
-        name: "BuildError",
-        kind: "config",
-        files: ["_site.toml"],
-      },
-    });
+    await expectBuildError(
+      build({
+        contentDir: join(FIXTURES, "registry-unknown-island", "content"),
+        pandocDir: PANDOC_DIR,
+        outDir,
+      }),
+      { kind: "config", files: ["_site.toml"] },
+    );
   });
 
   test("component handlers referencing missing Lua modules fail before rendering", async () => {
     const outDir = await tempDir("ssg-registry-missing-handler-");
-    expect(
-      await captureRejection(
-        build({
-          contentDir: join(FIXTURES, "registry-missing-component-handler", "content"),
-          pandocDir: PANDOC_DIR,
-          outDir,
-        }),
-      ),
-    ).toMatchObject({
-      rejected: true,
-      error: {
-        name: "BuildError",
-        kind: "config",
-        files: ["_site.toml"],
-      },
-    });
+    await expectBuildError(
+      build({
+        contentDir: join(FIXTURES, "registry-missing-component-handler", "content"),
+        pandocDir: PANDOC_DIR,
+        outDir,
+      }),
+      { kind: "config", files: ["_site.toml"] },
+    );
   });
 
   test("page schemas without required title fail before rendering", async () => {
     const outDir = await tempDir("ssg-registry-schema-no-title-");
-    expect(
-      await captureRejection(
-        build({
-          contentDir: join(FIXTURES, "registry-schema-no-title", "content"),
-          pandocDir: PANDOC_DIR,
-          outDir,
-        }),
-      ),
-    ).toMatchObject({
-      rejected: true,
-      error: {
-        name: "BuildError",
-        kind: "config",
-        files: ["_site.toml"],
-      },
-    });
+    await expectBuildError(
+      build({
+        contentDir: join(FIXTURES, "registry-schema-no-title", "content"),
+        pandocDir: PANDOC_DIR,
+        outDir,
+      }),
+      { kind: "config", files: ["_site.toml"] },
+    );
   });
 
   test("unknown page type declarations fail loudly at the page boundary", async () => {
     const outDir = await tempDir("ssg-registry-unknown-");
-    expect(
-      await captureRejection(
-        build({
-          contentDir: join(FIXTURES, "registry-unknown-type", "content"),
-          pandocDir: PANDOC_DIR,
-          outDir,
-        }),
-      ),
-    ).toMatchObject({
-      rejected: true,
-      error: {
-        name: "BuildError",
-        kind: "schema",
-        files: ["index.md"],
-      },
-    });
+    await expectBuildError(
+      build({
+        contentDir: join(FIXTURES, "registry-unknown-type", "content"),
+        pandocDir: PANDOC_DIR,
+        outDir,
+      }),
+      { kind: "schema", files: ["index.md"] },
+    );
   });
 
   test("missing bundled registry fails at the bundled registry path", async () => {
     const outDir = await tempDir("ssg-registry-missing-out-");
     const pandocDir = await tempDir("ssg-registry-missing-pandoc-");
-    expect(
-      await captureRejection(
-        build({
-          contentDir: join(FIXTURES, "registry-unknown-type", "content"),
-          pandocDir,
-          outDir,
-        }),
-      ),
-    ).toMatchObject({
-      rejected: true,
-      error: {
-        name: "BuildError",
-        kind: "config",
-        files: [join(pandocDir, "registry.toml")],
-      },
-    });
+    await expectBuildError(
+      build({
+        contentDir: join(FIXTURES, "registry-unknown-type", "content"),
+        pandocDir,
+        outDir,
+      }),
+      { kind: "config", files: [join(pandocDir, "registry.toml")] },
+    );
   });
 });

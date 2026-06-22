@@ -8,7 +8,7 @@ export interface ServeOptions {
 
 export interface RunningServer {
   port: number;
-  stop(): boolean;
+  stop(): void;
 }
 
 function requestedPort(port: number | undefined): number {
@@ -26,38 +26,34 @@ function requestedPort(port: number | undefined): number {
  */
 export function startServer(opts: ServeOptions): Promise<RunningServer> {
   let serve = sirv(opts.outDir, { dev: true });
-  let server = createServer((req, res): boolean => {
+  let server = createServer((req, res) => {
     serve(req, res, (): Promise<void> => {
       res.statusCode = 404;
       res.end("Not Found");
       return Promise.resolve();
     });
-    return true;
   });
 
-  return new Promise((resolve, reject): boolean => {
+  return new Promise((resolve, reject) => {
     server.on("error", reject);
-    server.listen(requestedPort(opts.port), (): boolean => {
+    server.listen(requestedPort(opts.port), () => {
       let address = server.address();
       if (!address) {
         server.close();
         reject(new Error("preview server did not report a bound TCP port"));
-        return true;
+        return;
       }
       if (typeof address === "string") {
         server.close();
         reject(new Error("preview server did not report a bound TCP port"));
-        return true;
+        return;
       }
       resolve({
         port: address.port,
-        stop: (): boolean => {
+        stop: () => {
           server.close();
-          return true;
         },
       });
-      return true;
     });
-    return true;
   });
 }

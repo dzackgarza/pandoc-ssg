@@ -328,7 +328,7 @@ async function validateRegistryFiles(
   contentDir: string,
   pandocDir: string,
   file: string,
-): Promise<boolean> {
+): Promise<void> {
   let files: RegistryFile[] = [];
   Object.values(config.pageTypes).forEach((pageType) => {
     files.push(registryFile(pageType.defaults, pageType.source));
@@ -354,7 +354,6 @@ async function validateRegistryFiles(
       throw new BuildError("config", [file], `registry path not found: ${entry.path}`);
     }
   }
-  return true;
 }
 
 function registryFile(path: string, source: RegistrySource | undefined): RegistryFile {
@@ -370,7 +369,7 @@ function assertRenderableSchema(
   schema: SiteConfig["schemas"][string],
   schemaId: string,
   file: string,
-): boolean {
+): void {
   let hasTitle = false;
   schema.fields.forEach((field) => {
     if (field.name === "site") {
@@ -387,7 +386,6 @@ function assertRenderableSchema(
       `schema ${schemaId} must declare required string field title`,
     );
   }
-  return true;
 }
 
 /**
