@@ -11,31 +11,27 @@ interface MathJaxGlobal {
   typesetClear?: (elements: Element[]) => void;
 }
 
-function mathJax(): MathJaxGlobal | false {
-  let mj = (globalThis as { MathJax?: MathJaxGlobal }).MathJax;
-  if (!mj) {
-    return false;
-  }
-  return mj;
+function mathJax(): MathJaxGlobal | undefined {
+  return (globalThis as { MathJax?: MathJaxGlobal }).MathJax;
 }
 
-function readyMathJax(): NonNullable<MathJaxGlobal["typesetPromise"]> | false {
+function readyMathJax(): NonNullable<MathJaxGlobal["typesetPromise"]> | undefined {
   let mj = mathJax();
   if (mj && typeof mj.typesetPromise === "function") {
     return mj.typesetPromise.bind(mj);
   }
-  return false;
+  return undefined;
 }
 
 /** Resolve once MathJax has finished loading; reject if it never does. */
 function whenReady(timeoutMs: number): Promise<NonNullable<MathJaxGlobal["typesetPromise"]>> {
-  return new Promise((resolve, reject): boolean => {
+  return new Promise((resolve, reject) => {
     let deadline = performance.now() + timeoutMs;
-    let poll = (): boolean => {
+    let poll = (): void => {
       let typeset = readyMathJax();
       if (typeset) {
         resolve(typeset);
-        return true;
+        return;
       }
       if (performance.now() >= deadline) {
         reject(
@@ -43,23 +39,20 @@ function whenReady(timeoutMs: number): Promise<NonNullable<MathJaxGlobal["typese
             "typesetMath: window.MathJax.typesetPromise never became available — the page must load MathJax",
           ),
         );
-        return true;
+        return;
       }
       requestAnimationFrame(poll);
-      return true;
     };
     poll();
-    return true;
   });
 }
 
 /** Re-typeset the math in `el` once MathJax is ready. */
-export async function typesetMath(el: Element, timeoutMs: number): Promise<boolean> {
+export async function typesetMath(el: Element, timeoutMs: number): Promise<void> {
   let typeset = await whenReady(timeoutMs);
   let mj = mathJax();
   if (mj && typeof mj.typesetClear === "function") {
     mj.typesetClear([el]);
   }
   await typeset([el]);
-  return true;
 }
