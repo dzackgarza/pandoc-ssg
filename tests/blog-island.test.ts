@@ -11,6 +11,7 @@ import type { Manifest } from "../src/types.ts";
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 const BLOG_CONTENT = join(FIXTURES, "blog-island", "content");
+const BLOG_TITLE_SELECTOR = ".blog-index__item .blog-index__link";
 
 interface PostMeta {
   title: string;
@@ -123,11 +124,6 @@ describe("O16: blog-index island hydrates and filters in the browser", () => {
   let page: Page;
   let browser: Browser;
 
-  async function visibleTitles(): Promise<string[]> {
-    // allInnerTexts avoids in-page DOM callbacks (no node-side DOM typing).
-    return page.locator(".blog-index__item .blog-index__link").allInnerTexts();
-  }
-
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), "ssg-island-br-"));
     await build({ contentDir: BLOG_CONTENT, pandocDir: PANDOC_DIR, outDir });
@@ -146,14 +142,19 @@ describe("O16: blog-index island hydrates and filters in the browser", () => {
   });
 
   test("renders all posts after hydration, newest first", async () => {
-    expect(await visibleTitles()).toEqual(["Second Post", "First Post", "Old Post"]);
+    // allInnerTexts avoids in-page DOM callbacks (no node-side DOM typing).
+    expect(await page.locator(BLOG_TITLE_SELECTOR).allInnerTexts()).toEqual([
+      "Second Post",
+      "First Post",
+      "Old Post",
+    ]);
   });
 
   test("search narrows the list to matching titles", async () => {
     await page.fill(".blog-index__search", "first");
     // string body evaluates in-browser; no node-side DOM typing needed
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 1");
-    expect(await visibleTitles()).toEqual(["First Post"]);
+    expect(await page.locator(BLOG_TITLE_SELECTOR).allInnerTexts()).toEqual(["First Post"]);
     await page.fill(".blog-index__search", "");
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 3");
   });
@@ -166,7 +167,10 @@ describe("O16: blog-index island hydrates and filters in the browser", () => {
       .getByRole("button", { name: "algebra", exact: true })
       .click();
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 2");
-    expect(await visibleTitles()).toEqual(["Second Post", "Old Post"]);
+    expect(await page.locator(BLOG_TITLE_SELECTOR).allInnerTexts()).toEqual([
+      "Second Post",
+      "Old Post",
+    ]);
     // reset the tag facet for the next test
     await page
       .locator(".blog-index__tags")
@@ -181,13 +185,16 @@ describe("O16: blog-index island hydrates and filters in the browser", () => {
       .getByRole("button", { name: "Tutorials", exact: true })
       .click();
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 1");
-    expect(await visibleTitles()).toEqual(["First Post"]);
+    expect(await page.locator(BLOG_TITLE_SELECTOR).allInnerTexts()).toEqual(["First Post"]);
 
     await page
       .locator(".blog-index__categories")
       .getByRole("button", { name: "Notes", exact: true })
       .click();
     await page.waitForFunction("document.querySelectorAll('.blog-index__item').length === 2");
-    expect(await visibleTitles()).toEqual(["Second Post", "Old Post"]);
+    expect(await page.locator(BLOG_TITLE_SELECTOR).allInnerTexts()).toEqual([
+      "Second Post",
+      "Old Post",
+    ]);
   });
 });

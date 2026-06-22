@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse } from "node-html-parser";
-import type { Manifest } from "./types.ts";
+import type { Manifest } from "../types.ts";
 
 export interface PageIssue {
   /** dist-relative output path of the page */

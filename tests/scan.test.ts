@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { scanContent } from "../src/scan.ts";
+import { scanContent } from "../src/site/scan.ts";
 
 const fixtures = join(import.meta.dir, "fixtures", "kernel");
 const basicContent = join(fixtures, "basic", "content");

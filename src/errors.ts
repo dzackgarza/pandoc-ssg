@@ -13,19 +13,28 @@ export type BuildErrorKind =
  * offending `files`, never on message text.
  */
 export class BuildError extends Error {
-  readonly kind: BuildErrorKind;
+  declare readonly kind: BuildErrorKind;
   /** content-relative paths of the offending source file(s) */
-  readonly files: string[];
+  declare readonly files: string[];
 
   constructor(kind: BuildErrorKind, files: string[], message: string, cause: unknown | false = false) {
-    if (cause === false) {
-      super(message);
-    } else {
-      super(message, { cause });
-    }
-    this.name = "BuildError";
-    this.kind = kind;
-    this.files = files;
-    return this;
+    super(message);
+    return createBuildError(kind, files, message, cause);
   }
+}
+
+function createBuildError(
+  kind: BuildErrorKind,
+  files: string[],
+  message: string,
+  cause: unknown | false,
+): BuildError {
+  let error = cause === false ? new Error(message) : new Error(message, { cause });
+  Object.setPrototypeOf(error, BuildError.prototype);
+  Object.defineProperties(error, {
+    name: { value: "BuildError", configurable: true },
+    kind: { value: kind, enumerable: true, configurable: true },
+    files: { value: files, enumerable: true, configurable: true },
+  });
+  return error as BuildError;
 }

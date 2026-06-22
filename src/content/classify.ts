@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import matter from "gray-matter";
-import type { ClassifiedFile, FileClass, SiteConfig } from "./types.ts";
+import type { ClassifiedFile, FileClass, SiteConfig } from "../types.ts";
 
 /**
  * Classify every scanned file into exactly one FileClass (O1):
@@ -10,16 +10,16 @@ import type { ClassifiedFile, FileClass, SiteConfig } from "./types.ts";
  * - "page":     a .md file whose YAML frontmatter has `site.page: true`
  * - "asset":    everything else, including non-opt-in markdown
  */
-export async function classifyFiles(
+export function classifyFiles(
   contentDir: string,
   relPaths: string[],
   config: Pick<SiteConfig, "passthrough">,
 ): Promise<ClassifiedFile[]> {
-  return await Promise.all(
-    relPaths.map(async (relPath) => ({
-      relPath,
-      class: await classifyOne(contentDir, relPath, config),
-    })),
+  return Promise.all(
+    relPaths.map(async (relPath) => {
+      let fileClass = await classifyOne(contentDir, relPath, config);
+      return { relPath, class: fileClass };
+    }),
   );
 }
 

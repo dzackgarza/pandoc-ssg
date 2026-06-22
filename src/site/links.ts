@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { Manifest } from "./types.ts";
+import type { Manifest } from "../types.ts";
 
 export interface BrokenLink {
   sourcePage: string;

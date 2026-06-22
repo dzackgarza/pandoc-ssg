@@ -1,6 +1,6 @@
 import { parse } from "node:path/posix";
-import { BuildError } from "./errors.ts";
-import type { PassthroughEntry, RouteEntry } from "./types.ts";
+import { BuildError } from "../errors.ts";
+import type { PassthroughEntry, RouteEntry } from "../types.ts";
 
 /**
  * Deterministic routing (O2):

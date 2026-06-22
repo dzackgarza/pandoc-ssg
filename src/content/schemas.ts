@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { BuildError } from "./errors.ts";
-import type { PageMeta, PageType, SchemaDefinition, SchemaFieldType, SiteConfig } from "./types.ts";
+import { BuildError } from "../errors.ts";
+import type { PageMeta, PageType, SchemaDefinition, SchemaFieldType, SiteConfig } from "../types.ts";
 
 function isRootOrBounded(s: string): boolean {
   if (s === "/") {
@@ -19,11 +19,6 @@ let siteShape = z
     route: routeShape.optional(),
   })
   .strict();
-
-/** Schema ids known to the registry. */
-export function knownSchemas(schemas: Record<string, SchemaDefinition>): string[] {
-  return Object.keys(schemas);
-}
 
 /**
  * Validate raw frontmatter against the named schema (O3). Strict: unknown

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { BuildError } from "../src/errors.ts";
-import { assertNoCollisions, outputPathForRoute, routeForPage } from "../src/routes.ts";
+import { assertNoCollisions, outputPathForRoute, routeForPage } from "../src/site/routes.ts";
 import type { PassthroughEntry, RouteEntry } from "../src/types.ts";
 
 function route(source: string, url: string, output: string): RouteEntry {

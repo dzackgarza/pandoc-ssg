@@ -16,7 +16,7 @@
  *                                                        console/page errors,
  *                                                        missing landmarks, or
  *                                                        MathJax errors (O15).
- *                                                        Needs optional playwright.
+ *                                                        Needs Chromium installed.
  *   serve [--out DIR] [--port N]                        — preview the built tree (O13)
  *   deploy DIR [--content DIR] [--pandoc DIR] [--out DIR] — build, then mirror the
  *                                                        built tree into DIR with
@@ -31,10 +31,10 @@ import { build } from "./build.ts";
 import { loadSiteConfig } from "./config.ts";
 import { deploySite } from "./deploy.ts";
 import { BuildError } from "./errors.ts";
-import { checkLinks, checkServedLinks } from "./links.ts";
-import { validatePageMeta } from "./schemas.ts";
+import { checkLinks, checkServedLinks } from "./site/links.ts";
+import { validatePageMeta } from "./content/schemas.ts";
 import { startServer } from "./serve.ts";
-import { validateSite } from "./validate.ts";
+import { validateSite } from "./site/validate.ts";
 import { type VerifyFinding, verifySite } from "./verify.ts";
 
 /** The design layer (defaults, templates, filters) bundled with the generator. */

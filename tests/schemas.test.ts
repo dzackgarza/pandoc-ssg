@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { resolvePageType, validatePageMeta } from "../src/schemas.ts";
+import { resolvePageType, validatePageMeta } from "../src/content/schemas.ts";
 import type { SiteConfig } from "../src/types.ts";
 
 const TEST_SCHEMAS: SiteConfig["schemas"] = {

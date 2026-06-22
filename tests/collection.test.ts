@@ -11,6 +11,7 @@ import type { Manifest } from "../src/types.ts";
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 const CONTENT = join(FIXTURES, "collection", "content");
+const COLLECTION_TITLE_SELECTOR = ".collection__item .collection__title";
 
 interface CItem {
   title: string;
@@ -81,10 +82,6 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
   let page: Page;
   let browser: Browser;
 
-  async function titles(): Promise<string[]> {
-    return page.locator(".collection__item .collection__title").allInnerTexts();
-  }
-
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), "ssg-coll-br-"));
     await build({ contentDir: CONTENT, pandocDir: PANDOC_DIR, outDir });
@@ -102,7 +99,7 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
   });
 
   test("renders all items after hydration", async () => {
-    expect((await titles()).length).toBe(4);
+    expect((await page.locator(COLLECTION_TITLE_SELECTOR).allInnerTexts()).length).toBe(4);
   });
 
   test(
@@ -126,7 +123,9 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
       .getByRole("button", { name: "Talks", exact: true })
       .click();
     await page.waitForFunction("document.querySelectorAll('.collection__item').length === 1");
-    expect(await titles()).toEqual(["A-infinity Categories and the Fukaya Category"]);
+    expect(await page.locator(COLLECTION_TITLE_SELECTOR).allInnerTexts()).toEqual([
+      "A-infinity Categories and the Fukaya Category",
+    ]);
   });
 
   test("renders each of an item's links as a labeled anchor", async () => {

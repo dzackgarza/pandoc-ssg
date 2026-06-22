@@ -60,6 +60,16 @@ const contentConfigShape = z
   })
   .strict();
 
+type ContentConfigExtension = {
+  passthrough: SiteConfig["passthrough"];
+  dirTypes: SiteConfig["dirTypes"];
+  pageTypes: SiteConfig["pageTypes"];
+  schemas: SiteConfig["schemas"];
+  componentHandlers: SiteConfig["componentHandlers"];
+  islands: SiteConfig["islands"];
+  generatedArtifacts: SiteConfig["generatedArtifacts"];
+};
+
 /**
  * Load and validate the required bundled registry plus content/_site.toml.
  * The bundled registry owns built-ins; content config may explicitly extend or
@@ -91,33 +101,45 @@ async function loadBundledRegistry(pandocDir: string): Promise<Omit<SiteConfig, 
   };
 }
 
-function parseSiteConfig(raw: string): Partial<SiteConfig> {
+function parseSiteConfig(raw: string): ContentConfigExtension {
   const table = parseToml(raw, "_site.toml", "_site.toml");
   const parsed = contentConfigShape.safeParse(table);
   if (!parsed.success) {
     throw new BuildError("config", ["_site.toml"], parsed.error.message);
   }
-  let content: Partial<SiteConfig> = {};
-  if (parsed.data.passthrough !== undefined) {
-    content.passthrough = parsed.data.passthrough;
+  return contentConfig(parsed.data);
+}
+
+function contentConfig(data: z.infer<typeof contentConfigShape>): ContentConfigExtension {
+  const content: ContentConfigExtension = {
+    passthrough: [],
+    dirTypes: [],
+    pageTypes: {},
+    schemas: {},
+    componentHandlers: {},
+    islands: {},
+    generatedArtifacts: [],
+  };
+  if (data.passthrough !== undefined) {
+    content.passthrough = data.passthrough;
   }
-  if (parsed.data.dirTypes !== undefined) {
-    content.dirTypes = parsed.data.dirTypes;
+  if (data.dirTypes !== undefined) {
+    content.dirTypes = data.dirTypes;
   }
-  if (parsed.data.pageTypes !== undefined) {
-    content.pageTypes = namePageTypes(parsed.data.pageTypes);
+  if (data.pageTypes !== undefined) {
+    content.pageTypes = namePageTypes(data.pageTypes);
   }
-  if (parsed.data.schemas !== undefined) {
-    content.schemas = parsed.data.schemas;
+  if (data.schemas !== undefined) {
+    content.schemas = data.schemas;
   }
-  if (parsed.data.componentHandlers !== undefined) {
-    content.componentHandlers = parsed.data.componentHandlers;
+  if (data.componentHandlers !== undefined) {
+    content.componentHandlers = data.componentHandlers;
   }
-  if (parsed.data.islands !== undefined) {
-    content.islands = parsed.data.islands;
+  if (data.islands !== undefined) {
+    content.islands = data.islands;
   }
-  if (parsed.data.generatedArtifacts !== undefined) {
-    content.generatedArtifacts = parsed.data.generatedArtifacts;
+  if (data.generatedArtifacts !== undefined) {
+    content.generatedArtifacts = data.generatedArtifacts;
   }
   return content;
 }
@@ -141,12 +163,12 @@ function namePageTypes(pageTypes: Record<string, Omit<PageType, "name">>): Recor
 
 function mergeContentConfig(
   bundled: Omit<SiteConfig, "passthrough">,
-  content: Partial<SiteConfig>,
+  content: ContentConfigExtension,
 ): SiteConfig {
   const merged: SiteConfig = {
-    passthrough: contentPassthrough(content),
-    dirTypes: mergeDirTypes(bundled.dirTypes, contentDirTypes(content)),
-    pageTypes: { ...bundled.pageTypes, ...contentPageTypes(content) },
+    passthrough: content.passthrough,
+    dirTypes: mergeDirTypes(bundled.dirTypes, content.dirTypes),
+    pageTypes: { ...bundled.pageTypes, ...content.pageTypes },
     schemas: { ...bundled.schemas, ...content.schemas },
     componentHandlers: { ...bundled.componentHandlers, ...content.componentHandlers },
     islands: { ...bundled.islands, ...content.islands },
@@ -155,34 +177,10 @@ function mergeContentConfig(
   return validateRegistry(merged, "_site.toml");
 }
 
-function contentPassthrough(content: Partial<SiteConfig>): SiteConfig["passthrough"] {
-  if (content.passthrough === undefined) {
-    return [];
-  }
-  return content.passthrough;
-}
-
-function contentDirTypes(content: Partial<SiteConfig>): SiteConfig["dirTypes"] {
-  if (content.dirTypes === undefined) {
-    return [];
-  }
-  return content.dirTypes;
-}
-
-function contentPageTypes(content: Partial<SiteConfig>): SiteConfig["pageTypes"] {
-  if (content.pageTypes === undefined) {
-    return {};
-  }
-  return content.pageTypes;
-}
-
 function generatedArtifacts(
   bundled: Omit<SiteConfig, "passthrough">,
-  content: Partial<SiteConfig>,
+  content: ContentConfigExtension,
 ): SiteConfig["generatedArtifacts"] {
-  if (content.generatedArtifacts === undefined) {
-    return bundled.generatedArtifacts;
-  }
   return [...bundled.generatedArtifacts, ...content.generatedArtifacts];
 }
 

@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse } from "smol-toml";
 import { z } from "zod";
-import { BuildError } from "./errors.ts";
-import type { NavItem } from "./types.ts";
+import { BuildError } from "../errors.ts";
+import type { NavItem } from "../types.ts";
 
 let navItemShape: z.ZodType<NavItem> = z.lazy(() =>
   z

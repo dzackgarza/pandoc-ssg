@@ -1,5 +1,6 @@
 import type { Manifest } from "./types.ts";
-import type { Browser, BrowserType, ConsoleMessage } from "playwright";
+import { chromium } from "playwright";
+import type { Browser, ConsoleMessage } from "playwright";
 
 export interface VerifyFinding {
   /** the page URL that failed */
@@ -16,17 +17,6 @@ export interface VerifyOptions {
   manifest: Manifest;
   /** per-page navigation timeout in ms */
   timeoutMs: number;
-}
-
-/**
- * Boundary translator: load the optional `playwright` dependency, turning its
- * absence into an actionable BuildError instead of a raw module-resolution
- * error. Browser verification is opt-in, so the lean kernel does not force
- * playwright (or its browser downloads) on every consumer.
- */
-async function loadChromium(): Promise<BrowserType> {
-  let mod = await import("playwright");
-  return mod.chromium;
 }
 
 /**
@@ -49,7 +39,6 @@ async function loadChromium(): Promise<BrowserType> {
  * passed. Requires a running preview server (see startServer) at baseUrl.
  */
 export async function verifySite(opts: VerifyOptions): Promise<VerifyFinding[]> {
-  let chromium = await loadChromium();
   let browser = await chromium.launch({ headless: true });
   let findings: VerifyFinding[] = [];
   try {

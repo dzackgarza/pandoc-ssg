@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { classifyFiles } from "../src/classify.ts";
+import { classifyFiles } from "../src/content/classify.ts";
 import type { ClassifiedFile, FileClass, SiteConfig } from "../src/types.ts";
 
 const basicContent = join(import.meta.dir, "fixtures", "kernel", "basic", "content");

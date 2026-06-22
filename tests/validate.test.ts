@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
 import type { Manifest } from "../src/types.ts";
-import { validateSite } from "../src/validate.ts";
+import { validateSite } from "../src/site/validate.ts";
 
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 const DEMO_CONTENT = join(import.meta.dir, "fixtures", "site", "demo", "content");

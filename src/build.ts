@@ -5,22 +5,25 @@ import { parse as parseHtml } from "node-html-parser";
 import type { Tags } from "yaml";
 import * as YAML from "yaml";
 import { z } from "zod";
-import { classifyFiles } from "./classify.ts";
+import { classifyFiles } from "./content/classify.ts";
 import { loadAppConfig, loadSiteConfig } from "./config.ts";
 import { BuildError } from "./errors.ts";
 import { buildIsland } from "./islands.ts";
-import { loadNavigation } from "./nav.ts";
+import { loadNavigation } from "./site/nav.ts";
 import { renderPage } from "./pandoc.ts";
-import { assertNoCollisions, outputPathForRoute, routeForPage } from "./routes.ts";
-import { scanContent } from "./scan.ts";
-import { resolvePageType, validatePageMeta } from "./schemas.ts";
+import { assertNoCollisions, outputPathForRoute, routeForPage } from "./site/routes.ts";
+import { scanContent } from "./site/scan.ts";
+import { resolvePageType, validatePageMeta } from "./content/schemas.ts";
 import type {
   BuildOptions,
   ClassifiedFile,
   GeneratedEntry,
   Manifest,
+  PageMeta,
   PageType,
+  PassthroughEntry,
   RouteEntry,
+  SiteConfig,
 } from "./types.ts";
 
 /** Post metadata the blog-index island consumes (emitted as blog/posts.json). */
@@ -168,6 +171,28 @@ interface PlannedPage {
   pageType: PageType;
 }
 
+interface BuildPlan {
+  pages: PlannedPage[];
+  passthrough: PassthroughEntry[];
+  blogPosts: Omit<PostMeta, "excerpt">[];
+  routes: RouteEntry[];
+}
+
+interface RenderInputs {
+  pandocDir: string;
+  nav: Awaited<ReturnType<typeof loadNavigation>>;
+  mathMacros: Record<string, string | [string, number]>;
+  items: Record<string, unknown>;
+  contentDir: string;
+  pandocHome: string;
+  postCtx: Map<string, Record<string, unknown>>;
+}
+
+interface IslandUsage {
+  usesBlogIndex: boolean;
+  collectionKeys: Set<string>;
+}
+
 /**
  * Full pipeline (O4–O7): scan → classify → validate → route → collision
  * check → nav validation → render pages via pandoc → copy assets/opaque
@@ -176,98 +201,123 @@ interface PlannedPage {
  */
 export async function build(opts: BuildOptions): Promise<Manifest> {
   let { contentDir, pandocDir, outDir } = opts;
-
-  // ---- validation phase: everything that can fail happens before any write ----
   let config = await loadSiteConfig(contentDir, pandocDir);
   let relPaths = await scanContent(contentDir);
   let classified = await classifyFiles(contentDir, relPaths, config);
-
-  let pages: PlannedPage[] = [];
-  let passthrough = passthroughEntries(classified);
-  // Excerpt is filled at posts.json time from the rendered HTML (pandoc owns the
-  // markdown parse), so it is absent during this classification pass.
-  let blogPosts: Omit<PostMeta, "excerpt">[] = [];
-
-  for (let fileIndex = 0; fileIndex < classified.length; fileIndex += 1) {
-    let file = classified[fileIndex];
-    if (!file) {
-      throw new Error(`classified file missing at index ${fileIndex}`);
-    }
-    if (file.class !== "page") {
-      continue;
-    }
-    let sourcePath = join(contentDir, file.relPath);
-    let raw = await readFile(sourcePath, "utf8");
-    let rawMeta = matter(raw, matterOptions).data;
-
-    let pageType = resolvePageType(file.relPath, rawMeta, config);
-    let explicit = explicitSchema(rawMeta);
-    let schemaId = explicit ? explicit : pageType.schema;
-    let meta = validatePageMeta(file.relPath, rawMeta, schemaId, config.schemas);
-
-    let url = routeForPage(file.relPath, routeOverride(rawMeta));
-    let route: RouteEntry = {
-      source: file.relPath,
-      url,
-      output: outputPathForRoute(url),
-      type: pageType.name,
-      schema: schemaId,
-    };
-    pages.push({ relPath: file.relPath, sourcePath, route, pageType });
-
-    if (pageType.name === "blog-post") {
-      // blog-post.v1 requires date; assert existence at this boundary.
-      if (!meta.date) {
-        throw new BuildError("schema", [file.relPath], "blog-post page missing required date");
-      }
-      blogPosts.push({
-        title: meta.title,
-        date: meta.date,
-        url,
-        tags: optionalStringList(meta.tags),
-        categories: optionalStringList(meta.categories),
-        dateLong: formatDate(meta.date),
-      });
-    }
-  }
-
-  let routes = pages.map((p) => p.route);
-  assertNoCollisions(routes, passthrough);
-
+  let plan = await planBuild(contentDir, classified, config);
   let generated: GeneratedEntry[] = [];
-  let manifest: Manifest = { schemaVersion: 1, routes, passthrough, generated };
-
+  let manifest: Manifest = {
+    schemaVersion: 1,
+    routes: plan.routes,
+    passthrough: plan.passthrough,
+    generated,
+  };
   let nav = await loadNavigation(contentDir);
-
   let appConfig = await loadAppConfig();
   let mathMacros = await generateMathMacros(appConfig.mathjaxMacroManifest, pandocDir);
   let items = await loadItems(contentDir);
+  let postCtx = buildPostContext(plan.blogPosts);
+  let rendered = await renderPlannedPages(plan.pages, {
+    pandocDir,
+    nav,
+    mathMacros,
+    items,
+    contentDir,
+    pandocHome: appConfig.pandocHome,
+    postCtx,
+  });
+  let islandUsage = discoverIslandUsage(rendered);
 
-  // Per-post template metadata (friendly date, prev/next neighbours, tag/category
-  // chips), keyed by route url. One source feeds the post page here; PostMeta
-  // feeds the listing island. Newest-first order makes prev = older, next = newer.
+  // ---- write phase: stage into a temp dir, then atomically swap into outDir ----
+  let staging = `${outDir}.staging-${process.pid}-${Date.now()}`;
+  await rm(staging, { recursive: true, force: true });
+  await mkdir(staging, { recursive: true });
+  await writeRenderedPages(staging, rendered);
+  await copyPassthroughEntries(contentDir, staging, plan.passthrough);
+  await emitThemeAssets(pandocDir, staging, generated);
+  await emitBlogIndex(staging, plan.blogPosts, rendered, generated, islandUsage.usesBlogIndex);
+  await emitCollectionIslands(staging, islandUsage.collectionKeys, items, generated);
+
+  await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest), "utf8");
+  await rm(outDir, { recursive: true, force: true });
+  await rename(staging, outDir);
+
+  return manifest;
+}
+
+async function planBuild(
+  contentDir: string,
+  classified: ClassifiedFile[],
+  config: SiteConfig,
+): Promise<BuildPlan> {
+  let pages: PlannedPage[] = [];
+  let blogPosts: Omit<PostMeta, "excerpt">[] = [];
+  for (let fileIndex = 0; fileIndex < classified.length; fileIndex += 1) {
+    let file = requiredIndex(classified, fileIndex, "classified file");
+    if (file.class === "page") {
+      let planned = await planPage(contentDir, file, config);
+      pages.push(planned.page);
+      appendBlogPost(blogPosts, planned.meta, planned.page.route.url, file.relPath, planned.page.pageType);
+    }
+  }
+  let passthrough = passthroughEntries(classified);
+  let routes = pages.map((p) => p.route);
+  assertNoCollisions(routes, passthrough);
+  return { pages, passthrough, blogPosts, routes };
+}
+
+async function planPage(contentDir: string, file: ClassifiedFile, config: SiteConfig) {
+  let sourcePath = join(contentDir, file.relPath);
+  let raw = await readFile(sourcePath, "utf8");
+  let rawMeta = matter(raw, matterOptions).data;
+  let pageType = resolvePageType(file.relPath, rawMeta, config);
+  let explicit = explicitSchema(rawMeta);
+  let schemaId = explicit ? explicit : pageType.schema;
+  let meta = validatePageMeta(file.relPath, rawMeta, schemaId, config.schemas);
+  let url = routeForPage(file.relPath, routeOverride(rawMeta));
+  let route: RouteEntry = {
+    source: file.relPath,
+    url,
+    output: outputPathForRoute(url),
+    type: pageType.name,
+    schema: schemaId,
+  };
+  return { page: { relPath: file.relPath, sourcePath, route, pageType }, meta };
+}
+
+function appendBlogPost(
+  blogPosts: Omit<PostMeta, "excerpt">[],
+  meta: PageMeta,
+  url: string,
+  relPath: string,
+  pageType: PageType,
+): boolean {
+  if (pageType.name !== "blog-post") {
+    return true;
+  }
+  if (!meta.date) {
+    throw new BuildError("schema", [relPath], "blog-post page missing required date");
+  }
+  blogPosts.push({
+    title: meta.title,
+    date: meta.date,
+    url,
+    tags: optionalStringList(meta.tags),
+    categories: optionalStringList(meta.categories),
+    dateLong: formatDate(meta.date),
+  });
+  return true;
+}
+
+function buildPostContext(blogPosts: Omit<PostMeta, "excerpt">[]): Map<string, Record<string, unknown>> {
   let byDate = [...blogPosts].sort((a, b) => b.date.localeCompare(a.date));
   let postCtx = new Map<string, Record<string, unknown>>();
   for (let i = 0; i < byDate.length; i += 1) {
-    let post = byDate[i];
-    if (!post) {
-      throw new Error(`blog post missing at index ${i}`);
-    }
+    let post = requiredIndex(byDate, i, "blog post");
+    let terms = postTerms(post);
+    let ctx: Record<string, unknown> = { date_long: post.dateLong, post_terms: terms };
     let newer = byDate[i - 1];
     let older = byDate[i + 1];
-    let terms = [
-      ...post.tags.map((t) => ({
-        name: t,
-        kind: "tag",
-        href: `/blog/?tag=${encodeURIComponent(t)}`,
-      })),
-      ...post.categories.map((c) => ({
-        name: c,
-        kind: "category",
-        href: `/blog/?category=${encodeURIComponent(c)}`,
-      })),
-    ];
-    let ctx: Record<string, unknown> = { date_long: post.dateLong, post_terms: terms };
     if (newer) {
       ctx.next = { url: newer.url, title: newer.title };
     }
@@ -276,62 +326,79 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     }
     postCtx.set(post.url, ctx);
   }
+  return postCtx;
+}
 
-  // Render every page (pandoc) before any write so a failure aborts cleanly.
+function postTerms(post: Omit<PostMeta, "excerpt">): Record<string, string>[] {
+  return [
+    ...post.tags.map((name) => ({ name, kind: "tag", href: `/blog/?tag=${encodeURIComponent(name)}` })),
+    ...post.categories.map((name) => ({
+      name,
+      kind: "category",
+      href: `/blog/?category=${encodeURIComponent(name)}`,
+    })),
+  ];
+}
+
+async function renderPlannedPages(
+  pages: PlannedPage[],
+  inputs: RenderInputs,
+): Promise<Map<string, string>> {
   let rendered = new Map<string, string>();
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
-    let page = pages[pageIndex];
-    if (!page) {
-      throw new Error(`planned page missing at index ${pageIndex}`);
-    }
+    let page = requiredIndex(pages, pageIndex, "planned page");
     let html = await renderPage({
       sourcePath: page.sourcePath,
       relPath: page.relPath,
-      pandocDir,
+      pandocDir: inputs.pandocDir,
       pageType: page.pageType,
-      nav,
-      mathMacros,
-      items,
-      contentRoot: contentDir,
-      pandocHome: appConfig.pandocHome,
-      extraMeta: postCtx.get(page.route.url),
+      nav: inputs.nav,
+      mathMacros: inputs.mathMacros,
+      items: inputs.items,
+      contentRoot: inputs.contentDir,
+      pandocHome: inputs.pandocHome,
+      extraMeta: inputs.postCtx.get(page.route.url),
     });
     rendered.set(page.route.output, html);
   }
+  return rendered;
+}
 
-  // Which island mounts the filter actually emitted — read off the rendered
-  // HTML (pandoc parsed the component fences), not by re-scanning raw markdown.
-  // Unknown collection keys are still validated against items.yaml below.
+function discoverIslandUsage(rendered: Map<string, string>): IslandUsage {
   let usesBlogIndex = false;
   let collectionKeys = new Set<string>();
   [...rendered.values()].forEach((html) => {
     let root = parseHtml(html);
-    if (root.querySelector("#blog-index")) {
+    if (!usesBlogIndex && root.querySelector("#blog-index") !== null) {
       usesBlogIndex = true;
     }
     root.querySelectorAll("[data-collection]").forEach((mount) => {
       let src = mount.getAttribute("data-collection");
       if (src) {
-        // "/_collections/<key>.json" → "<key>"
         collectionKeys.add(basename(src, ".json"));
       }
       return true;
     });
     return true;
   });
+  return { usesBlogIndex, collectionKeys };
+}
 
-  // ---- write phase: stage into a temp dir, then atomically swap into outDir ----
-  let staging = `${outDir}.staging-${process.pid}-${Date.now()}`;
-  await rm(staging, { recursive: true, force: true });
-  await mkdir(staging, { recursive: true });
-
+async function writeRenderedPages(staging: string, rendered: Map<string, string>): Promise<boolean> {
   await Promise.all([...rendered.entries()].map(async ([output, html]) => {
     let dest = join(staging, output);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, html, "utf8");
     return true;
   }));
+  return true;
+}
 
+async function copyPassthroughEntries(
+  contentDir: string,
+  staging: string,
+  passthrough: PassthroughEntry[],
+): Promise<boolean> {
   await Promise.all(passthrough.map(async (entry) => {
     let src = join(contentDir, entry.source);
     let dest = join(staging, entry.output);
@@ -339,10 +406,14 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     await copyFile(src, dest);
     return true;
   }));
+  return true;
+}
 
-  // Theme assets (O18): the design layer's stylesheet + self-hosted fonts ship
-  // with the generator, so the build emits them into dist/assets/ (pandoc/ is
-  // not otherwise copied). Unconditional — every page links the stylesheet.
+async function emitThemeAssets(
+  pandocDir: string,
+  staging: string,
+  generated: GeneratedEntry[],
+): Promise<boolean> {
   let themeAssetRels = await walkRel(join(pandocDir, "assets"));
   await Promise.all(themeAssetRels.map(async (rel) => {
     let src = join(pandocDir, "assets", rel);
@@ -353,31 +424,49 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     generated.push({ output, kind: "theme" });
     return true;
   }));
+  return true;
+}
 
-  // Interactive blog-index island (O16): only when a page uses the component.
-  if (usesBlogIndex) {
-    let postsOutput = "blog/posts.json";
-    let postsDest = join(staging, postsOutput);
-    await mkdir(dirname(postsDest), { recursive: true });
-    let sorted: PostMeta[] = [...blogPosts]
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .map((post) => {
-        // Every post was rendered into `rendered` above (its output key is
-        // outputPathForRoute(url) by construction); undefined would be a bug.
-        let html = rendered.get(outputPathForRoute(post.url));
-        if (!html) {
-          throw new Error(`no rendered HTML for post ${post.url}`);
-        }
-        return { ...post, excerpt: extractExcerpt(html) };
-      });
-    await writeFile(postsDest, JSON.stringify(sorted), "utf8");
-    generated.push({ output: postsOutput, kind: "data" });
-
-    generated.push({ output: await buildIsland("blog-index", staging), kind: "island" });
+async function emitBlogIndex(
+  staging: string,
+  blogPosts: Omit<PostMeta, "excerpt">[],
+  rendered: Map<string, string>,
+  generated: GeneratedEntry[],
+  enabled: boolean,
+): Promise<boolean> {
+  if (!enabled) {
+    return true;
   }
+  let postsOutput = "blog/posts.json";
+  let postsDest = join(staging, postsOutput);
+  await mkdir(dirname(postsDest), { recursive: true });
+  await writeFile(postsDest, JSON.stringify(renderedPostData(blogPosts, rendered)), "utf8");
+  generated.push({ output: postsOutput, kind: "data" });
+  generated.push({ output: await buildIsland("blog-index", staging), kind: "island" });
+  return true;
+}
 
-  // Filterable collection islands (O20): emit one JSON per referenced items key,
-  // then bundle the shared collection island. Fail loud on an unknown key.
+function renderedPostData(
+  blogPosts: Omit<PostMeta, "excerpt">[],
+  rendered: Map<string, string>,
+): PostMeta[] {
+  return [...blogPosts]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((post) => {
+      let html = rendered.get(outputPathForRoute(post.url));
+      if (!html) {
+        throw new Error(`no rendered HTML for post ${post.url}`);
+      }
+      return { ...post, excerpt: extractExcerpt(html) };
+    });
+}
+
+async function emitCollectionIslands(
+  staging: string,
+  collectionKeys: Set<string>,
+  items: Record<string, unknown>,
+  generated: GeneratedEntry[],
+): Promise<boolean> {
   if (collectionKeys.size > 0) {
     await Promise.all([...collectionKeys].map(async (key) => {
       let data = items[key];
@@ -397,13 +486,15 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     }));
     generated.push({ output: await buildIsland("collection", staging), kind: "island" });
   }
+  return true;
+}
 
-  await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest), "utf8");
-
-  await rm(outDir, { recursive: true, force: true });
-  await rename(staging, outDir);
-
-  return manifest;
+function requiredIndex<T>(items: T[], index: number, label: string): T {
+  let item = items[index];
+  if (!item) {
+    throw new Error(`${label} missing at index ${index}`);
+  }
+  return item;
 }
 
 /** POSIX paths of every file under `root`, recursively (relative to `root`). */

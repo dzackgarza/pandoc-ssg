@@ -15,10 +15,11 @@ The build shells out to system tools and reads the author's canonical math and f
 | **pandoc 3.6+** | document rendering, templates, math, AST filters | always |
 | **uv** | runs the bundled MathJax macro extractor (`pandoc/bin/extract_mathjax_macros.py`) | always (any page) |
 | **pdflatex** + **pdf2svg** | compile `\begin{tikzcd}` / `\begin{tikzpicture}` blocks to inline SVG | pages with TikZ diagrams |
-| **playwright** + chromium | `verify` / the `deploy` gate (browser checks) | `verify`, `deploy` |
-| **vite** + **svelte** | bundle interactive islands (blog-index, collection) | pages using those components |
+| **Chromium for Playwright** | `verify` / the `deploy` gate (browser checks) | `verify`, `deploy` |
+| **vite** + **svelte** | bundle interactive islands (blog-index, collection) | packaged with `pandoc-ssg` |
 
-`playwright`, `vite`, and `svelte` are optional peer deps of the content repo (install with `bun add -d playwright && bunx playwright install chromium`, etc.).
+The generator packages its browser/island build libraries.
+Playwright still needs a browser install available to the environment (`bunx playwright install chromium`).
 
 ### Configuration (`~/.config/pandoc-ssg/config.toml`)
 
