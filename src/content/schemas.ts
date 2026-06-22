@@ -70,11 +70,10 @@ export function resolvePageType(
 
 function schemaFields(definition: SchemaDefinition): Record<string, z.ZodTypeAny> {
   let fields: Record<string, z.ZodTypeAny> = { site: siteShape };
-  definition.fields.forEach((field) => {
+  for (let field of definition.fields) {
     let fieldSchema = fieldType(field.type);
     fields[field.name] = field.required ? fieldSchema : fieldSchema.optional();
-    return true;
-  });
+  }
   return fields;
 }
 
@@ -91,13 +90,12 @@ function fieldType(type: SchemaFieldType): z.ZodTypeAny {
 function inferTypeFromDir(relPath: string, dirTypes: { dir: string; type: string }[]): string {
   let bestDir = "";
   let bestType = "page";
-  dirTypes.forEach(({ dir, type }) => {
+  for (let { dir, type } of dirTypes) {
     let underDir = relPath === dir ? true : relPath.startsWith(`${dir}/`);
     if (underDir && dir.length >= bestDir.length) {
       bestDir = dir;
       bestType = type;
     }
-    return true;
-  });
+  }
   return bestType;
 }

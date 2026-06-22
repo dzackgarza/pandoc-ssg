@@ -39,7 +39,7 @@ export function assertNoCollisions(routes: RouteEntry[], passthrough: Passthroug
     ...routes.map((r) => ({ output: r.output, source: r.source })),
     ...passthrough.map((p) => ({ output: p.output, source: p.source })),
   ];
-  entries.forEach(({ output, source }) => {
+  for (let { output, source } of entries) {
     let prior = seen.get(output);
     if (prior) {
       throw new BuildError(
@@ -49,7 +49,6 @@ export function assertNoCollisions(routes: RouteEntry[], passthrough: Passthroug
       );
     }
     seen.set(output, source);
-    return true;
-  });
+  }
   return true;
 }

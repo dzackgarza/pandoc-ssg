@@ -1,8 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { parse } from "smol-toml";
 import { z } from "zod";
-import { BuildError } from "../errors.ts";
+import { BuildError, parseToml } from "../errors.ts";
 import type { NavItem } from "../types.ts";
 
 let navItemShape: z.ZodType<NavItem> = z.lazy(() =>
@@ -59,18 +58,7 @@ export async function loadNavigation(contentDir: string): Promise<NavItem[]> {
   }
   let raw = await readFile(navPath, "utf8");
 
-  let table = {};
-  try {
-    table = parse(raw);
-  } catch (err) {
-    let detail = err instanceof Error ? err.message : String(err);
-    throw new BuildError(
-      "nav",
-      ["_data/navigation.toml"],
-      `malformed navigation.toml: ${detail}`,
-      err,
-    );
-  }
+  let table = parseToml(raw, "nav", "_data/navigation.toml", "navigation.toml");
 
   let parsed = navShape.safeParse(table);
   if (!parsed.success) {
