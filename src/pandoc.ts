@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import * as YAML from "yaml";
+import { registryPath } from "./config.ts";
 import { BuildError } from "./errors.ts";
 import type { ComponentHandler, IslandEntry, NavItem, PageType, RegistryFile } from "./types.ts";
 
@@ -177,10 +178,6 @@ export async function renderPage(input: RenderInput): Promise<string> {
     await rm(metaDir, { recursive: true, force: true });
   }
   return rendered;
-}
-
-function registryPath(file: RegistryFile, contentRoot: string, pandocDir: string): string {
-  return join(file.source === "content" ? contentRoot : pandocDir, file.path);
 }
 
 function componentRegistry(input: RenderInput): Record<string, unknown> {
