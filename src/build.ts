@@ -20,15 +20,19 @@ import type {
   GeneratedEntry,
   IslandEntry,
   Manifest,
+  ManifestDependency,
   PageMeta,
   PageType,
   PassthroughEntry,
+  RegistryFile,
   RouteEntry,
   SiteConfig,
 } from "./types.ts";
 
 /** Post metadata the blog-index island consumes (emitted as blog/posts.json). */
 interface PostMeta {
+  /** content-relative source file; manifest dependency metadata only */
+  source: string;
   title: string;
   date: string;
   url: string;
@@ -39,6 +43,8 @@ interface PostMeta {
   /** friendly date, e.g. "November 28, 2020" */
   dateLong: string;
 }
+
+type PublicPostMeta = Omit<PostMeta, "source">;
 
 let dateFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
@@ -176,7 +182,6 @@ interface BuildPlan {
   pages: PlannedPage[];
   passthrough: PassthroughEntry[];
   blogPosts: Omit<PostMeta, "excerpt">[];
-  routes: RouteEntry[];
 }
 
 interface RenderInputs {
@@ -194,6 +199,16 @@ interface RenderInputs {
 
 type IslandUsage = Map<string, Set<string>>;
 
+interface ManifestDependencyContext {
+  contentDir: string;
+  pandocDir: string;
+  siteConfigDependencies: ManifestDependency[];
+  navDependency?: ManifestDependency;
+  itemsDependency?: ManifestDependency;
+  macroManifestDependency: ManifestDependency;
+  siteFilters: SiteConfig["filters"];
+}
+
 /**
  * Full pipeline (O4–O7): scan → classify → validate → route → collision
  * check → nav validation → render pages via pandoc → copy assets/opaque
@@ -207,14 +222,15 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let classified = await classifyFiles(contentDir, relPaths, config);
   let plan = await planBuild(contentDir, classified, config);
   let generated: GeneratedEntry[] = [];
-  let manifest: Manifest = {
-    schemaVersion: 1,
-    routes: plan.routes,
-    passthrough: plan.passthrough,
-    generated,
-  };
   let nav = await loadNavigation(contentDir);
   let appConfig = await loadAppConfig();
+  let dependencyContext = await manifestDependencyContext(contentDir, pandocDir, appConfig.mathjaxMacroManifest, config);
+  let manifest: Manifest = {
+    schemaVersion: 2,
+    routes: plan.pages.map((page) => routeWithDependencies(page, dependencyContext)),
+    passthrough: plan.passthrough.map((entry) => passthroughWithDependencies(entry)),
+    generated,
+  };
   let mathMacros = await generateMathMacros(appConfig.mathjaxMacroManifest, pandocDir);
   let items = await loadItems(contentDir);
   let postCtx = buildPostContext(plan.blogPosts);
@@ -244,8 +260,10 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     rendered,
     items,
     generated,
+    dependencies: dependencyContext,
   });
 
+  generated.sort((a, b) => generatedEntryKey(a).localeCompare(generatedEntryKey(b)));
   await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest), "utf8");
   await rm(outDir, { recursive: true, force: true });
   await rename(staging, outDir);
@@ -271,7 +289,7 @@ async function planBuild(
   let passthrough = passthroughEntries(classified);
   let routes = pages.map((p) => p.route);
   assertNoCollisions(routes, passthrough);
-  return { pages, passthrough, blogPosts, routes };
+  return { pages, passthrough, blogPosts };
 }
 
 async function planPage(contentDir: string, file: ClassifiedFile, config: SiteConfig) {
@@ -293,6 +311,59 @@ async function planPage(contentDir: string, file: ClassifiedFile, config: SiteCo
   return { page: { relPath: file.relPath, sourcePath, route, pageType }, meta };
 }
 
+async function manifestDependencyContext(
+  contentDir: string,
+  pandocDir: string,
+  macroManifestPath: string,
+  config: SiteConfig,
+): Promise<ManifestDependencyContext> {
+  let siteConfigDependencies = [
+    dependency("site-config", "registry.toml", "pandoc"),
+    ...((await Bun.file(join(contentDir, "_site.toml")).exists())
+      ? [dependency("site-config", "_site.toml", "content")]
+      : []),
+  ];
+  let navDependency = (await Bun.file(join(contentDir, "_data", "navigation.toml")).exists())
+    ? dependency("navigation", "_data/navigation.toml", "content")
+    : undefined;
+  let itemsDependency = (await Bun.file(join(contentDir, "_data", "items.yaml")).exists())
+    ? dependency("items-data", "_data/items.yaml", "content")
+    : undefined;
+  return {
+    contentDir,
+    pandocDir,
+    siteConfigDependencies: sortedDependencies(siteConfigDependencies),
+    navDependency,
+    itemsDependency,
+    macroManifestDependency: dependency("macro-manifest", macroManifestPath, "absolute"),
+    siteFilters: config.filters,
+  };
+}
+
+function routeWithDependencies(page: PlannedPage, context: ManifestDependencyContext): RouteEntry {
+  return {
+    ...page.route,
+    dependencies: sortedDependencies([
+      dependency("source-page", page.relPath, "content"),
+      registryDependency("template", { path: page.pageType.template, source: page.pageType.source }),
+      registryDependency("defaults", { path: page.pageType.defaults, source: page.pageType.source }),
+      ...registryDependencies("filter", context.siteFilters ?? []),
+      ...registryDependencies("filter", page.pageType.filters ?? []),
+      ...context.siteConfigDependencies,
+      ...(context.navDependency ? [context.navDependency] : []),
+      ...(context.itemsDependency ? [context.itemsDependency] : []),
+      context.macroManifestDependency,
+    ]),
+  };
+}
+
+function passthroughWithDependencies(entry: PassthroughEntry): PassthroughEntry {
+  return {
+    ...entry,
+    dependencies: sortedDependencies([dependency("passthrough-source", entry.source, "content")]),
+  };
+}
+
 function appendBlogPost(
   blogPosts: Omit<PostMeta, "excerpt">[],
   meta: PageMeta,
@@ -308,6 +379,7 @@ function appendBlogPost(
   }
   blogPosts.push({
     title: meta.title,
+    source: relPath,
     date: meta.date,
     url,
     tags: optionalStringList(meta.tags),
@@ -441,14 +513,18 @@ async function emitThemeAssets(
   staging: string,
   generated: GeneratedEntry[],
 ): Promise<boolean> {
-  let themeAssetRels = await walkRel(join(pandocDir, "assets"));
+  let themeAssetRels = (await walkRel(join(pandocDir, "assets"))).sort();
   await Promise.all(themeAssetRels.map(async (rel) => {
     let src = join(pandocDir, "assets", rel);
     let output = `assets/${rel}`;
     let dest = join(staging, output);
     await mkdir(dirname(dest), { recursive: true });
     await copyFile(src, dest);
-    generated.push({ output, kind: "theme" });
+    generated.push({
+      output,
+      kind: "theme",
+      dependencies: sortedDependencies([dependency("theme-asset", output, "pandoc")]),
+    });
     return true;
   }));
   return true;
@@ -464,6 +540,7 @@ async function emitIslandArtifacts(
     rendered: Map<string, string>;
     items: Record<string, unknown>;
     generated: GeneratedEntry[];
+    dependencies: ManifestDependencyContext;
   },
 ): Promise<boolean> {
   for (const name of [...usage.keys()].sort()) {
@@ -472,7 +549,14 @@ async function emitIslandArtifacts(
       throw new BuildError("config", ["registry.toml"], `used island ${name} is not registered`);
     }
     await emitIslandData(staging, name, island, requiredUsage(usage, name), data);
-    data.generated.push({ output: await buildIsland(island, staging, roots), kind: "island" });
+    data.generated.push({
+      output: await buildIsland(island, staging, roots),
+      kind: "island",
+      dependencies: sortedDependencies([
+        ...data.dependencies.siteConfigDependencies,
+        registryDependency("island-entry", { path: island.entry, source: island.source }),
+      ]),
+    });
   }
   return true;
 }
@@ -487,6 +571,7 @@ async function emitIslandData(
     rendered: Map<string, string>;
     items: Record<string, unknown>;
     generated: GeneratedEntry[];
+    dependencies: ManifestDependencyContext;
   },
 ): Promise<boolean> {
   if (!island.dataOutput) {
@@ -498,6 +583,11 @@ async function emitIslandData(
       islandOutput(island.dataOutput, ""),
       renderedPostData(data.blogPosts, data.rendered),
       data.generated,
+      [
+        ...data.dependencies.siteConfigDependencies,
+        data.dependencies.macroManifestDependency,
+        ...data.blogPosts.map((post) => dependency("source-page", post.source, "content")),
+      ],
     );
     return true;
   }
@@ -511,7 +601,10 @@ async function emitIslandData(
       if (typeof itemData === "undefined") {
         throw new BuildError("config", ["_data/items.yaml"], `${name}: unknown items key '${key}'`);
       }
-      await writeGeneratedJson(staging, islandOutput(island.dataOutput!, key), itemData, data.generated);
+      await writeGeneratedJson(staging, islandOutput(island.dataOutput!, key), itemData, data.generated, [
+        ...data.dependencies.siteConfigDependencies,
+        dependency("items-data", "_data/items.yaml", "content", key),
+      ]);
       return true;
     }));
     return true;
@@ -522,7 +615,7 @@ async function emitIslandData(
 function renderedPostData(
   blogPosts: Omit<PostMeta, "excerpt">[],
   rendered: Map<string, string>,
-): PostMeta[] {
+): PublicPostMeta[] {
   return [...blogPosts]
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((post) => {
@@ -530,7 +623,8 @@ function renderedPostData(
       if (!html) {
         throw new Error(`no rendered HTML for post ${post.url}`);
       }
-      return { ...post, excerpt: extractExcerpt(html) };
+      let { source: _source, ...publicPost } = post;
+      return { ...publicPost, excerpt: extractExcerpt(html) };
     });
 }
 
@@ -539,11 +633,12 @@ async function writeGeneratedJson(
   output: string,
   data: unknown,
   generated: GeneratedEntry[],
+  dependencies: ManifestDependency[],
 ): Promise<boolean> {
   let dest = join(staging, output);
   await mkdir(dirname(dest), { recursive: true });
   await writeFile(dest, JSON.stringify(data), "utf8");
-  generated.push({ output, kind: "data" });
+  generated.push({ output, kind: "data", dependencies: sortedDependencies(dependencies) });
   return true;
 }
 
@@ -557,6 +652,47 @@ function requiredUsage(usage: IslandUsage, name: string): Set<string> {
     throw new Error(`island usage missing for ${name}`);
   }
   return dataKeys;
+}
+
+function dependency(
+  kind: ManifestDependency["kind"],
+  path: string,
+  origin: ManifestDependency["origin"],
+  key?: string,
+): ManifestDependency {
+  let dep: ManifestDependency = { kind, path, origin };
+  if (key !== undefined) {
+    dep.key = key;
+  }
+  return dep;
+}
+
+function registryDependency(kind: ManifestDependency["kind"], file: RegistryFile): ManifestDependency {
+  return dependency(kind, file.path, file.source ?? "pandoc");
+}
+
+function registryDependencies(
+  kind: ManifestDependency["kind"],
+  files: RegistryFile[],
+): ManifestDependency[] {
+  return files.map((file) => registryDependency(kind, file));
+}
+
+function sortedDependencies(dependencies: ManifestDependency[]): ManifestDependency[] {
+  let byKey = new Map<string, ManifestDependency>();
+  dependencies.forEach((dep) => {
+    byKey.set(dependencyKey(dep), dep);
+    return true;
+  });
+  return [...byKey.values()].sort((a, b) => dependencyKey(a).localeCompare(dependencyKey(b)));
+}
+
+function dependencyKey(dep: ManifestDependency): string {
+  return [dep.kind, dep.origin, dep.path, dep.key ?? ""].join("\u0000");
+}
+
+function generatedEntryKey(entry: GeneratedEntry): string {
+  return [entry.kind, entry.output].join("\u0000");
 }
 
 function requiredIndex<T>(items: T[], index: number, label: string): T {

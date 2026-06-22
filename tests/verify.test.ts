@@ -44,7 +44,7 @@ const PAGES: Record<string, string> = {
 
 function manifestFor(keys: string[]): Manifest {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     routes: keys.map((k) => ({
       source: `${k}.md`,
       url: `/${k}/`,

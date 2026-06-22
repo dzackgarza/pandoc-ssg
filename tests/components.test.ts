@@ -436,8 +436,10 @@ describe("component registry: content-owned Lua handlers", () => {
     expect(html).toContain('data-mini="/mini/notes.json"');
     expect(html).toContain('<script type="module" src="/assets/islands/mini-list.js">');
     expect(data.map((item: { title: string }) => item.title)).toEqual(["One", "Two"]);
-    expect(manifest.generated).toContainEqual({ output: "mini/notes.json", kind: "data" });
-    expect(manifest.generated).toContainEqual({ output: "assets/islands/mini-list.js", kind: "island" });
+    expect(manifest.generated).toContainEqual(expect.objectContaining({ output: "mini/notes.json", kind: "data" }));
+    expect(manifest.generated).toContainEqual(
+      expect.objectContaining({ output: "assets/islands/mini-list.js", kind: "island" }),
+    );
     await rm(outDir, { recursive: true, force: true });
   });
 });

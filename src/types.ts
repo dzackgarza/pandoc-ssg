@@ -106,11 +106,13 @@ export interface RouteEntry {
   output: string;
   type: string;
   schema: string;
+  dependencies?: ManifestDependency[];
 }
 
 export interface PassthroughEntry {
   source: string;
   output: string;
+  dependencies?: ManifestDependency[];
 }
 
 /**
@@ -121,10 +123,33 @@ export interface PassthroughEntry {
 export interface GeneratedEntry {
   output: string;
   kind: "data" | "island" | "theme";
+  dependencies?: ManifestDependency[];
+}
+
+export type ManifestDependencyOrigin = "content" | "pandoc" | "config" | "absolute";
+
+export type ManifestDependencyKind =
+  | "defaults"
+  | "filter"
+  | "island-entry"
+  | "items-data"
+  | "macro-manifest"
+  | "navigation"
+  | "passthrough-source"
+  | "site-config"
+  | "source-page"
+  | "template"
+  | "theme-asset";
+
+export interface ManifestDependency {
+  kind: ManifestDependencyKind;
+  path: string;
+  origin: ManifestDependencyOrigin;
+  key?: string;
 }
 
 export interface Manifest {
-  schemaVersion: 1;
+  schemaVersion: 2;
   routes: RouteEntry[];
   passthrough: PassthroughEntry[];
   generated: GeneratedEntry[];

@@ -84,6 +84,10 @@ content/
 
 A Markdown file is compiled only if its frontmatter opts in with `site.page: true`; everything else is copied byte-for-byte.
 The build writes `dist/site-manifest.json` as the single contract every downstream tool consumes.
+Manifest schema v2 records deterministic dependency metadata on routes, passthrough
+copies, and generated artifacts so downstream tools can tell which source page,
+registry file, template/defaults/filter, data key, theme asset, macro manifest, or
+island entry produced each output.
 
 ## Components and transclusion
 

@@ -43,6 +43,13 @@ describe("O18: theme assets are emitted and linked", () => {
     expect(theme).toContain("assets/theme/site.css");
   });
 
+  test("theme manifest entries point back to their source assets", () => {
+    const siteCss = manifest.generated.find((g) => g.output === "assets/theme/site.css");
+    expect(siteCss?.dependencies).toEqual([
+      { kind: "theme-asset", path: "assets/theme/site.css", origin: "pandoc" },
+    ]);
+  });
+
   test("every page links the stylesheet", () => {
     expect(indexHtml).toContain('<link rel="stylesheet" href="/assets/theme/site.css">');
   });

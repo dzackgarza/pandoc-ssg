@@ -100,6 +100,22 @@ describe("O16: blog-index island build output", () => {
     expect(outputs).toEqual(["assets/islands/blog-index.js", "blog/posts.json"]);
   });
 
+  test("records data and island dependencies in the manifest", () => {
+    const posts = manifest.generated.find((g) => g.output === "blog/posts.json");
+    const island = manifest.generated.find((g) => g.output === "assets/islands/blog-index.js");
+    expect(posts?.dependencies).toContainEqual({
+      kind: "source-page",
+      path: "blog/2026-01-01-first.md",
+      origin: "content",
+    });
+    expect(posts?.dependencies).toContainEqual(expect.objectContaining({ kind: "macro-manifest", origin: "absolute" }));
+    expect(island?.dependencies).toContainEqual({
+      kind: "island-entry",
+      path: "islands/blog-index/main.ts",
+      origin: "pandoc",
+    });
+  });
+
   test("bijection: dist == manifest.json ∪ routes ∪ passthrough ∪ generated", async () => {
     const onDisk = (await walk(outDir)).sort();
     const expected = [

@@ -15,7 +15,7 @@ function freshDir(): Promise<string> {
 
 function route(output: string): Manifest {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     routes: [{ source: "x.md", url: "/x/", output, type: "page", schema: "page.v1" }],
     passthrough: [],
     generated: [],

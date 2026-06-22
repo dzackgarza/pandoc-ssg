@@ -74,6 +74,22 @@ describe("O20: collection island build output", () => {
     expect(outs).toContain("_collections/notes.json");
     expect(outs).toContain("assets/islands/collection.js");
   });
+
+  test("records collection data and island dependencies in the manifest", () => {
+    const data = manifest.generated.find((g) => g.output === "_collections/notes.json");
+    const island = manifest.generated.find((g) => g.output === "assets/islands/collection.js");
+    expect(data?.dependencies).toContainEqual({
+      kind: "items-data",
+      path: "_data/items.yaml",
+      origin: "content",
+      key: "notes",
+    });
+    expect(island?.dependencies).toContainEqual({
+      kind: "island-entry",
+      path: "islands/collection/main.ts",
+      origin: "pandoc",
+    });
+  });
 });
 
 describe("O20: collection hydrates and filters by category/tag/search", () => {
