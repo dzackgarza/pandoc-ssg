@@ -3,7 +3,6 @@ dir = "essays"
 type = "essay"
 
 [pageTypes.essay]
-source = "content"
 schema = "essay.v1"
 template = "_templates/essay.html"
 defaults = "_defaults/essay.yaml"

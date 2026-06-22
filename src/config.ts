@@ -171,7 +171,7 @@ function contentConfig(data: z.infer<typeof contentConfigShape>): ContentConfigE
     content.dirTypes = data.dirTypes;
   }
   if (data.pageTypes !== undefined) {
-    content.pageTypes = namePageTypes(data.pageTypes, "pandoc");
+    content.pageTypes = namePageTypes(data.pageTypes, "content");
   }
   if (data.schemas !== undefined) {
     content.schemas = data.schemas;

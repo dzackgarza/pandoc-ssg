@@ -54,7 +54,7 @@ describe("C1: registry foundation", () => {
     expect(html).toContain('<h2 id="registry-controlled-heading">Registry Controlled Heading</h2>');
   });
 
-  test("content registry owns a custom page template, defaults file, and filter", async () => {
+  test("content registry owns custom page files when source is omitted", async () => {
     const outDir = await tempDir("ssg-registry-render-");
     const manifest = await build({
       contentDir: join(FIXTURES, "registry-render", "content"),
