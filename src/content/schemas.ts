@@ -90,7 +90,7 @@ function fieldType(type: SchemaFieldType): z.ZodTypeAny {
 function inferTypeFromDir(relPath: string, dirTypes: { dir: string; type: string }[]): string {
   let bestDir = "";
   let bestType = "page";
-  for (let { dir, type } of dirTypes) {
+  for (const { dir, type } of dirTypes) {
     let underDir = relPath === dir ? true : relPath.startsWith(`${dir}/`);
     if (underDir && dir.length >= bestDir.length) {
       bestDir = dir;

@@ -75,11 +75,9 @@ async function verifyPage(
     if (m.type() === "error") {
       consoleErrors.push(m.text());
     }
-    return true;
   });
   page.on("pageerror", (e: Error) => {
     pageErrors.push(e.message);
-    return true;
   });
 
   let findings: VerifyFinding[] = [];
