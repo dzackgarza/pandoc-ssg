@@ -7,6 +7,12 @@ import { type RunningServer, startServer } from "../src/serve.ts";
 
 const THEME_SRC = join(import.meta.dir, "..", "pandoc", "assets", "theme");
 
+interface FontProbe {
+  ff: string;
+  lsize: string;
+  psize: string;
+}
+
 /**
  * amsthm run-in labels (the `<span class="thmlabel">` the amsthm_label filter
  * injects, e.g. "Example 1.1.") must read like a standard math paper: bold, in
@@ -44,9 +50,9 @@ describe("amsthm label uses the body serif, not the sans display font", () => {
       await page.goto(`http://localhost:${server.port}/`, { waitUntil: "load" });
       // String-form evaluate (runs in the page) to keep DOM globals out of the
       // node-side type context, matching the other browser tests.
-      let m = (await page.evaluate(
+      let m = (await page.evaluate<FontProbe>(
         "(() => { const lab = document.querySelector('.thmlabel'); const p = document.getElementById('env'); const lcs = getComputedStyle(lab); return { ff: lcs.fontFamily, lsize: lcs.fontSize, psize: getComputedStyle(p).fontSize }; })()",
-      )) as { ff: string; lsize: string; psize: string };
+      ));
       labelFontFamily = m.ff;
       labelFontSize = m.lsize;
       proseFontSize = m.psize;

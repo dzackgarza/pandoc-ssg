@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { Manifest } from "./types.ts";
+import type { Manifest } from "../types.ts";
 
 export interface BrokenLink {
   sourcePage: string;
@@ -51,16 +51,15 @@ export async function checkLinks(distDir: string): Promise<BrokenLink[]> {
 
   let report = JSON.parse(out) as LycheeReport;
   let filePrefix = `file://${root}/`;
-  let broken: BrokenLink[] = [];
-  for (const [file, links] of Object.entries(report.error_map)) {
+  let broken: BrokenLink[] = Object.entries(report.error_map).flatMap(([file, links]) => {
     let sourcePage = file.startsWith(`${root}/`) ? file.slice(root.length + 1) : file;
-    for (const link of links) {
+    return links.map((link) => {
       let target = link.url.startsWith(filePrefix)
         ? `/${link.url.slice(filePrefix.length)}`
         : link.url;
-      broken.push({ sourcePage, target });
-    }
-  }
+      return { sourcePage, target };
+    });
+  });
 
   return sortBroken(broken);
 }
@@ -105,13 +104,12 @@ export async function checkServedLinks(baseUrl: string, manifest: Manifest): Pro
   }
 
   let report = JSON.parse(out) as LycheeReport;
-  let broken: BrokenLink[] = [];
-  for (const [page, links] of Object.entries(report.error_map)) {
+  let broken: BrokenLink[] = Object.entries(report.error_map).flatMap(([page, links]) => {
     let sourcePage = page.startsWith(baseUrl) ? page.slice(baseUrl.length) : page;
-    for (const link of links) {
+    return links.map((link) => {
       let target = link.url.startsWith(baseUrl) ? link.url.slice(baseUrl.length) : link.url;
-      broken.push({ sourcePage, target });
-    }
-  }
+      return { sourcePage, target };
+    });
+  });
   return sortBroken(broken);
 }

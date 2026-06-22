@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
+import type { Browser, Page } from "playwright";
 import { build } from "../src/build.ts";
 import { type RunningServer, startServer } from "../src/serve.ts";
 import type { Manifest } from "../src/types.ts";
@@ -10,6 +11,7 @@ import type { Manifest } from "../src/types.ts";
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 const CONTENT = join(FIXTURES, "collection", "content");
+const COLLECTION_TITLE_SELECTOR = ".collection__item .collection__title";
 
 interface CItem {
   title: string;
@@ -72,19 +74,29 @@ describe("O20: collection island build output", () => {
     expect(outs).toContain("_collections/notes.json");
     expect(outs).toContain("assets/islands/collection.js");
   });
+
+  test("records collection data and island dependencies in the manifest", () => {
+    const data = manifest.generated.find((g) => g.output === "_collections/notes.json");
+    const island = manifest.generated.find((g) => g.output === "assets/islands/collection.js");
+    expect(data?.dependencies).toContainEqual({
+      kind: "items-data",
+      path: "_data/items.yaml",
+      origin: "content",
+      key: "notes",
+    });
+    expect(island?.dependencies).toContainEqual({
+      kind: "island-entry",
+      path: "islands/collection/main.ts",
+      origin: "pandoc",
+    });
+  });
 });
 
 describe("O20: collection hydrates and filters by category/tag/search", () => {
   let outDir: string;
   let server: RunningServer;
-  // biome-ignore lint/suspicious/noExplicitAny: playwright types via dynamic dep
-  let page: any;
-  // biome-ignore lint/suspicious/noExplicitAny: playwright types via dynamic dep
-  let browser: any;
-
-  async function titles(): Promise<string[]> {
-    return page.locator(".collection__item .collection__title").allInnerTexts();
-  }
+  let page: Page;
+  let browser: Browser;
 
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), "ssg-coll-br-"));
@@ -103,7 +115,7 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
   });
 
   test("renders all items after hydration", async () => {
-    expect((await titles()).length).toBe(4);
+    expect((await page.locator(COLLECTION_TITLE_SELECTOR).allInnerTexts()).length).toBe(4);
   });
 
   test(
@@ -127,7 +139,9 @@ describe("O20: collection hydrates and filters by category/tag/search", () => {
       .getByRole("button", { name: "Talks", exact: true })
       .click();
     await page.waitForFunction("document.querySelectorAll('.collection__item').length === 1");
-    expect(await titles()).toEqual(["A-infinity Categories and the Fukaya Category"]);
+    expect(await page.locator(COLLECTION_TITLE_SELECTOR).allInnerTexts()).toEqual([
+      "A-infinity Categories and the Fukaya Category",
+    ]);
   });
 
   test("renders each of an item's links as a labeled anchor", async () => {

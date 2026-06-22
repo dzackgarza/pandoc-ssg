@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { scanContent } from "../src/scan.ts";
+import { scanContent } from "../src/site/scan.ts";
 
 const fixtures = join(import.meta.dir, "fixtures", "kernel");
 const basicContent = join(fixtures, "basic", "content");
@@ -33,6 +33,7 @@ test("scanContent recurses into dotless deep directories and keeps POSIX separat
   expect(got).toEqual([
     "2026/spring/math2250/index.md",
     "2026/spring/math2250/mypic.jpg",
+    "_site.toml",
     "blog/first.md",
     "index.md",
   ]);

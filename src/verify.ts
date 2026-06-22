@@ -1,5 +1,6 @@
-import { BuildError } from "./errors.ts";
 import type { Manifest } from "./types.ts";
+import { chromium } from "playwright";
+import type { Browser, ConsoleMessage } from "playwright";
 
 export interface VerifyFinding {
   /** the page URL that failed */
@@ -14,28 +15,8 @@ export interface VerifyOptions {
   /** origin of a running preview server, e.g. http://localhost:8080 */
   baseUrl: string;
   manifest: Manifest;
-  /** per-page navigation timeout in ms (default 20000) */
-  timeoutMs?: number;
-}
-
-/**
- * Boundary translator: load the optional `playwright` dependency, turning its
- * absence into an actionable BuildError instead of a raw module-resolution
- * error. Browser verification is opt-in, so the lean kernel does not force
- * playwright (or its browser downloads) on every consumer.
- */
-async function loadChromium(): Promise<unknown> {
-  try {
-    let mod = await import("playwright");
-    return (mod as { chromium: unknown }).chromium;
-  } catch (err) {
-    throw new BuildError(
-      "verify",
-      [],
-      "browser verification needs the optional 'playwright' dependency; install it and its browser with `bun add -d playwright && bunx playwright install chromium`",
-      err,
-    );
-  }
+  /** per-page navigation timeout in ms */
+  timeoutMs: number;
 }
 
 /**
@@ -58,16 +39,13 @@ async function loadChromium(): Promise<unknown> {
  * passed. Requires a running preview server (see startServer) at baseUrl.
  */
 export async function verifySite(opts: VerifyOptions): Promise<VerifyFinding[]> {
-  let timeoutMs = opts.timeoutMs === undefined ? 20000 : opts.timeoutMs;
-  // biome-ignore lint/suspicious/noExplicitAny: playwright is an optional dep loaded dynamically; no types at kernel level
-  let chromium = (await loadChromium()) as any;
   let browser = await chromium.launch({ headless: true });
   let findings: VerifyFinding[] = [];
   try {
-    for (const route of opts.manifest.routes) {
-      let pageFindings = await verifyPage(browser, opts.baseUrl, route.url, timeoutMs);
-      findings.push(...pageFindings);
-    }
+    let perPageFindings = await Promise.all(
+      opts.manifest.routes.map((route) => verifyPage(browser, opts.baseUrl, route.url, opts.timeoutMs)),
+    );
+    findings.push(...perPageFindings.flat());
   } finally {
     await browser.close();
   }
@@ -83,9 +61,8 @@ export async function verifySite(opts: VerifyOptions): Promise<VerifyFinding[]> 
   return findings;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: playwright Browser/Page have no types here (optional dep)
 async function verifyPage(
-  browser: any,
+  browser: Browser,
   baseUrl: string,
   routeUrl: string,
   timeoutMs: number,
@@ -94,20 +71,20 @@ async function verifyPage(
   let page = await browser.newPage();
   let consoleErrors: string[] = [];
   let pageErrors: string[] = [];
-  page.on("console", (m: { type(): string; text(): string }) => {
+  page.on("console", (m: ConsoleMessage) => {
     if (m.type() === "error") {
       consoleErrors.push(m.text());
     }
   });
-  page.on("pageerror", (e: { message?: string }) => {
-    pageErrors.push(e.message === undefined ? String(e) : e.message);
+  page.on("pageerror", (e: Error) => {
+    pageErrors.push(e.message);
   });
 
   let findings: VerifyFinding[] = [];
   // domcontentloaded (not networkidle): real pages embed iframes/external media
   // that never go idle. Math gets a bounded settle window below.
   let response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-  if (response !== null && response.status() >= 400) {
+  if (response && response.status() >= 400) {
     findings.push({ url, issue: "http-error", detail: String(response.status()) });
   }
   if ((await page.locator("main").count()) === 0) {
@@ -119,10 +96,15 @@ async function verifyPage(
   // Scan prose only: "{%"/"{:" inside <pre>/<code> is legitimate displayed code
   // (e.g. LaTeX macros), not un-migrated Liquid/kramdown. String body avoids
   // node-side DOM typing.
-  let proseText = (await page.evaluate(
+  let proseText = await page.evaluate<string>(
     "(() => { const c = document.body.cloneNode(true); c.querySelectorAll('pre, code').forEach((e) => e.remove()); return c.innerText; })()",
-  )) as string;
-  if (proseText.includes("{%") || proseText.includes("{:")) {
+  );
+  let hasLiquid = proseText.includes("{%");
+  let hasKramdownAttribute = proseText.includes("{:");
+  if (hasLiquid) {
+    findings.push({ url, issue: "unresolved-markup", detail: "" });
+  }
+  if (hasKramdownAttribute) {
     findings.push({ url, issue: "unresolved-markup", detail: "" });
   }
   // MathJax typesets asynchronously after load; settle only when the page
@@ -140,29 +122,14 @@ async function verifyPage(
   // its raw TeX in span.math). Correctly typeset math is glyph-only, so any leftover
   // \controlSequence in rendered math proves an undefined macro / unrendered
   // expression that must gate the build before deploy.
-  let leftover = (await page.evaluate(
+  let leftover = await page.evaluate<string[]>(
     "(() => { const out = []; for (const el of document.querySelectorAll('mjx-container, span.math')) { const m = (el.textContent || '').match(/\\\\[a-zA-Z]+/g); if (m) { out.push(...m); } } return Array.from(new Set(out)); })()",
-  )) as string[];
+  );
   if (leftover.length > 0) {
     findings.push({ url, issue: "undefined-macro", detail: leftover.slice(0, 8).join(" ") });
   }
-  for (const text of consoleErrors) {
-    // Third-party noise that is not a page defect: a 404 on an external
-    // image/font subresource, or an embedded frame (e.g. a YouTube player) using
-    // a feature the host page does not grant ("Permissions policy violation",
-    // e.g. compute-pressure). Keep only genuine script-level errors from the page.
-    if (
-      text.includes("Failed to load resource") ||
-      text.includes("net::") ||
-      text.includes("Permissions policy violation")
-    ) {
-      continue;
-    }
-    findings.push({ url, issue: "console-error", detail: text });
-  }
-  for (const text of pageErrors) {
-    findings.push({ url, issue: "page-error", detail: text });
-  }
+  findings.push(...consoleErrors.map((text) => ({ url, issue: "console-error", detail: text })));
+  findings.push(...pageErrors.map((text) => ({ url, issue: "page-error", detail: text })));
   await page.close();
   return findings;
 }

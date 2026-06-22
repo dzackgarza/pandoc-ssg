@@ -1,15 +1,6 @@
 import { z } from "zod";
-import { BuildError } from "./errors.ts";
-import type { PageMeta, PageType } from "./types.ts";
-
-/**
- * Page type registry (O8): name → schema id + pandoc template file.
- * "page" is the default type for pages in unmapped directories.
- */
-export let pageTypes: Record<string, PageType> = {
-  page: { name: "page", schema: "page.v1", template: "page.html" },
-  "blog-post": { name: "blog-post", schema: "blog-post.v1", template: "blog.html" },
-};
+import { BuildError } from "../errors.ts";
+import type { PageMeta, PageType, SchemaDefinition, SchemaFieldType, SiteConfig } from "../types.ts";
 
 function isRootOrBounded(s: string): boolean {
   if (s === "/") {
@@ -29,33 +20,6 @@ let siteShape = z
   })
   .strict();
 
-let pageV1 = z
-  .object({
-    title: z.string(),
-    site: siteShape,
-  })
-  .strict();
-
-let blogPostV1 = z
-  .object({
-    title: z.string(),
-    site: siteShape,
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    tags: z.array(z.string()).optional(),
-    categories: z.array(z.string()).optional(),
-  })
-  .strict();
-
-let schemaRegistry: Record<string, z.ZodType<PageMeta>> = {
-  "page.v1": pageV1,
-  "blog-post.v1": blogPostV1,
-};
-
-/** Schema ids known to the registry. */
-export function knownSchemas(): string[] {
-  return Object.keys(schemaRegistry);
-}
-
 /**
  * Validate raw frontmatter against the named schema (O3). Strict: unknown
  * schema id, missing required fields, or unknown keys throw
@@ -66,16 +30,21 @@ export function knownSchemas(): string[] {
  *               categories (string[] each), the blog-index island's facets.
  * All schemas:  optional site.route ("/" or "/…/" shaped), site.type, site.schema.
  */
-export function validatePageMeta(relPath: string, rawMeta: unknown, schemaId: string): PageMeta {
-  let schema = schemaRegistry[schemaId];
-  if (schema === undefined) {
+export function validatePageMeta(
+  relPath: string,
+  rawMeta: unknown,
+  schemaId: string,
+  schemas: Record<string, SchemaDefinition>,
+): PageMeta {
+  let schemaDefinition = schemas[schemaId];
+  if (!schemaDefinition) {
     throw new BuildError("schema", [relPath], `unknown schema id ${schemaId}`);
   }
-  let parsed = schema.safeParse(rawMeta);
+  let parsed = z.object(schemaFields(schemaDefinition)).strict().safeParse(rawMeta);
   if (!parsed.success) {
     throw new BuildError("schema", [relPath], parsed.error.message);
   }
-  return parsed.data;
+  return parsed.data as PageMeta;
 }
 
 /**
@@ -87,16 +56,35 @@ export function validatePageMeta(relPath: string, rawMeta: unknown, schemaId: st
 export function resolvePageType(
   relPath: string,
   rawMeta: unknown,
-  dirTypes: { dir: string; type: string }[],
+  config: SiteConfig,
 ): PageType {
   let explicitType = (rawMeta as { site?: { type?: unknown } }).site?.type;
   let typeName =
-    typeof explicitType === "string" ? explicitType : inferTypeFromDir(relPath, dirTypes);
-  let pageType = pageTypes[typeName];
-  if (pageType === undefined) {
+    typeof explicitType === "string" ? explicitType : inferTypeFromDir(relPath, config.dirTypes);
+  let pageType = config.pageTypes[typeName];
+  if (!pageType) {
     throw new BuildError("schema", [relPath], `unknown page type ${typeName}`);
   }
   return pageType;
+}
+
+function schemaFields(definition: SchemaDefinition): Record<string, z.ZodTypeAny> {
+  let fields: Record<string, z.ZodTypeAny> = { site: siteShape };
+  for (let field of definition.fields) {
+    let fieldSchema = fieldType(field.type);
+    fields[field.name] = field.required ? fieldSchema : fieldSchema.optional();
+  }
+  return fields;
+}
+
+function fieldType(type: SchemaFieldType): z.ZodTypeAny {
+  if (type === "string") {
+    return z.string();
+  }
+  if (type === "date") {
+    return z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+  }
+  return z.array(z.string());
 }
 
 function inferTypeFromDir(relPath: string, dirTypes: { dir: string; type: string }[]): string {

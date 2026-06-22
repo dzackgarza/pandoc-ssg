@@ -15,10 +15,11 @@ The build shells out to system tools and reads the author's canonical math and f
 | **pandoc 3.6+** | document rendering, templates, math, AST filters | always |
 | **uv** | runs the bundled MathJax macro extractor (`pandoc/bin/extract_mathjax_macros.py`) | always (any page) |
 | **pdflatex** + **pdf2svg** | compile `\begin{tikzcd}` / `\begin{tikzpicture}` blocks to inline SVG | pages with TikZ diagrams |
-| **playwright** + chromium | `verify` / the `deploy` gate (browser checks) | `verify`, `deploy` |
-| **vite** + **svelte** | bundle interactive islands (blog-index, collection) | pages using those components |
+| **Chromium for Playwright** | `verify` / the `deploy` gate (browser checks) | `verify`, `deploy` |
+| **vite** + **svelte** | bundle interactive islands (blog-index, collection) | packaged with `pandoc-ssg` |
 
-`playwright`, `vite`, and `svelte` are optional peer deps of the content repo (install with `bun add -d playwright && bunx playwright install chromium`, etc.).
+The generator packages its browser/island build libraries.
+Playwright still needs a browser install available to the environment (`bunx playwright install chromium`).
 
 ### Configuration (`~/.config/pandoc-ssg/config.toml`)
 
@@ -83,6 +84,10 @@ content/
 
 A Markdown file is compiled only if its frontmatter opts in with `site.page: true`; everything else is copied byte-for-byte.
 The build writes `dist/site-manifest.json` as the single contract every downstream tool consumes.
+Manifest schema v2 records deterministic dependency metadata on routes, passthrough
+copies, and generated artifacts so downstream tools can tell which source page,
+registry file, template/defaults/filter, data key, theme asset, macro manifest, or
+island entry produced each output.
 
 ## Components and transclusion
 
@@ -98,6 +103,17 @@ Fenced-div components expand from `_data/items.yaml`:
 ::: {.include path="./_partials/abstract.md"}
 :::
 ```
+
+Component handlers are registry entries. The bundled registry declares the
+built-ins; a content repo can add `[componentHandlers.<type>]` with either a
+built-in `handler` id or a content-owned Lua `module`. Custom Lua modules return
+a function or `{ render = function(...) }` and receive component attributes,
+`_data/items.yaml`, the content root, and registry metadata.
+
+Interactive islands are also registry entries. `[islands.<name>]` declares the
+entrypoint, output bundle path, optional data output path, data source, and mount
+name; component handlers emit `data-ssg-island="<name>"` to request the bundle and
+any declared generated data artifact.
 
 ## Development
 

@@ -68,6 +68,16 @@ function dateToYmd(value: unknown): string {
   return String(value);
 }
 
+describe("CLI dispatch", () => {
+  test("running without a subcommand reports the missing command", async () => {
+    const r = await runCli([]);
+
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("missing subcommand");
+    expect(r.stderr).not.toContain("undefined");
+  });
+});
+
 describe("CLI build (O9)", () => {
   test("build on a valid site exits 0 and populates dist/index.html", async () => {
     const contentDir = await stageContent("valid-site");
@@ -139,6 +149,49 @@ describe("CLI new post (O9)", () => {
     const contentDir = await stageContent("roundtrip-site");
     const r = await runCli(["new", "post", "--content", contentDir]);
     expect(r.exitCode).not.toBe(0);
+  });
+
+  test("new post remains the built-in blog-post scaffold alias", async () => {
+    const contentDir = await stageContent("roundtrip-site");
+
+    const r = await runCli(["new", "post", "Alias Preserved", "--content", contentDir]);
+
+    expect(r.exitCode).toBe(0);
+    const prefix = todayPrefix();
+    const expected = path.join(contentDir, "blog", `${prefix}-alias-preserved.md`);
+    const parsed = matter(await Bun.file(expected).text());
+    expect(parsed.data.site?.type).toBe("blog-post");
+    expect(dateToYmd(parsed.data.date)).toBe(prefix);
+  });
+
+  test("new <type> scaffolds a registered custom page type", async () => {
+    const contentDir = await stageContent("custom-scaffold-site");
+
+    const r = await runCli(["new", "note", "Spectral Sequence", "--content", contentDir]);
+
+    expect(r.exitCode).toBe(0);
+    const expected = path.join(contentDir, "notes", "spectral-sequence.md");
+    const parsed = matter(await Bun.file(expected).text());
+    expect(parsed.data.title).toBe("Spectral Sequence");
+    expect(parsed.data.summary).toBe("Draft note");
+    expect(parsed.data.site).toEqual({ page: true, type: "note" });
+  });
+
+  test("new <type> --dir writes a registered scaffold into an explicit directory", async () => {
+    const contentDir = await stageContent("custom-scaffold-site");
+
+    const r = await runCli([
+      "new",
+      "note",
+      "Filtered Complex",
+      "--content",
+      contentDir,
+      "--dir",
+      "drafts",
+    ]);
+
+    expect(r.exitCode).toBe(0);
+    expect(await Bun.file(path.join(contentDir, "drafts", "filtered-complex.md")).exists()).toBe(true);
   });
 });
 

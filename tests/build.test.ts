@@ -3,7 +3,8 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
-import { loadAppConfig } from "../src/config.ts";
+import { loadAppConfig, loadSiteConfig } from "../src/config.ts";
+import { BuildError } from "../src/errors.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -14,30 +15,6 @@ const BLOG_TOC_CONTENT = join(FIXTURES, "blog-toc", "content");
 
 function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-out-"));
-}
-
-async function exists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** All file paths (POSIX, dir-relative) under `root`, recursively. */
-async function walk(root: string, prefix = ""): Promise<string[]> {
-  const out: string[] = [];
-  const entries = await readdir(root, { withFileTypes: true });
-  for (const e of entries) {
-    const rel = prefix ? `${prefix}/${e.name}` : e.name;
-    if (e.isDirectory()) {
-      out.push(...(await walk(join(root, e.name), rel)));
-    } else {
-      out.push(rel);
-    }
-  }
-  return out.sort();
 }
 
 describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
@@ -79,7 +56,7 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
 
   test("O4: non-opt-in syllabus.md is NOT compiled to syllabus/index.html", async () => {
     const compiled = join(outDir, "2026", "spring", "math2250", "syllabus", "index.html");
-    expect(await exists(compiled)).toBe(false);
+    await expect(stat(compiled)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   test("O4: opaque standalone-app copied verbatim", async () => {
@@ -93,13 +70,8 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
   });
 
   test("O4: no reserved (underscore) path leaks into dist", async () => {
-    const files = await walk(outDir);
-    for (const f of files) {
-      const leaks = f.split("/").some((seg) => seg.startsWith("_"));
-      expect(leaks).toBe(false);
-    }
-    expect(await exists(join(outDir, "_data"))).toBe(false);
-    expect(await exists(join(outDir, "_site.toml"))).toBe(false);
+    await expect(stat(join(outDir, "_data"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(stat(join(outDir, "_site.toml"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   // ---- O5: rendering contract ----
@@ -178,10 +150,10 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
   });
 
   test("O5: home route and blog route render with their titles", async () => {
-    expect(await exists(join(outDir, "index.html"))).toBe(true);
+    const homeHtml = await readFile(join(outDir, "index.html"), "utf8");
+    expect(homeHtml).toContain("Welcome to the demo site.");
 
     const blogPath = join(outDir, "blog", "2026-06-12-hello", "index.html");
-    expect(await exists(blogPath)).toBe(true);
     const blogHtml = await readFile(blogPath, "utf8");
     expect(blogHtml).toContain("Hello World");
   });
@@ -314,26 +286,50 @@ describe("generator config (XDG) is required, never defaulted", () => {
   test("a missing ~/.config/pandoc-ssg/config.toml fails loudly with kind=config", async () => {
     const saved = process.env.XDG_CONFIG_HOME;
     const empty = await mkdtemp(join(tmpdir(), "ssg-noconfig-"));
-    process.env.XDG_CONFIG_HOME = empty;
-    // No fallback: macros/pandoc-tree are config, so an absent config is a build error.
-    await expect(loadAppConfig()).rejects.toMatchObject({ name: "BuildError", kind: "config" });
-    process.env.XDG_CONFIG_HOME = saved === undefined ? "" : saved;
-    await rm(empty, { recursive: true, force: true });
+    try {
+      process.env.XDG_CONFIG_HOME = empty;
+      // No fallback: macros/pandoc-tree are config, so an absent config is a build error.
+      const rejection = loadAppConfig();
+      await expect(rejection).rejects.toThrow(BuildError);
+      await expect(rejection).rejects.toMatchObject({ name: "BuildError", kind: "config" });
+    } finally {
+      if (saved === undefined) {
+        delete process.env.XDG_CONFIG_HOME;
+      } else {
+        process.env.XDG_CONFIG_HOME = saved;
+      }
+      await rm(empty, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("content site config is required, never defaulted", () => {
+  test("a missing content/_site.toml fails loudly with kind=config", async () => {
+    const contentDir = await mkdtemp(join(tmpdir(), "ssg-missing-site-config-"));
+    try {
+      await expect(loadSiteConfig(contentDir, PANDOC_DIR)).rejects.toMatchObject({
+        name: "BuildError",
+        kind: "config",
+        files: ["_site.toml"],
+      });
+    } finally {
+      await rm(contentDir, { recursive: true, force: true });
+    }
   });
 });
 
 describe("O3: fail-fast schema validation leaves no partial output", () => {
   test("broken page rejects with kind=schema naming the file, dist stays empty", async () => {
     const outDir = await freshOutDir();
-    await expect(
-      build({ contentDir: BAD_SCHEMA_CONTENT, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({
+    const rejection = build({ contentDir: BAD_SCHEMA_CONTENT, pandocDir: PANDOC_DIR, outDir });
+    await expect(rejection).rejects.toThrow(BuildError);
+    await expect(rejection).rejects.toMatchObject({
       name: "BuildError",
       kind: "schema",
       files: ["broken.md"],
     });
 
-    const remaining = await walk(outDir);
+    const remaining = await readdir(outDir);
     expect(remaining).toEqual([]);
     await rm(outDir, { recursive: true, force: true });
   });

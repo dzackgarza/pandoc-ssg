@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
+import { BuildError } from "../src/errors.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -10,6 +11,11 @@ const COMPONENTS_CONTENT = join(FIXTURES, "components", "content");
 
 function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-out-"));
+}
+
+async function expectBuildError(promise: Promise<unknown>, kind: string): Promise<void> {
+  await expect(promise).rejects.toThrow(BuildError);
+  await expect(promise).rejects.toMatchObject({ name: "BuildError", kind });
 }
 
 /**
@@ -113,9 +119,7 @@ describe("component filter: a media-gallery item with an unknown type fails the 
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badMedia = join(FIXTURES, "components", "bad-media");
-    await expect(
-      build({ contentDir: badMedia, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badMedia, pandocDir: PANDOC_DIR, outDir }), "pandoc");
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -165,9 +169,7 @@ describe("component filter: a link-group with an unknown items key fails the bui
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badLinks = join(FIXTURES, "components", "bad-linkgroup");
-    await expect(
-      build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }), "pandoc");
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -176,9 +178,7 @@ describe("component filter: a link-group link with no href fails the build", () 
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badLinks = join(FIXTURES, "components", "bad-linkgroup-nohref");
-    await expect(
-      build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }), "pandoc");
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -235,9 +235,7 @@ describe("component filter: a timeline with an unknown items key fails the build
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badTimeline = join(FIXTURES, "components", "bad-timeline");
-    await expect(
-      build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }), "pandoc");
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -246,9 +244,7 @@ describe("component filter: a timeline entry with no date fails the build", () =
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badTimeline = join(FIXTURES, "components", "bad-timeline-nodate");
-    await expect(
-      build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }), "pandoc");
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -318,9 +314,7 @@ describe("component filter: a papers list with an unknown items key fails the bu
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badPapers = join(FIXTURES, "components", "bad-papers");
-    await expect(
-      build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }), "pandoc");
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -329,9 +323,7 @@ describe("component filter: a paper entry with no title fails the build", () => 
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badPapers = join(FIXTURES, "components", "bad-papers-notitle");
-    await expect(
-      build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }), "pandoc");
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -366,9 +358,7 @@ describe("component filter: an unknown video provider fails the build", () => {
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badVideo = join(FIXTURES, "components", "bad-video");
-    await expect(
-      build({ contentDir: badVideo, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badVideo, pandocDir: PANDOC_DIR, outDir }), "pandoc");
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -377,9 +367,45 @@ describe("component filter: unknown component type fails the build", () => {
   test("an unregistered component type rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badContent = join(FIXTURES, "components", "bad-content");
-    await expect(
-      build({ contentDir: badContent, pandocDir: PANDOC_DIR, outDir }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    await expectBuildError(build({ contentDir: badContent, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await rm(outDir, { recursive: true, force: true });
+  });
+});
+
+describe("component registry: content-owned Lua handlers", () => {
+  test("a registered custom static component renders without editing the built-in dispatcher", async () => {
+    const outDir = await freshOutDir();
+    await build({
+      contentDir: join(FIXTURES, "registry-component", "content"),
+      pandocDir: PANDOC_DIR,
+      outDir,
+    });
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    expect(html).toContain('class="callout"');
+    expect(html).toContain('data-handler="callout"');
+    expect(html).toContain("<strong>Registry Callout</strong>");
+    expect(html).toContain("<span>From Items</span>");
+    expect(html).not.toContain('type="callout"');
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  test("a registered custom island component emits registry-declared data and bundle outputs", async () => {
+    const outDir = await freshOutDir();
+    const manifest = await build({
+      contentDir: join(FIXTURES, "registry-custom-island", "content"),
+      pandocDir: PANDOC_DIR,
+      outDir,
+    });
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    const data = JSON.parse(await readFile(join(outDir, "mini", "notes.json"), "utf8"));
+    expect(html).toContain('data-ssg-island="mini-list"');
+    expect(html).toContain('data-mini="/mini/notes.json"');
+    expect(html).toContain('<script type="module" src="/assets/islands/mini-list.js">');
+    expect(data.map((item: { title: string }) => item.title)).toEqual(["One", "Two"]);
+    expect(manifest.generated).toContainEqual(expect.objectContaining({ output: "mini/notes.json", kind: "data" }));
+    expect(manifest.generated).toContainEqual(
+      expect.objectContaining({ output: "assets/islands/mini-list.js", kind: "island" }),
+    );
     await rm(outDir, { recursive: true, force: true });
   });
 });

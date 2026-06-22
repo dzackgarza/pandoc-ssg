@@ -11,6 +11,13 @@ export interface RunningServer {
   stop(): void;
 }
 
+function requestedPort(port: number | undefined): number {
+  if (port === undefined) {
+    return 0;
+  }
+  return port;
+}
+
 /**
  * Static preview server over a built dist tree. sirv owns the static serving —
  * directory-index resolution, content types, and path-traversal protection;
@@ -19,18 +26,24 @@ export interface RunningServer {
  */
 export function startServer(opts: ServeOptions): Promise<RunningServer> {
   let serve = sirv(opts.outDir, { dev: true });
-  let server = createServer((req, res) =>
-    serve(req, res, () => {
+  let server = createServer((req, res) => {
+    serve(req, res, (): Promise<void> => {
       res.statusCode = 404;
       res.end("Not Found");
-    }),
-  );
+      return Promise.resolve();
+    });
+  });
 
   return new Promise((resolve, reject) => {
     server.on("error", reject);
-    server.listen(opts.port === undefined ? 0 : opts.port, () => {
+    server.listen(requestedPort(opts.port), () => {
       let address = server.address();
-      if (address === null || typeof address === "string") {
+      if (!address) {
+        server.close();
+        reject(new Error("preview server did not report a bound TCP port"));
+        return;
+      }
+      if (typeof address === "string") {
         server.close();
         reject(new Error("preview server did not report a bound TCP port"));
         return;

@@ -1,0 +1,14 @@
+[[dirTypes]]
+dir = "essays"
+type = "essay"
+
+[pageTypes.essay]
+schema = "essay.v1"
+template = "page.html"
+defaults = "defaults/page.yaml"
+filters = ["filters/does-not-exist.lua"]
+
+[schemas."essay.v1"]
+fields = [
+  { name = "title", type = "string", required = true },
+]

@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
+import { BuildError } from "../src/errors.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -65,13 +66,13 @@ describe("O10: transclusion splices parsed blocks", () => {
 describe("O10: transclusion rejects path escaping content/", () => {
   test("an include escaping the content root rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
-    await expect(
-      build({
-        contentDir: join(FIXTURES, "transclude-escape", "content"),
-        pandocDir: PANDOC_DIR,
-        outDir,
-      }),
-    ).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
+    const rejection = build({
+      contentDir: join(FIXTURES, "transclude-escape", "content"),
+      pandocDir: PANDOC_DIR,
+      outDir,
+    });
+    await expect(rejection).rejects.toThrow(BuildError);
+    await expect(rejection).rejects.toMatchObject({ name: "BuildError", kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });

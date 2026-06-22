@@ -1,6 +1,6 @@
 import { parse } from "node:path/posix";
-import { BuildError } from "./errors.ts";
-import type { PassthroughEntry, RouteEntry } from "./types.ts";
+import { BuildError } from "../errors.ts";
+import type { PassthroughEntry, RouteEntry } from "../types.ts";
 
 /**
  * Deterministic routing (O2):
@@ -11,8 +11,8 @@ import type { PassthroughEntry, RouteEntry } from "./types.ts";
  * A validated `site.route` override replaces the inferred URL. node:path/posix
  * owns splitting the dir from the extension-stripped name.
  */
-export function routeForPage(relPath: string, routeOverride?: string): string {
-  if (routeOverride !== undefined) {
+export function routeForPage(relPath: string, routeOverride: string | false = false): string {
+  if (routeOverride) {
     return routeOverride;
   }
   let { dir, name } = parse(relPath);
@@ -39,9 +39,9 @@ export function assertNoCollisions(routes: RouteEntry[], passthrough: Passthroug
     ...routes.map((r) => ({ output: r.output, source: r.source })),
     ...passthrough.map((p) => ({ output: p.output, source: p.source })),
   ];
-  for (const { output, source } of entries) {
+  for (let { output, source } of entries) {
     let prior = seen.get(output);
-    if (prior !== undefined) {
+    if (prior) {
       throw new BuildError(
         "route-collision",
         [prior, source],

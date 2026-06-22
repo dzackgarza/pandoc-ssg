@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { BuildError } from "../src/errors.ts";
-import { assertNoCollisions, outputPathForRoute, routeForPage } from "../src/routes.ts";
+import { assertNoCollisions, outputPathForRoute, routeForPage } from "../src/site/routes.ts";
 import type { PassthroughEntry, RouteEntry } from "../src/types.ts";
 
 function route(source: string, url: string, output: string): RouteEntry {
@@ -45,13 +45,13 @@ test("outputPathForRoute maps /a/b/ to a/b/index.html", () => {
 
 // O2: assertNoCollisions.
 
-test("assertNoCollisions does not throw on disjoint outputs", () => {
+test("assertNoCollisions accepts disjoint outputs", () => {
   const routes = [
     route("content/index.md", "/", "index.html"),
     route("content/about.md", "/about/", "about/index.html"),
   ];
   const pass = [passthrough("content/MakeMeAQual/index.html", "MakeMeAQual/index.html")];
-  expect(assertNoCollisions(routes, pass)).toBeUndefined();
+  expect(() => assertNoCollisions(routes, pass)).not.toThrow();
 });
 
 test("assertNoCollisions throws route-collision naming both page sources on a page/page clash", async () => {
@@ -59,7 +59,9 @@ test("assertNoCollisions throws route-collision naming both page sources on a pa
     route("content/about.md", "/about/", "about/index.html"),
     route("content/about/index.md", "/about/", "about/index.html"),
   ];
-  await expect(Promise.resolve().then(() => assertNoCollisions(routes, []))).rejects.toMatchObject({
+  const rejection = Promise.resolve().then(() => assertNoCollisions(routes, []));
+  await expect(rejection).rejects.toThrow(BuildError);
+  await expect(rejection).rejects.toMatchObject({
     name: "BuildError",
     kind: "route-collision",
     files: ["content/about.md", "content/about/index.md"],
@@ -77,9 +79,9 @@ test("assertNoCollisions throws BuildError on a page/page clash", () => {
 test("assertNoCollisions throws route-collision naming both sources on a page/passthrough clash", async () => {
   const routes = [route("content/app.md", "/app/", "app/index.html")];
   const pass = [passthrough("content/app/index.html", "app/index.html")];
-  await expect(
-    Promise.resolve().then(() => assertNoCollisions(routes, pass)),
-  ).rejects.toMatchObject({
+  const rejection = Promise.resolve().then(() => assertNoCollisions(routes, pass));
+  await expect(rejection).rejects.toThrow(BuildError);
+  await expect(rejection).rejects.toMatchObject({
     name: "BuildError",
     kind: "route-collision",
     files: ["content/app.md", "content/app/index.html"],

@@ -9,6 +9,8 @@
 -- component type or a missing data key aborts the build (pandoc exits nonzero).
 
 local items = {}
+local registry = { handlers = {}, islands = {}, contentRoot = "" }
+local module_cache = {}
 
 local function load_items(meta)
   local path_meta = meta.items_path
@@ -26,6 +28,26 @@ local function load_items(meta)
   local raw = fh:read("a")
   fh:close()
   items = pandoc.json.decode(raw)
+end
+
+local function load_components_registry(meta)
+  local path_meta = meta.components_registry_path
+  if path_meta == nil then
+    error("components: missing components_registry_path metadata")
+  end
+  local path = pandoc.utils.stringify(path_meta)
+  if path == "" then
+    error("components: empty components_registry_path metadata")
+  end
+  local fh = io.open(path, "r")
+  if fh == nil then
+    error("components: cannot open registry sidecar at " .. path)
+  end
+  local raw = fh:read("a")
+  fh:close()
+  registry = pandoc.json.decode(raw)
+  registry.handlers = registry.handlers or {}
+  registry.islands = registry.islands or {}
 end
 
 local function esc_text(s)
@@ -282,6 +304,146 @@ local function render_link_group(key)
   return table.concat(parts, "\n")
 end
 
+local function site_path(path)
+  if path == nil or path == "" then
+    return ""
+  end
+  if path:sub(1, 1) == "/" then
+    return path
+  end
+  return "/" .. path
+end
+
+local function data_output(template, key)
+  if template == nil then
+    return ""
+  end
+  return template:gsub("{key}", key or "")
+end
+
+local function island_for_component(component_type, handler)
+  local island_name = handler.island
+  if island_name == nil or island_name == "" then
+    error("component " .. tostring(component_type) .. ": registry handler does not declare an island")
+  end
+  local island = registry.islands[island_name]
+  if island == nil then
+    error("component " .. tostring(component_type) .. ": island '" .. tostring(island_name) .. "' is not registered")
+  end
+  return island_name, island
+end
+
+local function render_collection(attrs, handler)
+  local key = attrs.items
+  if key == nil or key == "" then
+    error("component collection: missing required items=\"KEY\" attribute")
+  end
+  local island_name, island = island_for_component("collection", handler)
+  local mount = island.mount or "collection"
+  local data_path = site_path(data_output(island.dataOutput, key))
+  return '<div class="'
+    .. esc_attr(mount)
+    .. '" data-ssg-island="'
+    .. esc_attr(island_name)
+    .. '" data-ssg-data-key="'
+    .. esc_attr(key)
+    .. '" data-collection="'
+    .. esc_attr(data_path)
+    .. '"></div>\n'
+    .. '<script type="module" src="'
+    .. esc_attr(site_path(island.output))
+    .. '"></script>'
+end
+
+local function render_blog_index(handler)
+  local island_name, island = island_for_component("blog-index", handler)
+  local mount = island.mount or "blog-index"
+  return '<div id="'
+    .. esc_attr(mount)
+    .. '" data-ssg-island="'
+    .. esc_attr(island_name)
+    .. '" data-posts="'
+    .. esc_attr(site_path(island.dataOutput))
+    .. '"></div>\n'
+    .. '<script type="module" src="'
+    .. esc_attr(site_path(island.output))
+    .. '"></script>'
+end
+
+local builtins = {
+  ["feature-row"] = function(attrs)
+    return render_feature_row(attrs.items)
+  end,
+  ["media-gallery"] = function(attrs)
+    return render_media_gallery(attrs.items)
+  end,
+  ["link-group"] = function(attrs)
+    return render_link_group(attrs.items)
+  end,
+  ["timeline"] = function(attrs)
+    return render_timeline(attrs.items)
+  end,
+  ["papers"] = function(attrs)
+    return render_papers(attrs.items)
+  end,
+  ["video"] = function(attrs)
+    return render_video(attrs.provider, attrs.id)
+  end,
+  ["collection"] = render_collection,
+  ["blog-index"] = function(_attrs, handler)
+    return render_blog_index(handler)
+  end,
+}
+
+local function component_attrs(el)
+  local attrs = {}
+  for key, value in pairs(el.attributes) do
+    attrs[key] = value
+  end
+  if el.identifier ~= nil and el.identifier ~= "" then
+    attrs.id = el.identifier
+  end
+  return attrs
+end
+
+local function render_custom(handler, attrs)
+  local path = handler.module
+  if path == nil or path == "" then
+    error("component handler " .. tostring(handler.handler) .. ": missing module path")
+  end
+  local mod = module_cache[path]
+  if mod == nil then
+    mod = dofile(path)
+    module_cache[path] = mod
+  end
+  local render = mod
+  if type(mod) == "table" then
+    render = mod.render
+  end
+  if type(render) ~= "function" then
+    error("component handler " .. tostring(handler.handler) .. ": module must return a function or table.render")
+  end
+  local result = render(attrs, items, registry.contentRoot, registry)
+  if type(result) == "string" then
+    return result
+  end
+  if type(result) == "table" and type(result.html) == "string" then
+    return result.html
+  end
+  error("component handler " .. tostring(handler.handler) .. ": render result must be HTML string")
+end
+
+local function render_component(component_type, handler, attrs)
+  if handler.module ~= nil then
+    return render_custom(handler, attrs)
+  end
+  local renderer = builtins[handler.handler]
+  if renderer == nil then
+    error("component " .. tostring(component_type) .. ": unknown built-in handler '" .. tostring(handler.handler) .. "'")
+  end
+  return renderer(attrs, handler)
+end
+
 local function expand_div(el)
   local is_component = false
   for _, c in ipairs(el.classes) do
@@ -295,54 +457,17 @@ local function expand_div(el)
   end
 
   local ctype = el.attributes.type
-  if ctype == "feature-row" then
-    return pandoc.RawBlock("html", render_feature_row(el.attributes.items))
+  local handler = registry.handlers[ctype]
+  if handler == nil then
+    error("unknown component type: " .. tostring(ctype))
   end
-  if ctype == "media-gallery" then
-    return pandoc.RawBlock("html", render_media_gallery(el.attributes.items))
-  end
-  if ctype == "link-group" then
-    return pandoc.RawBlock("html", render_link_group(el.attributes.items))
-  end
-  if ctype == "timeline" then
-    return pandoc.RawBlock("html", render_timeline(el.attributes.items))
-  end
-  if ctype == "papers" then
-    return pandoc.RawBlock("html", render_papers(el.attributes.items))
-  end
-  if ctype == "video" then
-    -- pandoc maps `id="x"` to the element identifier, not attributes.id
-    return pandoc.RawBlock("html", render_video(el.attributes.provider, el.identifier))
-  end
-  if ctype == "collection" then
-    -- Interactive filterable collection island (O20): mount + module script.
-    -- The client fetches the per-key JSON the build emitted from items.yaml.
-    local key = el.attributes.items
-    if key == nil or key == "" then
-      error("component collection: missing required items=\"KEY\" attribute")
-    end
-    return pandoc.RawBlock(
-      "html",
-      '<div class="collection" data-collection="/_collections/' .. key .. '.json"></div>\n'
-        .. '<script type="module" src="/assets/islands/collection.js"></script>'
-    )
-  end
-  if ctype == "blog-index" then
-    -- Interactive island (O16): emit only the hydration mount + module script.
-    -- The build emits blog/posts.json and bundles the Svelte island; the
-    -- client fetches the data-posts URL and renders the filterable list.
-    return pandoc.RawBlock(
-      "html",
-      '<div id="blog-index" data-posts="/blog/posts.json"></div>\n'
-        .. '<script type="module" src="/assets/islands/blog-index.js"></script>'
-    )
-  end
-  error("unknown component type: " .. tostring(ctype))
+  return pandoc.RawBlock("html", render_component(ctype, handler, component_attrs(el)))
 end
 
 -- Drive the whole pass from Pandoc() so items are loaded before any Div is
 -- expanded (deterministic ordering, independent of filter-traversal rules).
 function Pandoc(doc)
   load_items(doc.meta)
+  load_components_registry(doc.meta)
   return doc:walk({ Div = expand_div })
 end

@@ -15,19 +15,25 @@ function mathJax(): MathJaxGlobal | undefined {
   return (globalThis as { MathJax?: MathJaxGlobal }).MathJax;
 }
 
+function readyMathJax(): NonNullable<MathJaxGlobal["typesetPromise"]> | undefined {
+  let mj = mathJax();
+  if (mj && typeof mj.typesetPromise === "function") {
+    return mj.typesetPromise.bind(mj);
+  }
+  return undefined;
+}
+
 /** Resolve once MathJax has finished loading; reject if it never does. */
-function whenReady(timeoutMs = 10000): Promise<NonNullable<MathJaxGlobal["typesetPromise"]>> {
+function whenReady(timeoutMs: number): Promise<NonNullable<MathJaxGlobal["typesetPromise"]>> {
   return new Promise((resolve, reject) => {
-    let elapsed = 0;
-    const step = 50;
-    const poll = () => {
-      const mj = mathJax();
-      if (mj !== undefined && typeof mj.typesetPromise === "function") {
-        resolve(mj.typesetPromise.bind(mj));
+    let deadline = performance.now() + timeoutMs;
+    let poll = (): void => {
+      let typeset = readyMathJax();
+      if (typeset) {
+        resolve(typeset);
         return;
       }
-      elapsed += step;
-      if (elapsed >= timeoutMs) {
+      if (performance.now() >= deadline) {
         reject(
           new Error(
             "typesetMath: window.MathJax.typesetPromise never became available — the page must load MathJax",
@@ -35,15 +41,18 @@ function whenReady(timeoutMs = 10000): Promise<NonNullable<MathJaxGlobal["typese
         );
         return;
       }
-      setTimeout(poll, step);
+      requestAnimationFrame(poll);
     };
     poll();
   });
 }
 
 /** Re-typeset the math in `el` once MathJax is ready. */
-export async function typesetMath(el: Element): Promise<void> {
-  const typeset = await whenReady();
-  mathJax()?.typesetClear?.([el]);
+export async function typesetMath(el: Element, timeoutMs: number): Promise<void> {
+  let typeset = await whenReady(timeoutMs);
+  let mj = mathJax();
+  if (mj && typeof mj.typesetClear === "function") {
+    mj.typesetClear([el]);
+  }
   await typeset([el]);
 }

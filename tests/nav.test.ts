@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadNavigation } from "../src/nav.ts";
+import { loadNavigation } from "../src/site/nav.ts";
 
 async function navDir(toml: string): Promise<string> {
   let dir = await mkdtemp(join(tmpdir(), "nav-"));

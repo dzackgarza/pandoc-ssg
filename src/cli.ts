@@ -16,7 +16,7 @@
  *                                                        console/page errors,
  *                                                        missing landmarks, or
  *                                                        MathJax errors (O15).
- *                                                        Needs optional playwright.
+ *                                                        Needs Chromium installed.
  *   serve [--out DIR] [--port N]                        — preview the built tree (O13)
  *   deploy DIR [--content DIR] [--pandoc DIR] [--out DIR] — build, then mirror the
  *                                                        built tree into DIR with
@@ -28,12 +28,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import matter from "gray-matter";
 import { build } from "./build.ts";
+import { loadSiteConfig } from "./config.ts";
 import { deploySite } from "./deploy.ts";
 import { BuildError } from "./errors.ts";
-import { checkLinks, checkServedLinks } from "./links.ts";
-import { validatePageMeta } from "./schemas.ts";
+import { checkLinks, checkServedLinks } from "./site/links.ts";
+import { validatePageMeta } from "./content/schemas.ts";
 import { startServer } from "./serve.ts";
-import { validateSite } from "./validate.ts";
+import { validateSite } from "./site/validate.ts";
+import type { PageScaffold, PageType, SiteConfig } from "./types.ts";
 import { type VerifyFinding, verifySite } from "./verify.ts";
 
 /** The design layer (defaults, templates, filters) bundled with the generator. */
@@ -59,7 +61,17 @@ function buildOpts(flags: Map<string, string>): {
 /** Flag value, or a fallback when the flag is absent. */
 function flagOr(flags: Map<string, string>, name: string, fallback: string): string {
   let value = flags.get(name);
-  return value === undefined ? fallback : value;
+  if (typeof value === "string") {
+    return value;
+  }
+  return fallback;
+}
+
+function portFromFlag(portFlag: string | undefined): number {
+  if (portFlag === undefined) {
+    return 0;
+  }
+  return Number(portFlag);
 }
 
 /** Collect repeated `--flag value` pairs from argv into a flag map. */
@@ -115,23 +127,23 @@ async function runCheck(flags: Map<string, string>): Promise<number> {
   let opts = buildOpts(flags);
   let manifest = await build(opts);
   let issues = await validateSite(opts.outDir, manifest);
-  for (const issue of issues) {
+  issues.forEach((issue) => {
     process.stderr.write(`page issue: ${issue.issue} (in ${issue.page})\n`);
-  }
+  });
   let broken = await checkLinks(opts.outDir);
-  for (const link of broken) {
+  broken.forEach((link) => {
     process.stderr.write(`broken link: ${link.target} (in ${link.sourcePage})\n`);
-  }
+  });
   return issues.length + broken.length === 0 ? 0 : 1;
 }
 
 /** Write each verification finding to stderr. */
 function reportFindings(findings: Awaited<ReturnType<typeof verifySite>>): void {
-  for (const f of findings) {
+  findings.forEach((f) => {
     process.stderr.write(
       `verify: ${f.issue} on ${f.url}${f.detail === "" ? "" : ` — ${f.detail}`}\n`,
     );
-  }
+  });
 }
 
 /**
@@ -145,10 +157,11 @@ async function verifyOut(
   manifest: Awaited<ReturnType<typeof build>>,
 ): Promise<VerifyFinding[]> {
   let server = await startServer({ outDir });
+  let findings: VerifyFinding[] = [];
   try {
     let baseUrl = `http://localhost:${server.port}`;
     let [browserFindings, brokenLinks] = await Promise.all([
-      verifySite({ baseUrl, manifest }),
+      verifySite({ baseUrl, manifest, timeoutMs: 20000 }),
       checkServedLinks(baseUrl, manifest),
     ]);
     let linkFindings: VerifyFinding[] = brokenLinks.map((b) => ({
@@ -156,10 +169,11 @@ async function verifyOut(
       issue: "broken-link",
       detail: b.target,
     }));
-    return [...browserFindings, ...linkFindings];
+    findings = [...browserFindings, ...linkFindings];
   } finally {
     server.stop();
   }
+  return findings;
 }
 
 async function runVerify(flags: Map<string, string>): Promise<number> {
@@ -172,7 +186,7 @@ async function runVerify(flags: Map<string, string>): Promise<number> {
 
 async function runDeploy(positionals: string[], flags: Map<string, string>): Promise<number> {
   let deployDir = positionals[0];
-  if (deployDir === undefined) {
+  if (typeof deployDir === "undefined") {
     throw new BuildError("config", [], "missing deploy target directory: ssg deploy DIR");
   }
   let opts = buildOpts(flags);
@@ -195,41 +209,107 @@ async function runDeploy(positionals: string[], flags: Map<string, string>): Pro
 async function runServe(flags: Map<string, string>): Promise<number> {
   let outDir = flagOr(flags, "out", "dist");
   let portFlag = flags.get("port");
-  let port = portFlag === undefined ? undefined : Number(portFlag);
+  let port = portFromFlag(portFlag);
   let server = await startServer({ outDir, port });
   process.stdout.write(`serving ${outDir} at http://localhost:${server.port}/\n`);
   // Block until the process is terminated; the server keeps handling requests.
-  return new Promise<number>(() => {});
+  return await new Promise<number>(() => {});
 }
 
-async function runNewPost(positionals: string[], flags: Map<string, string>): Promise<number> {
+interface ScaffoldContext {
+  title: string;
+  slug: string;
+  date: string;
+  type: string;
+}
+
+async function runNewPage(
+  requestedType: string | undefined,
+  positionals: string[],
+  flags: Map<string, string>,
+): Promise<number> {
+  if (typeof requestedType === "undefined") {
+    throw new BuildError("scaffold", [], "missing page type");
+  }
   let title = positionals[0];
-  if (title === undefined) {
-    throw new BuildError("scaffold", [], "missing post title");
+  if (typeof title === "undefined") {
+    throw new BuildError("scaffold", [], `missing ${requestedType} title`);
   }
   let contentDir = flagOr(flags, "content", "content");
+  let pandocDir = flagOr(flags, "pandoc", BUNDLED_PANDOC);
+  let config = await loadSiteConfig(contentDir, pandocDir);
+  let pageType = scaffoldPageType(config, requestedType);
+  let scaffold = requiredScaffold(pageType, requestedType);
   let date = today();
-  let relPath = join("blog", `${date}-${slugify(title)}.md`);
+  let ctx: ScaffoldContext = { title, slug: slugify(title), date, type: pageType.name };
+  let dir = flagOr(flags, "dir", renderTemplate(scaffold.dir, ctx));
+  let relPath = join(dir, renderTemplate(scaffold.filename, ctx));
   let target = join(contentDir, relPath);
 
-  let frontmatter = matter.stringify("", {
+  let data: Record<string, unknown> = {
     site: { page: true },
     title,
-    date,
-  });
+    ...scaffoldFields(scaffold, ctx),
+  };
+  let site = data.site as { page: true; type?: string };
+  site.type = pageType.name;
+  let frontmatter = matter.stringify("", data);
   let validate = matter(frontmatter);
-  validatePageMeta(relPath, validate.data, "blog-post.v1");
+  validatePageMeta(relPath, validate.data, pageType.schema, config.schemas);
 
   if (await Bun.file(target).exists()) {
-    throw new BuildError("scaffold", [relPath], `post already exists: ${relPath}`);
+    throw new BuildError("scaffold", [relPath], `${pageType.name} already exists: ${relPath}`);
   }
-  await mkdir(join(contentDir, "blog"), { recursive: true });
+  await mkdir(join(contentDir, dir), { recursive: true });
   await writeFile(target, frontmatter, { encoding: "utf8", flag: "wx" });
   return 0;
 }
 
+function scaffoldPageType(config: SiteConfig, requestedType: string): PageType {
+  let direct = config.pageTypes[requestedType];
+  if (direct) {
+    return direct;
+  }
+  let matched = Object.values(config.pageTypes).find(
+    (pageType) => pageType.scaffold?.alias === requestedType,
+  );
+  if (matched) {
+    return matched;
+  }
+  throw new BuildError("scaffold", [], `unknown 'new' target: ${requestedType}`);
+}
+
+function requiredScaffold(pageType: PageType, requestedType: string): PageScaffold {
+  if (pageType.scaffold) {
+    return pageType.scaffold;
+  }
+  throw new BuildError("scaffold", [], `page type has no scaffold: ${requestedType}`);
+}
+
+function scaffoldFields(
+  scaffold: PageScaffold,
+  ctx: ScaffoldContext,
+): Record<string, unknown> {
+  let fields: Record<string, unknown> = {};
+  Object.entries(scaffold.fields ?? {}).forEach(([name, value]) => {
+    fields[name] = renderTemplate(value, ctx);
+  });
+  return fields;
+}
+
+function renderTemplate(template: string, ctx: ScaffoldContext): string {
+  return template
+    .replaceAll("{title}", ctx.title)
+    .replaceAll("{slug}", ctx.slug)
+    .replaceAll("{date}", ctx.date)
+    .replaceAll("{type}", ctx.type);
+}
+
 async function dispatch(argv: string[]): Promise<number> {
   let [subcommand, ...rest] = argv;
+  if (subcommand === undefined) {
+    throw new BuildError("config", [], "missing subcommand");
+  }
 
   if (subcommand === "build") {
     return await runBuild(parseFlags(rest).flags);
@@ -254,29 +334,29 @@ async function dispatch(argv: string[]): Promise<number> {
 
   if (subcommand === "new") {
     let [kind, ...newRest] = rest;
-    if (kind !== "post") {
-      throw new BuildError("scaffold", [], `unknown 'new' target: ${String(kind)}`);
-    }
     let { flags, positionals } = parseFlags(newRest);
-    return await runNewPost(positionals, flags);
+    return await runNewPage(kind, positionals, flags);
   }
 
-  throw new BuildError("config", [], `unknown subcommand: ${String(subcommand)}`);
+  throw new BuildError("config", [], `unknown subcommand: ${subcommand}`);
 }
 
-export async function main(argv: string[]): Promise<number> {
+async function main(argv: string[]): Promise<number> {
   // Single boundary renderer: a thrown BuildError becomes a stderr report and a
   // nonzero return; any other exception propagates (crash) rather than being swallowed.
+  let status = 0;
   try {
-    return await dispatch(argv);
+    status = await dispatch(argv);
   } catch (err) {
     if (err instanceof BuildError) {
       let files = err.files.length > 0 ? `\n${err.files.join("\n")}` : "";
       process.stderr.write(`${err.kind} error: ${err.message}${files}\n`);
-      return 1;
+      status = 1;
+    } else {
+      return await Promise.reject(err);
     }
-    throw err;
   }
+  return status;
 }
 
 if (import.meta.main) {

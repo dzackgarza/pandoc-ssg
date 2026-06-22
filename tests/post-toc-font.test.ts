@@ -44,7 +44,7 @@ describe("post TOC entries use the body serif, not the sans display font", () =>
       await page.goto(`http://localhost:${server.port}/`, { waitUntil: "load" });
       entryFontFamily = (await page.evaluate(
         "getComputedStyle(document.getElementById('entry')).fontFamily",
-      )) as string;
+      ));
       await page.close();
     } finally {
       await browser.close();

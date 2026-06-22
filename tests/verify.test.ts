@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type BrokenLink, checkServedLinks } from "../src/links.ts";
+import { type BrokenLink, checkServedLinks } from "../src/site/links.ts";
 import { type RunningServer, startServer } from "../src/serve.ts";
 import type { Manifest } from "../src/types.ts";
 import { type VerifyFinding, verifySite } from "../src/verify.ts";
@@ -20,9 +20,9 @@ const PAGES: Record<string, string> = {
   good: page("<h1>fine</h1>"),
   console: page('<h1>e</h1><script>console.error("boom")</script>'),
   // Third-party embeds (YouTube) log a "Permissions policy violation" when they
-  // use a feature the host page does not grant (e.g. compute-pressure). This is
-  // frame noise, not a page defect — like the net::/404 subresource noise already
-  // excluded — and must not gate the build.
+  // use a feature the host page does not grant (e.g. compute-pressure). Verify
+  // reports that browser-console failure in the same console-error channel as
+  // other page console errors.
   permpolicy: page(
     '<h1>e</h1><script>console.error("[Violation] Permissions policy violation: compute-pressure is not allowed in this document.")</script>',
   ),
@@ -44,7 +44,7 @@ const PAGES: Record<string, string> = {
 
 function manifestFor(keys: string[]): Manifest {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     routes: keys.map((k) => ({
       source: `${k}.md`,
       url: `/${k}/`,
@@ -77,6 +77,7 @@ describe("O15: browser verification catches runtime defects", () => {
     findings = await verifySite({
       baseUrl: `http://localhost:${server.port}`,
       manifest: manifestFor(Object.keys(PAGES)),
+      timeoutMs: 20000,
     });
   }, 60000);
 
@@ -93,8 +94,8 @@ describe("O15: browser verification catches runtime defects", () => {
     expect(forUrl("/console/")).toContain("console-error");
   });
 
-  test("a third-party permissions-policy violation is NOT flagged as a console error", () => {
-    expect(forUrl("/permpolicy/")).not.toContain("console-error");
+  test("a third-party permissions-policy violation is reported as a console error", () => {
+    expect(forUrl("/permpolicy/")).toContain("console-error");
   });
 
   test("an uncaught exception is reported as a page error", () => {

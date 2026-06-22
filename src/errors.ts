@@ -1,3 +1,5 @@
+import { parse } from "smol-toml";
+
 export type BuildErrorKind =
   | "config"
   | "schema"
@@ -18,9 +20,28 @@ export class BuildError extends Error {
   readonly files: string[];
 
   constructor(kind: BuildErrorKind, files: string[], message: string, cause?: unknown) {
-    super(message, cause === undefined ? undefined : { cause });
+    if (cause === undefined) {
+      super(message);
+    } else {
+      super(message, { cause });
+    }
     this.name = "BuildError";
     this.kind = kind;
     this.files = files;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export function parseToml(
+  raw: string,
+  kind: BuildErrorKind,
+  file: string,
+  label: string,
+): unknown {
+  try {
+    return parse(raw);
+  } catch (err) {
+    let detail = err instanceof Error ? err.message : String(err);
+    throw new BuildError(kind, [file], `malformed ${label}: ${detail}`, err);
   }
 }

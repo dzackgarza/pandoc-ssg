@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse } from "node-html-parser";
-import type { Manifest } from "./types.ts";
+import type { Manifest } from "../types.ts";
 
 export interface PageIssue {
   /** dist-relative output path of the page */
@@ -28,13 +28,11 @@ export interface PageIssue {
  * array means every page passed.
  */
 export async function validateSite(distDir: string, manifest: Manifest): Promise<PageIssue[]> {
-  let issues: PageIssue[] = [];
-  for (const route of manifest.routes) {
+  let perRouteIssues = await Promise.all(manifest.routes.map(async (route) => {
     let html = await readFile(join(distDir, route.output), "utf8");
-    for (const issue of pageIssues(html)) {
-      issues.push({ page: route.output, issue });
-    }
-  }
+    return pageIssues(html).map((issue) => ({ page: route.output, issue }));
+  }));
+  let issues = perRouteIssues.flat();
   issues.sort((a, b) => {
     if (a.page !== b.page) {
       return a.page < b.page ? -1 : 1;
@@ -56,11 +54,13 @@ function pageIssues(html: string): string[] {
     found.push("missing-doctype");
   }
   let root = parse(html);
-  if (root.querySelector("main") === null) {
+  if (!root.querySelector("main")) {
     found.push("missing-main");
   }
   let title = root.querySelector("title");
-  if (title === null || title.text.trim() === "") {
+  if (!title) {
+    found.push("empty-title");
+  } else if (title.text.trim() === "") {
     found.push("empty-title");
   }
   if (html.includes("{%")) {

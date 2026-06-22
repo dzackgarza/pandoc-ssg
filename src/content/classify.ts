@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import matter from "gray-matter";
-import type { ClassifiedFile, FileClass, SiteConfig } from "./types.ts";
+import type { ClassifiedFile, FileClass, SiteConfig } from "../types.ts";
 
 /**
  * Classify every scanned file into exactly one FileClass (O1):
@@ -10,25 +10,28 @@ import type { ClassifiedFile, FileClass, SiteConfig } from "./types.ts";
  * - "page":     a .md file whose YAML frontmatter has `site.page: true`
  * - "asset":    everything else, including non-opt-in markdown
  */
-export async function classifyFiles(
+export function classifyFiles(
   contentDir: string,
   relPaths: string[],
-  config: SiteConfig,
+  config: Pick<SiteConfig, "passthrough">,
 ): Promise<ClassifiedFile[]> {
-  let result: ClassifiedFile[] = [];
-  for (const relPath of relPaths) {
-    result.push({ relPath, class: await classifyOne(contentDir, relPath, config) });
-  }
-  return result;
+  return Promise.all(
+    relPaths.map(async (relPath) => {
+      let fileClass = await classifyOne(contentDir, relPath, config);
+      return { relPath, class: fileClass };
+    }),
+  );
 }
 
 async function classifyOne(
   contentDir: string,
   relPath: string,
-  config: SiteConfig,
+  config: Pick<SiteConfig, "passthrough">,
 ): Promise<FileClass> {
-  let segment = relPath.split("/")[0];
-  let firstSegment = segment === undefined ? "" : segment;
+  let firstSegment = relPath.split("/")[0];
+  if (!firstSegment) {
+    throw new Error("content path must not be empty");
+  }
   if (firstSegment.startsWith("_")) {
     return "reserved";
   }

@@ -1,0 +1,7 @@
+[[dirTypes]]
+dir = "essays"
+type = "essay"
+
+[pageTypes.essay]
+template = "page.html"
+defaults = "defaults/page.yaml"

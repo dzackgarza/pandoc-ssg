@@ -3,7 +3,7 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
-import type { Manifest, RouteEntry } from "../src/types.ts";
+import type { Manifest, ManifestDependency, RouteEntry } from "../src/types.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -26,6 +26,15 @@ async function walk(root: string, prefix = ""): Promise<string[]> {
 
 function sortRoutes(routes: RouteEntry[]): RouteEntry[] {
   return [...routes].sort((a, b) => a.source.localeCompare(b.source));
+}
+
+function routeCore(route: RouteEntry): Omit<RouteEntry, "dependencies"> {
+  const { dependencies: _dependencies, ...core } = route;
+  return core;
+}
+
+function sortedDependencyKeys(dependencies: ManifestDependency[]): string[] {
+  return dependencies.map((dep) => [dep.kind, dep.origin, dep.path, dep.key ?? ""].join("\u0000")).sort();
 }
 
 const EXPECTED_ROUTES: RouteEntry[] = [
@@ -86,14 +95,14 @@ describe("O6: manifest is the single contract", () => {
       pandocDir: PANDOC_DIR,
       outDir,
     });
-  });
+  }, 30000);
 
   afterAll(async () => {
     await rm(outDir, { recursive: true, force: true });
   });
 
-  test("schemaVersion is 1", () => {
-    expect(returned.schemaVersion).toBe(1);
+  test("schemaVersion is 2", () => {
+    expect(returned.schemaVersion).toBe(2);
   });
 
   test("returned manifest deep-equals the written site-manifest.json", async () => {
@@ -103,7 +112,34 @@ describe("O6: manifest is the single contract", () => {
   });
 
   test("routes are EXACTLY the expected set", () => {
-    expect(sortRoutes(returned.routes)).toEqual(sortRoutes(EXPECTED_ROUTES));
+    expect(sortRoutes(returned.routes).map(routeCore)).toEqual(sortRoutes(EXPECTED_ROUTES));
+  });
+
+  test("route entries carry source, registry, nav, macro, and data dependencies", () => {
+    const about = returned.routes.find((r) => r.source === "about.md");
+    expect(about?.dependencies).toContainEqual({ kind: "source-page", path: "about.md", origin: "content" });
+    expect(about?.dependencies).toContainEqual({ kind: "template", path: "page.html", origin: "pandoc" });
+    expect(about?.dependencies).toContainEqual({ kind: "defaults", path: "defaults/page.yaml", origin: "pandoc" });
+    expect(about?.dependencies).toContainEqual({ kind: "navigation", path: "_data/navigation.toml", origin: "content" });
+    expect(about?.dependencies).toContainEqual({ kind: "site-config", path: "_site.toml", origin: "content" });
+    expect(about?.dependencies).toContainEqual({ kind: "site-config", path: "registry.toml", origin: "pandoc" });
+    expect(about?.dependencies).toContainEqual(expect.objectContaining({ kind: "macro-manifest", origin: "absolute" }));
+  });
+
+  test("passthrough entries carry their copied source dependency", () => {
+    const app = returned.passthrough.find((p) => p.output === "standalone-app/app.js");
+    expect(app?.dependencies).toEqual([
+      { kind: "passthrough-source", path: "standalone-app/app.js", origin: "content" },
+    ]);
+  });
+
+  test("all dependency arrays are deterministically sorted", () => {
+    for (const entry of [...returned.routes, ...returned.passthrough, ...returned.generated]) {
+      const dependencies = entry.dependencies ?? [];
+      expect(dependencies.map((dep) => [dep.kind, dep.origin, dep.path, dep.key ?? ""].join("\u0000"))).toEqual(
+        sortedDependencyKeys(dependencies),
+      );
+    }
   });
 
   test("passthrough outputs cover every asset and opaque file exactly", () => {

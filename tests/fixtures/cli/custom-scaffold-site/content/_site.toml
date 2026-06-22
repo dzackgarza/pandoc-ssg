@@ -1,0 +1,18 @@
+[pageTypes.note]
+source = "content"
+schema = "note.v1"
+template = "_templates/note.html"
+defaults = "_defaults/note.yaml"
+
+[pageTypes.note.scaffold]
+dir = "notes"
+filename = "{slug}.md"
+
+[pageTypes.note.scaffold.fields]
+summary = "Draft note"
+
+[schemas."note.v1"]
+fields = [
+  { name = "title", type = "string", required = true },
+  { name = "summary", type = "string", required = true },
+]
