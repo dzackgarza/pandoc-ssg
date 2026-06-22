@@ -3,7 +3,7 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
-import { loadAppConfig } from "../src/config.ts";
+import { loadAppConfig, loadSiteConfig } from "../src/config.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -335,6 +335,18 @@ describe("generator config (XDG) is required, never defaulted", () => {
     });
     process.env.XDG_CONFIG_HOME = saved === undefined ? "" : saved;
     await rm(empty, { recursive: true, force: true });
+  });
+});
+
+describe("content site config is required, never defaulted", () => {
+  test("a missing content/_site.toml fails loudly with kind=config", async () => {
+    const contentDir = await mkdtemp(join(tmpdir(), "ssg-missing-site-config-"));
+    await expect(loadSiteConfig(contentDir, PANDOC_DIR)).rejects.toMatchObject({
+      name: "BuildError",
+      kind: "config",
+      files: ["_site.toml"],
+    });
+    await rm(contentDir, { recursive: true, force: true });
   });
 });
 
