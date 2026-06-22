@@ -23,14 +23,34 @@ export interface SiteConfig {
   islands: Record<string, IslandEntry>;
   /** generated artifact rules; C4 owns manifest dependency metadata */
   generatedArtifacts: GeneratedArtifactRule[];
+  /** site-wide Lua filters applied to every rendered page */
+  filters?: RegistryFile[];
 }
 
-/** A registered page type: schema + template pairing. */
+export type RegistrySource = "pandoc" | "content";
+
+export interface RegistryFile {
+  path: string;
+  source?: RegistrySource;
+}
+
+export interface PageScaffold {
+  alias?: string;
+  dir: string;
+  filename: string;
+  fields?: Record<string, string>;
+}
+
+/** A registered page type: schema + template/default/filter/scaffold contract. */
 export interface PageType {
   name: string;
   schema: string;
   template: string;
   defaults: string;
+  filters?: RegistryFile[];
+  scaffold?: PageScaffold;
+  feed?: "blog";
+  source?: RegistrySource;
 }
 
 export type SchemaFieldType = "string" | "date" | "string[]";

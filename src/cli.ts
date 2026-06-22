@@ -35,6 +35,7 @@ import { checkLinks, checkServedLinks } from "./site/links.ts";
 import { validatePageMeta } from "./content/schemas.ts";
 import { startServer } from "./serve.ts";
 import { validateSite } from "./site/validate.ts";
+import type { PageScaffold, PageType, SiteConfig } from "./types.ts";
 import { type VerifyFinding, verifySite } from "./verify.ts";
 
 /** The design layer (defaults, templates, filters) bundled with the generator. */
@@ -219,32 +220,94 @@ async function runServe(flags: Map<string, string>): Promise<number> {
   return await new Promise<number>((): boolean => true);
 }
 
-async function runNewPost(positionals: string[], flags: Map<string, string>): Promise<number> {
+interface ScaffoldContext {
+  title: string;
+  slug: string;
+  date: string;
+  type: string;
+}
+
+async function runNewPage(
+  requestedType: string | undefined,
+  positionals: string[],
+  flags: Map<string, string>,
+): Promise<number> {
+  if (typeof requestedType === "undefined") {
+    throw new BuildError("scaffold", [], "missing page type");
+  }
   let title = positionals[0];
   if (typeof title === "undefined") {
-    throw new BuildError("scaffold", [], "missing post title");
+    throw new BuildError("scaffold", [], `missing ${requestedType} title`);
   }
   let contentDir = flagOr(flags, "content", "content");
   let pandocDir = flagOr(flags, "pandoc", BUNDLED_PANDOC);
+  let config = await loadSiteConfig(contentDir, pandocDir);
+  let pageType = scaffoldPageType(config, requestedType);
+  let scaffold = requiredScaffold(pageType, requestedType);
   let date = today();
-  let relPath = join("blog", `${date}-${slugify(title)}.md`);
+  let ctx: ScaffoldContext = { title, slug: slugify(title), date, type: pageType.name };
+  let dir = flagOr(flags, "dir", renderTemplate(scaffold.dir, ctx));
+  let relPath = join(dir, renderTemplate(scaffold.filename, ctx));
   let target = join(contentDir, relPath);
 
-  let frontmatter = matter.stringify("", {
+  let data: Record<string, unknown> = {
     site: { page: true },
     title,
-    date,
-  });
+    ...scaffoldFields(scaffold, ctx),
+  };
+  let site = data.site as { page: true; type?: string };
+  site.type = pageType.name;
+  let frontmatter = matter.stringify("", data);
   let validate = matter(frontmatter);
-  let config = await loadSiteConfig(contentDir, pandocDir);
-  validatePageMeta(relPath, validate.data, "blog-post.v1", config.schemas);
+  validatePageMeta(relPath, validate.data, pageType.schema, config.schemas);
 
   if (await Bun.file(target).exists()) {
-    throw new BuildError("scaffold", [relPath], `post already exists: ${relPath}`);
+    throw new BuildError("scaffold", [relPath], `${pageType.name} already exists: ${relPath}`);
   }
-  await mkdir(join(contentDir, "blog"), { recursive: true });
+  await mkdir(join(contentDir, dir), { recursive: true });
   await writeFile(target, frontmatter, { encoding: "utf8", flag: "wx" });
   return 0;
+}
+
+function scaffoldPageType(config: SiteConfig, requestedType: string): PageType {
+  let direct = config.pageTypes[requestedType];
+  if (direct) {
+    return direct;
+  }
+  let matched = Object.values(config.pageTypes).find(
+    (pageType) => pageType.scaffold?.alias === requestedType,
+  );
+  if (matched) {
+    return matched;
+  }
+  throw new BuildError("scaffold", [], `unknown 'new' target: ${requestedType}`);
+}
+
+function requiredScaffold(pageType: PageType, requestedType: string): PageScaffold {
+  if (pageType.scaffold) {
+    return pageType.scaffold;
+  }
+  throw new BuildError("scaffold", [], `page type has no scaffold: ${requestedType}`);
+}
+
+function scaffoldFields(
+  scaffold: PageScaffold,
+  ctx: ScaffoldContext,
+): Record<string, unknown> {
+  let fields: Record<string, unknown> = {};
+  Object.entries(scaffold.fields ?? {}).forEach(([name, value]) => {
+    fields[name] = renderTemplate(value, ctx);
+    return true;
+  });
+  return fields;
+}
+
+function renderTemplate(template: string, ctx: ScaffoldContext): string {
+  return template
+    .replaceAll("{title}", ctx.title)
+    .replaceAll("{slug}", ctx.slug)
+    .replaceAll("{date}", ctx.date)
+    .replaceAll("{type}", ctx.type);
 }
 
 async function dispatch(argv: string[]): Promise<number> {
@@ -273,13 +336,8 @@ async function dispatch(argv: string[]): Promise<number> {
 
   if (subcommand === "new") {
     let [kind, ...newRest] = rest;
-    if (kind !== "post") {
-      return await Promise.reject(
-        new BuildError("scaffold", [], `unknown 'new' target: ${String(kind)}`),
-      );
-    }
     let { flags, positionals } = parseFlags(newRest);
-    return await runNewPost(positionals, flags);
+    return await runNewPage(kind, positionals, flags);
   }
 
   return await Promise.reject(

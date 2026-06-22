@@ -7,6 +7,15 @@ defaults = "defaults/page.yaml"
 schema = "blog-post.v1"
 template = "blog.html"
 defaults = "defaults/blog.yaml"
+feed = "blog"
+
+[pageTypes."blog-post".scaffold]
+alias = "post"
+dir = "blog"
+filename = "{date}-{slug}.md"
+
+[pageTypes."blog-post".scaffold.fields]
+date = "{date}"
 
 [schemas."page.v1"]
 fields = [

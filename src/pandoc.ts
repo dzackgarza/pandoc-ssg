@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import * as YAML from "yaml";
 import { BuildError } from "./errors.ts";
-import type { NavItem, PageType } from "./types.ts";
+import type { NavItem, PageType, RegistryFile } from "./types.ts";
 
 export interface RenderInput {
   /** absolute path of the source markdown file */
@@ -26,6 +26,8 @@ export interface RenderInput {
   contentRoot: string;
   /** the author's pandoc tree (PANDOC_DIR); resolves the tikzcd filter's template + styles */
   pandocHome: string;
+  /** site-wide Lua filters declared by content/_site.toml or bundled registry */
+  siteFilters?: RegistryFile[];
   /**
    * Extra template metadata merged into the pandoc metadata (e.g. a blog post's
    * friendly `date_long`, `prev`/`next` neighbours, tag/category chips). The
@@ -83,7 +85,20 @@ function navToMeta(items: NavItem[]): Record<string, unknown>[] {
  * BuildError(kind="pandoc").
  */
 export async function renderPage(input: RenderInput): Promise<string> {
-  let defaultsPath = join(input.pandocDir, input.pageType.defaults);
+  let defaultsPath = registryPath(
+    { path: input.pageType.defaults, source: input.pageType.source },
+    input.contentRoot,
+    input.pandocDir,
+  );
+  let templatePath = registryPath(
+    { path: input.pageType.template, source: input.pageType.source },
+    input.contentRoot,
+    input.pandocDir,
+  );
+  let filters = [...(input.siteFilters ?? []), ...(input.pageType.filters ?? [])].flatMap((filter) => [
+    "--lua-filter",
+    registryPath(filter, input.contentRoot, input.pandocDir),
+  ]);
 
   let metadata: Record<string, unknown> = {
     nav: navToMeta(input.nav),
@@ -119,6 +134,9 @@ export async function renderPage(input: RenderInput): Promise<string> {
         "pandoc",
         "--defaults",
         defaultsPath,
+        "--template",
+        templatePath,
+        ...filters,
         "--metadata-file",
         metaFile,
         resolve(input.sourcePath),
@@ -151,4 +169,8 @@ export async function renderPage(input: RenderInput): Promise<string> {
     await rm(metaDir, { recursive: true, force: true });
   }
   return rendered;
+}
+
+function registryPath(file: RegistryFile, contentRoot: string, pandocDir: string): string {
+  return join(file.source === "content" ? contentRoot : pandocDir, file.path);
 }

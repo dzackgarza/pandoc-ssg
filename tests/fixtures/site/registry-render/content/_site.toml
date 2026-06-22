@@ -1,0 +1,16 @@
+[[dirTypes]]
+dir = "essays"
+type = "essay"
+
+[pageTypes.essay]
+source = "content"
+schema = "essay.v1"
+template = "_templates/essay.html"
+defaults = "_defaults/essay.yaml"
+filters = ["_filters/essay.lua"]
+
+[schemas."essay.v1"]
+fields = [
+  { name = "title", type = "string", required = true },
+  { name = "subtitle", type = "string", required = true },
+]

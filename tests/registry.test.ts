@@ -58,12 +58,54 @@ describe("C1: registry foundation", () => {
     expect(html).toContain('<h2 id="registry-controlled-heading">Registry Controlled Heading</h2>');
   });
 
+  test("content registry owns a custom page template, defaults file, and filter", async () => {
+    const outDir = await tempDir("ssg-registry-render-");
+    const manifest = await build({
+      contentDir: join(FIXTURES, "registry-render", "content"),
+      pandocDir: PANDOC_DIR,
+      outDir,
+    });
+
+    expect(manifest.routes).toContainEqual({
+      source: "essays/sample.md",
+      url: "/essays/sample/",
+      output: "essays/sample/index.html",
+      type: "essay",
+      schema: "essay.v1",
+    });
+
+    const html = await readFile(join(outDir, "essays", "sample", "index.html"), "utf8");
+    expect(html).toContain('data-template="essay"');
+    expect(html).toContain('<p class="subtitle">Custom template and filter</p>');
+    expect(html).toContain('<p class="registry-filter">filtered-by-content</p>');
+  });
+
   test("malformed content registry page types fail before rendering", async () => {
     const outDir = await tempDir("ssg-registry-bad-");
     expect(
       await captureRejection(
         build({
           contentDir: join(FIXTURES, "registry-malformed", "content"),
+          pandocDir: PANDOC_DIR,
+          outDir,
+        }),
+      ),
+    ).toMatchObject({
+      rejected: true,
+      error: {
+        name: "BuildError",
+        kind: "config",
+        files: ["_site.toml"],
+      },
+    });
+  });
+
+  test("unknown registry filter paths fail before rendering", async () => {
+    const outDir = await tempDir("ssg-registry-missing-filter-");
+    expect(
+      await captureRejection(
+        build({
+          contentDir: join(FIXTURES, "registry-missing-filter", "content"),
           pandocDir: PANDOC_DIR,
           outDir,
         }),

@@ -186,6 +186,7 @@ interface RenderInputs {
   contentDir: string;
   pandocHome: string;
   postCtx: Map<string, Record<string, unknown>>;
+  siteFilters: SiteConfig["filters"];
 }
 
 interface IslandUsage {
@@ -225,6 +226,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     contentDir,
     pandocHome: appConfig.pandocHome,
     postCtx,
+    siteFilters: config.filters,
   });
   let islandUsage = discoverIslandUsage(rendered);
 
@@ -292,7 +294,7 @@ function appendBlogPost(
   relPath: string,
   pageType: PageType,
 ): boolean {
-  if (pageType.name !== "blog-post") {
+  if (pageType.feed !== "blog") {
     return true;
   }
   if (!meta.date) {
@@ -357,6 +359,7 @@ async function renderPlannedPages(
       items: inputs.items,
       contentRoot: inputs.contentDir,
       pandocHome: inputs.pandocHome,
+      siteFilters: inputs.siteFilters,
       extraMeta: inputs.postCtx.get(page.route.url),
     });
     rendered.set(page.route.output, html);
