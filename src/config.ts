@@ -383,6 +383,12 @@ function registryFile(path: string, source: RegistrySource | undefined): Registr
 
 function registryPath(file: RegistryFile, contentDir: string, pandocDir: string): string {
   let base = file.source === "content" ? contentDir : pandocDir;
+  if (file.source !== "content" && file.path.startsWith("islands/")) {
+    return join(pandocDir, "..", file.path);
+  }
+  if (file.source !== "content" && file.path.endsWith(".html") && !file.path.includes("/")) {
+    return join(base, "templates", file.path);
+  }
   return join(base, file.path);
 }
 

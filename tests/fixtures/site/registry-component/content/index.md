@@ -4,5 +4,5 @@ site:
   page: true
 ---
 
-::: {.component type="callout" title="Registry Callout" items="notes"}
+:::{.component type="callout" title="Registry Callout" items="notes"}
 :::

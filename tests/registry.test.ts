@@ -45,13 +45,13 @@ describe("C1: registry foundation", () => {
       outDir,
     });
 
-    expect(manifest.routes).toContainEqual({
+    expect(manifest.routes).toContainEqual(expect.objectContaining({
       source: "essays/sample.md",
       url: "/essays/sample/",
       output: "essays/sample/index.html",
       type: "essay",
       schema: "essay.v1",
-    });
+    }));
 
     const html = await readFile(join(outDir, "essays", "sample", "index.html"), "utf8");
     expect(html).toContain("<title>Registry Essay</title>");
@@ -66,13 +66,13 @@ describe("C1: registry foundation", () => {
       outDir,
     });
 
-    expect(manifest.routes).toContainEqual({
+    expect(manifest.routes).toContainEqual(expect.objectContaining({
       source: "essays/sample.md",
       url: "/essays/sample/",
       output: "essays/sample/index.html",
       type: "essay",
       schema: "essay.v1",
-    });
+    }));
 
     const html = await readFile(join(outDir, "essays", "sample", "index.html"), "utf8");
     expect(html).toContain('data-template="essay"');

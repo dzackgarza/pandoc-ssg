@@ -13,7 +13,10 @@ export async function buildIsland(
   stagingDir: string,
   roots: { contentDir: string; pandocDir: string },
 ): Promise<string> {
-  let entry = join(island.source === "content" ? roots.contentDir : roots.pandocDir, island.entry);
+  let entry =
+    island.source === "content"
+      ? join(roots.contentDir, island.entry)
+      : join(roots.pandocDir, "..", island.entry);
   let outDir = join(stagingDir, dirname(island.output));
   await viteBuild({
     configFile: false,

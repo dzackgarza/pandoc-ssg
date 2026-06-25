@@ -4,5 +4,5 @@ site:
   page: true
 ---
 
-::: {.component type="mini-list" items="notes"}
+:::{.component type="mini-list" items="notes"}
 :::

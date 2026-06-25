@@ -180,6 +180,12 @@ export async function renderPage(input: RenderInput): Promise<string> {
 }
 
 function registryPath(file: RegistryFile, contentRoot: string, pandocDir: string): string {
+  if (file.source !== "content" && file.path.startsWith("islands/")) {
+    return join(pandocDir, "..", file.path);
+  }
+  if (file.source !== "content" && file.path.endsWith(".html") && !file.path.includes("/")) {
+    return join(pandocDir, "templates", file.path);
+  }
   return join(file.source === "content" ? contentRoot : pandocDir, file.path);
 }
 
