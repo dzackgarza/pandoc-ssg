@@ -188,7 +188,8 @@ dist/
 
 The exact names are negotiable, but the boundary is not.
 `content/` is the authoring surface.
-`pandoc/` is the design/document-transformation surface.
+The selected Pandoc bundle is the design/document-transformation surface.
+That bundle may be a repo-local `pandoc/` directory, a shared theme package, or the starter bundle shipped with the generator.
 `kernel/` is the small, boring compiler.
 `islands/` is optional interactivity.
 `dist/` is disposable output.
@@ -784,8 +785,9 @@ The system should be understood as four layers.
 The first layer is **content**. It contains pages, literal downloadable files, static assets, data files, and standalone sub-sites.
 Authors live here.
 
-The second layer is **Pandoc design**. It contains defaults, templates, partials, Lua filters, and MathJax configuration.
-Site layout and semantic transformations live here.
+The second layer is the **selected Pandoc bundle**. It contains defaults, templates, partials, Lua filters, CSS/assets, and MathJax configuration.
+Site layout, visual identity, page chrome, and semantic transformations live here.
+For a real site this bundle is site-owned or theme-package-owned; it is not part of the generic generator kernel.
 
 The third layer is the **kernel**. It scans, validates, routes, invokes Pandoc, copies assets, writes the manifest, and fails fast.
 It should be small enough to read in one sitting.
@@ -793,6 +795,6 @@ It should be small enough to read in one sitting.
 The fourth layer is **optional interactivity**. It contains typed islands such as galleries, card scrollers, search, or standalone app wrappers.
 It should never be required for ordinary pages.
 
-This gives the desired “set it and forget it” workflow: after the templates, schemas, filters, and data-backed components are established, ordinary content creation is just creating Markdown files and nearby assets in `content/`. Changing the nav is editing `content/_data/navigation.toml`. Changing layout is editing Pandoc templates.
+This gives the desired “set it and forget it” workflow: after the templates, schemas, filters, and data-backed components are established, ordinary content creation is just creating Markdown files and nearby assets in `content/`. Changing the nav is editing `content/_data/navigation.toml`. Changing layout is editing the selected Pandoc bundle's templates/CSS.
 Adding a new component is adding a schema, a Pandoc component transform, and optionally an island.
 The compiler core should rarely change.

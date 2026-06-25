@@ -68,6 +68,14 @@ A content repo may override `--pandoc` to supply its own templates/filters/defau
 The MathJax macro manifest and the pandoc tree are read from the static config (see Requirements), not flags.
 `deploy` browser-verifies the built tree and refuses to publish if any page has a rendering defect.
 
+## Theme ownership
+
+`pandoc-ssg` is the generic generator.
+It may ship a starter `pandoc/` design layer so a new site can render immediately, but ongoing site aesthetics belong to the site: its Pandoc templates, CSS, filters, data, or an explicit theme package selected through `--pandoc`.
+
+Do not treat the bundled starter theme as the canonical home for a content site's visual identity.
+Changing the current site's Tufte/Pico choices, navbar styling, typography, or page chrome should happen in the content repo's design layer or a site-owned theme override unless the intended change is explicitly to the packaged default theme.
+
 ## Content layout
 
 ```
@@ -84,10 +92,7 @@ content/
 
 A Markdown file is compiled only if its frontmatter opts in with `site.page: true`; everything else is copied byte-for-byte.
 The build writes `dist/site-manifest.json` as the single contract every downstream tool consumes.
-Manifest schema v2 records deterministic dependency metadata on routes, passthrough
-copies, and generated artifacts so downstream tools can tell which source page,
-registry file, template/defaults/filter, data key, theme asset, macro manifest, or
-island entry produced each output.
+Manifest schema v2 records deterministic dependency metadata on routes, passthrough copies, and generated artifacts so downstream tools can tell which source page, registry file, template/defaults/filter, data key, theme asset, macro manifest, or island entry produced each output.
 
 ## Components and transclusion
 
@@ -104,16 +109,11 @@ Fenced-div components expand from `_data/items.yaml`:
 :::
 ```
 
-Component handlers are registry entries. The bundled registry declares the
-built-ins; a content repo can add `[componentHandlers.<type>]` with either a
-built-in `handler` id or a content-owned Lua `module`. Custom Lua modules return
-a function or `{ render = function(...) }` and receive component attributes,
-`_data/items.yaml`, the content root, and registry metadata.
+Component handlers are registry entries.
+The bundled registry declares the built-ins; a content repo can add `[componentHandlers.<type>]` with either a built-in `handler` id or a content-owned Lua `module`. Custom Lua modules return a function or `{ render = function(...) }` and receive component attributes, `_data/items.yaml`, the content root, and registry metadata.
 
-Interactive islands are also registry entries. `[islands.<name>]` declares the
-entrypoint, output bundle path, optional data output path, data source, and mount
-name; component handlers emit `data-ssg-island="<name>"` to request the bundle and
-any declared generated data artifact.
+Interactive islands are also registry entries.
+`[islands.<name>]` declares the entrypoint, output bundle path, optional data output path, data source, and mount name; component handlers emit `data-ssg-island="<name>"` to request the bundle and any declared generated data artifact.
 
 ## Development
 
