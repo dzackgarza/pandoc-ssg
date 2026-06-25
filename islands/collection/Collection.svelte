@@ -143,7 +143,8 @@
         <div class="collection__body">
           <span class="collection__title">{item.title}</span>
           {#if item.category}<span class="collection__cat">{item.category}</span>{/if}
-          {#if item.description}<p class="collection__desc">{item.description}</p>{/if}
+          <!-- description is author-authored trusted content; allow inline links/markup -->
+          {#if item.description}<p class="collection__desc">{@html item.description}</p>{/if}
           {#if item.links && item.links.length > 0}
             <span class="collection__links">
               {#each item.links as link}
@@ -157,7 +158,9 @@
                 src={embedSrc(item.video)}
                 title={item.title}
                 loading="lazy"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerpolicy="strict-origin-when-cross-origin"
                 allowfullscreen
               ></iframe>
             </div>
