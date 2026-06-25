@@ -1552,3 +1552,45 @@ I cannot, from this session, inspect the rendered page, computed CSS, actual fon
 
 A real case-study design analysis still requires one of: full-page screenshots, raw HTML/CSS, or browser-render access to the site.
 Without that, I should not produce the visual analysis.
+
+* * *
+
+# Site-specific amendments — dzackgarza.com (2026-06-26)
+
+The daniellitt case study above is the **reference doctrine**; by default it wins on
+conflict. The following are the deliberate, owner-approved **exceptions** for
+dzackgarza.com, recorded so the doctrine and the live site agree (and so the do-nots above
+are not mistaken for site defects). Each was decided against **rendered full-page
+screenshots of the built site** — the only valid basis, per the thread above.
+
+1. **Tag/category filter chips are kept.** The blanket "no tag pills" do-not is overridden
+   for the collection/blog filter facets. In their current subtle form — small, muted,
+   hairline-bordered, navy only when active — they do **not** read as gaudy social-media
+   badges. The alternative, a bare pile of tag-words, read as disorganized and failed to
+   signal the terms are clickable. Possible future refinement: a `#`-prefix + underline
+   style instead of the pill outline. Acceptable as-is for now.
+
+2. **A simple search + tag/category filter is a deliberate, valued feature — not dashboard
+   creep.** It exists to navigate a *large* corpus of expository writing, course notes, and
+   informal grad-school work (far more than a typical academic produces, where a plain link
+   dump quickly becomes a mess). Its purpose is **service**: a grad student should be able to
+   filter to the course notes relevant to their studies quickly. That navigational value
+   outranks the doctrine's aloof-archive preference here. The filter is justified *because*
+   the collection is large; it would be overkill on a small one.
+
+3. **The homepage carries no "Recent Notes" or "Talks" sections.** That material moves to
+   sub-pages. "Recent Notes" is obviated by filtering the expository collection to notes
+   sorted chronologically; "Talks" already has its own sub-page, so the homepage section is
+   redundant. This pulls the homepage back toward the doctrine's prose-first, less-index
+   intent.
+
+4. **Navigation:** "Papers" → **"Research"**; "Blog" is filed **under "Writing"** rather than
+   a top-level item — reducing top-level nav and dropping the feed-framing "Blog" label the
+   doctrine discourages.
+
+5. **Tufte is the deliberate, validated typographic base** (et-book serif; left-aligned
+   measure with margin room). It is working well and is **not** to be swapped for a centered
+   bounded column. The doctrine cites Tufte approvingly, so this is within its spirit.
+
+Still open (not yet decided): the large embedded video block high on the homepage — whether
+to replace the live player with a quiet poster-thumbnail link.
