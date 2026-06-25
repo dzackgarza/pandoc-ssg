@@ -383,7 +383,13 @@ function registryFile(path: string, source: RegistrySource | undefined): Registr
 
 function registryPath(file: RegistryFile, contentDir: string, pandocDir: string): string {
   let base = file.source === "content" ? contentDir : pandocDir;
-  if (file.source !== "content" && file.path.startsWith("islands/")) {
+  // Island entries are project-root-relative — either a content-repo `islands/`
+  // tree or the generator's `node_modules/pandoc-ssg/islands/…` — matching how
+  // islands.ts resolves them as join(pandocDir, "..", entry).
+  if (
+    file.source !== "content" &&
+    (file.path.startsWith("islands/") || file.path.startsWith("node_modules/"))
+  ) {
     return join(pandocDir, "..", file.path);
   }
   if (file.source !== "content" && file.path.endsWith(".html") && !file.path.includes("/")) {

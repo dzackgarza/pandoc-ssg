@@ -144,7 +144,7 @@
           <span class="collection__title">{item.title}</span>
           {#if item.category}<span class="collection__cat">{item.category}</span>{/if}
           {#if item.description}<p class="collection__desc">{item.description}</p>{/if}
-          {#if item.links.length > 0}
+          {#if item.links && item.links.length > 0}
             <span class="collection__links">
               {#each item.links as link}
                 <a class="collection__link" href={link.href}>{link.label}</a>
