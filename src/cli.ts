@@ -18,6 +18,12 @@
  *                                                        MathJax errors (O15).
  *                                                        Needs Chromium installed.
  *   serve [--out DIR] [--port N]                        — preview the built tree (O13)
+ *   shots [--content DIR] [--pandoc DIR] [--out DIR] [--shots DIR]
+ *                                                      — build, serve, and write a
+ *                                                        full-page PNG per route into
+ *                                                        --shots DIR (default ./shots),
+ *                                                        kept out of dist/ (O29).
+ *                                                        Needs Chromium installed.
  *   deploy DIR [--content DIR] [--pandoc DIR] [--out DIR] — build, then mirror the
  *                                                        built tree into DIR with
  *                                                        rsync -a --delete (O19)
@@ -34,6 +40,7 @@ import { BuildError } from "./errors.ts";
 import { checkLinks, checkServedLinks } from "./site/links.ts";
 import { validatePageMeta } from "./content/schemas.ts";
 import { startServer } from "./serve.ts";
+import { screenshotSite } from "./shots.ts";
 import { validateSite } from "./site/validate.ts";
 import type { PageScaffold, PageType, SiteConfig } from "./types.ts";
 import { type VerifyFinding, verifySite } from "./verify.ts";
@@ -188,6 +195,26 @@ async function runVerify(flags: Map<string, string>): Promise<number> {
   return findings.length === 0 ? 0 : 1;
 }
 
+async function runShots(flags: Map<string, string>): Promise<number> {
+  let opts = buildOpts(flags);
+  let manifest = await build(opts);
+  let shotsDir = flagOr(flags, "shots", "shots");
+  let server = await startServer({ outDir: opts.outDir });
+  let results: Awaited<ReturnType<typeof screenshotSite>>;
+  try {
+    results = await screenshotSite({
+      baseUrl: `http://localhost:${server.port}`,
+      manifest,
+      outDir: shotsDir,
+      timeoutMs: 20000,
+    });
+  } finally {
+    server.stop();
+  }
+  process.stdout.write(`wrote ${results.length} screenshot(s) to ${shotsDir}\n`);
+  return 0;
+}
+
 async function runDeploy(positionals: string[], flags: Map<string, string>): Promise<number> {
   let deployDir = positionals[0];
   if (typeof deployDir === "undefined") {
@@ -327,6 +354,10 @@ async function dispatch(argv: string[]): Promise<number> {
 
   if (subcommand === "serve") {
     return await runServe(parseFlags(rest).flags);
+  }
+
+  if (subcommand === "shots") {
+    return await runShots(parseFlags(rest).flags);
   }
 
   if (subcommand === "deploy") {
