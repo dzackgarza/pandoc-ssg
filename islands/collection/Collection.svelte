@@ -13,6 +13,16 @@
     tags: string[];
     image?: string;
     alt?: string;
+    // Optional per-item media (folds the Talks page in): a slide gallery and/or
+    // a single video embed. Rendered with the same .media-gallery /
+    // .responsive-embed classes the theme styles for the Lua components.
+    images?: { src: string; alt?: string; href?: string }[];
+    video?: { provider: string; id: string };
+  }
+
+  // YouTube is the one supported provider (OSOT with the O17 video component).
+  function embedSrc(video: { provider: string; id: string }): string {
+    return `https://www.youtube.com/embed/${video.id}`;
   }
 
   let { dataUrl }: { dataUrl: string } = $props();
@@ -140,6 +150,32 @@
                 <a class="collection__link" href={link.href}>{link.label}</a>
               {/each}
             </span>
+          {/if}
+          {#if item.video}
+            <div class="responsive-embed">
+              <iframe
+                src={embedSrc(item.video)}
+                title={item.title}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+              ></iframe>
+            </div>
+          {/if}
+          {#if item.images && item.images.length > 0}
+            <div class="media-gallery">
+              {#each item.images as img}
+                <figure class="media-gallery__item">
+                  {#if img.href}
+                    <a class="media-gallery__link" href={img.href}>
+                      <img class="media-gallery__image" src={img.src} alt={img.alt === undefined ? "" : img.alt} loading="lazy" />
+                    </a>
+                  {:else}
+                    <img class="media-gallery__image" src={img.src} alt={img.alt === undefined ? "" : img.alt} loading="lazy" />
+                  {/if}
+                </figure>
+              {/each}
+            </div>
           {/if}
         </div>
       </li>
