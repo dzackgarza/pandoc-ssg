@@ -4,6 +4,7 @@ import envPaths from "env-paths";
 import { parse } from "smol-toml";
 import { z } from "zod";
 import { BuildError } from "./errors.ts";
+import { resolveIslandEntry } from "./island-path.ts";
 import type {
   ComponentHandler,
   IslandEntry,
@@ -359,10 +360,6 @@ async function validateRegistryFiles(
     }
     return true;
   });
-  Object.values(config.islands).forEach((island) => {
-    files.push(registryFile(island.entry, island.source));
-    return true;
-  });
   files.push(...(config.filters ?? []));
   for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
     let entry = files[fileIndex];
@@ -374,6 +371,14 @@ async function validateRegistryFiles(
       throw new BuildError("config", [file], `registry path not found: ${entry.path}`);
     }
   }
+  // Islands resolve through the shared resolver that islands.ts also uses, so
+  // validation and bundling cannot disagree on where an island entry lives.
+  for (let island of Object.values(config.islands)) {
+    let resolved = resolveIslandEntry(island, { contentDir, pandocDir });
+    if (!(await Bun.file(resolved).exists())) {
+      throw new BuildError("config", [file], `registry path not found: ${island.entry}`);
+    }
+  }
   return true;
 }
 
@@ -383,15 +388,8 @@ function registryFile(path: string, source: RegistrySource | undefined): Registr
 
 function registryPath(file: RegistryFile, contentDir: string, pandocDir: string): string {
   let base = file.source === "content" ? contentDir : pandocDir;
-  // Island entries are project-root-relative — either a content-repo `islands/`
-  // tree or the generator's `node_modules/pandoc-ssg/islands/…` — matching how
-  // islands.ts resolves them as join(pandocDir, "..", entry).
-  if (
-    file.source !== "content" &&
-    (file.path.startsWith("islands/") || file.path.startsWith("node_modules/"))
-  ) {
-    return join(pandocDir, "..", file.path);
-  }
+  // Islands are resolved by resolveIslandEntry, not here; this handles templates,
+  // defaults, and filters only.
   if (file.source !== "content" && file.path.endsWith(".html") && !file.path.includes("/")) {
     return join(base, "templates", file.path);
   }
