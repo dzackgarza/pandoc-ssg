@@ -795,6 +795,5 @@ It should be small enough to read in one sitting.
 The fourth layer is **optional interactivity**. It contains typed islands such as galleries, card scrollers, search, or standalone app wrappers.
 It should never be required for ordinary pages.
 
-This gives the desired “set it and forget it” workflow: after the templates, schemas, filters, and data-backed components are established, ordinary content creation is just creating Markdown files and nearby assets in `content/`. Changing the nav is editing `content/_data/navigation.toml`. Changing layout is editing the selected Pandoc bundle's templates/CSS.
-Adding a new component is adding a schema, a Pandoc component transform, and optionally an island.
+This gives the desired “set it and forget it” workflow: after the templates, schemas, filters, and data-backed components are established, ordinary content creation is just creating Markdown files and nearby assets in `content/`. Changing the nav is editing `content/_data/navigation.toml`. Changing layout is editing the selected Pandoc bundle's templates/CSS. Adding a new component is adding a schema, a Pandoc component transform, and optionally an island.
 The compiler core should rarely change.
