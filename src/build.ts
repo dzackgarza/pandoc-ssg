@@ -1,5 +1,5 @@
 import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import matter from "gray-matter";
 import { parse as parseHtml } from "node-html-parser";
 import type { Tags } from "yaml";
@@ -451,20 +451,16 @@ function discoverIslandUsage(rendered: Map<string, string>): IslandUsage {
   let usage: IslandUsage = new Map();
   [...rendered.values()].forEach((html) => {
     let root = parseHtml(html);
+    // Island discovery is purely registry/attribute-driven: every island mount
+    // (built-in or content-owned) carries `data-ssg-island` naming its registry
+    // entry and an optional `data-ssg-data-key`. No component name is special-
+    // cased here, so a site can register and unify its own listing islands
+    // without editing the kernel (decouples blog-index/collection identity from
+    // the discovery pass — see dzackgarza/pandoc-ssg#2, #3).
     root.querySelectorAll("[data-ssg-island]").forEach((mount) => {
       let island = mount.getAttribute("data-ssg-island");
       if (island) {
         addIslandUsage(usage, island, mount.getAttribute("data-ssg-data-key") ?? "");
-      }
-      return true;
-    });
-    if (root.querySelector("#blog-index") !== null) {
-      addIslandUsage(usage, "blog-index", "");
-    }
-    root.querySelectorAll("[data-collection]").forEach((mount) => {
-      let src = mount.getAttribute("data-collection");
-      if (src) {
-        addIslandUsage(usage, "collection", basename(src, ".json"));
       }
       return true;
     });
@@ -623,8 +619,17 @@ function renderedPostData(
       if (!html) {
         throw new Error(`no rendered HTML for post ${post.url}`);
       }
-      let { source: _source, ...publicPost } = post;
-      return { ...publicPost, excerpt: extractExcerpt(html) };
+      // Construct the public shape explicitly — `source` is internal manifest
+      // metadata and must not leak into the client-facing posts.json.
+      return {
+        title: post.title,
+        date: post.date,
+        url: post.url,
+        tags: post.tags,
+        categories: post.categories,
+        dateLong: post.dateLong,
+        excerpt: extractExcerpt(html),
+      };
     });
 }
 

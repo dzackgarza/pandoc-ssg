@@ -29,8 +29,13 @@ function sortRoutes(routes: RouteEntry[]): RouteEntry[] {
 }
 
 function routeCore(route: RouteEntry): Omit<RouteEntry, "dependencies"> {
-  const { dependencies: _dependencies, ...core } = route;
-  return core;
+  return {
+    source: route.source,
+    url: route.url,
+    output: route.output,
+    type: route.type,
+    schema: route.schema,
+  };
 }
 
 function sortedDependencyKeys(dependencies: ManifestDependency[]): string[] {
