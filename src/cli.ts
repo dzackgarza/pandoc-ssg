@@ -34,9 +34,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import matter from "gray-matter";
 import { build } from "./build.ts";
-import { loadSiteConfig } from "./config.ts";
+import { loadAppConfig, loadSiteConfig } from "./config.ts";
 import { deploySite } from "./deploy.ts";
 import { BuildError } from "./errors.ts";
+import { pandocConfigStatus, writeKnownGood } from "./pandoc-config.ts";
 import { checkLinks, checkServedLinks } from "./site/links.ts";
 import { validatePageMeta } from "./content/schemas.ts";
 import { startServer } from "./serve.ts";
@@ -126,7 +127,67 @@ function slugify(title: string): string {
 }
 
 async function runBuild(flags: Map<string, string>): Promise<number> {
-  await build(buildOpts(flags));
+  let opts = buildOpts(flags);
+  await build(opts);
+  await reportPandocConfig(opts.contentDir);
+  return 0;
+}
+
+/**
+ * Stamp the build with the pandoc-config version it floated on, and warn loudly when that
+ * version has advanced past what this site was last verified against. Never blocks the build:
+ * the warning prompts re-verification + `pandoc-config bump`, it does not pin or fail.
+ */
+async function reportPandocConfig(contentDir: string): Promise<void> {
+  let appConfig = await loadAppConfig();
+  let status = await pandocConfigStatus(appConfig.pandocHome, contentDir);
+  if (status.version === null) {
+    process.stderr.write("pandoc-config: provenance unavailable — pandocHome is not a git checkout\n");
+    return;
+  }
+  process.stdout.write(`pandoc-config: built against ${status.version}\n`);
+  if (status.drift !== null && status.drift.aheadBy > 0) {
+    process.stderr.write(
+      `WARNING: pandoc-config advanced ${status.drift.aheadBy} commit(s) past this site's known-good ` +
+        `(${status.knownGood} -> ${status.version}). Re-verify rendering, then bump with ` +
+        "`pandoc-ssg pandoc-config bump`.\n",
+    );
+  }
+  if (status.drift !== null && status.drift.aheadBy === -1) {
+    process.stderr.write(
+      `WARNING: this build's pandoc-config (${status.version}) is not a descendant of the site's ` +
+        `known-good (${status.knownGood}); they have diverged. Re-verify and bump.\n`,
+    );
+  }
+}
+
+/** `pandoc-config [print|bump]`: inspect or advance the site's known-good pandoc-config stamp. */
+async function runPandocConfig(sub: string | undefined, flags: Map<string, string>): Promise<number> {
+  if (sub !== undefined && sub !== "bump" && sub !== "print") {
+    return await Promise.reject(
+      new BuildError("config", [], `unknown pandoc-config subcommand: ${sub} (expected: print, bump)`),
+    );
+  }
+  let contentDir = flagOr(flags, "content", "content");
+  let appConfig = await loadAppConfig();
+  let status = await pandocConfigStatus(appConfig.pandocHome, contentDir);
+  if (sub === "bump") {
+    if (status.version === null) {
+      return await Promise.reject(
+        new BuildError("config", [], "cannot bump known-good: pandocHome is not a git checkout"),
+      );
+    }
+    let path = await writeKnownGood(contentDir, status.version);
+    process.stdout.write(`known-good set to ${status.version} (${path})\n`);
+    return 0;
+  }
+  process.stdout.write(
+    `pandoc-config version: ${status.version === null ? "unavailable" : status.version}\n`,
+  );
+  process.stdout.write(`known-good:            ${status.knownGood === null ? "(unset)" : status.knownGood}\n`);
+  if (status.drift !== null && status.drift.aheadBy > 0) {
+    process.stdout.write(`drift:                 ahead by ${status.drift.aheadBy} commit(s) — re-verify and bump\n`);
+  }
   return 0;
 }
 
@@ -369,6 +430,11 @@ async function dispatch(argv: string[]): Promise<number> {
     let [kind, ...newRest] = rest;
     let { flags, positionals } = parseFlags(newRest);
     return await runNewPage(kind, positionals, flags);
+  }
+
+  if (subcommand === "pandoc-config") {
+    let [sub, ...pcRest] = rest;
+    return await runPandocConfig(sub, parseFlags(pcRest).flags);
   }
 
   return await Promise.reject(
