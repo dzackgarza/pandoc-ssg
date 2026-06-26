@@ -82,14 +82,14 @@ const bundledRegistryShape = z
 
 const contentConfigShape = z
   .object({
-    passthrough: z.array(z.object({ path: z.string() }).strict()).optional(),
-    dirTypes: z.array(dirTypeShape).optional(),
-    pageTypes: z.record(pageTypeShape).optional(),
-    schemas: z.record(schemaShape).optional(),
-    componentHandlers: z.record(componentHandlerShape).optional(),
-    islands: z.record(islandShape).optional(),
-    generatedArtifacts: z.array(generatedArtifactShape).optional(),
-    filters: z.array(z.string().min(1)).optional(),
+    passthrough: z.array(z.object({ path: z.string() }).strict()).default([]),
+    dirTypes: z.array(dirTypeShape).default([]),
+    pageTypes: z.record(pageTypeShape).default({}),
+    schemas: z.record(schemaShape).default({}),
+    componentHandlers: z.record(componentHandlerShape).default({}),
+    islands: z.record(islandShape).default({}),
+    generatedArtifacts: z.array(generatedArtifactShape).default([]),
+    filters: z.array(z.string().min(1)).default([]),
   })
   .strict();
 
@@ -156,41 +156,19 @@ function parseSiteConfig(raw: string): ContentConfigExtension {
 }
 
 function contentConfig(data: z.infer<typeof contentConfigShape>): ContentConfigExtension {
-  const content: ContentConfigExtension = {
-    passthrough: [],
-    dirTypes: [],
-    pageTypes: {},
-    schemas: {},
-    componentHandlers: {},
-    islands: {},
-    generatedArtifacts: [],
-    filters: [],
+  // Every field carries a schema-level default (.default), so the parsed data is
+  // total here — map straight through, applying the naming transforms. Empty
+  // record/array defaults pass through the transforms unchanged.
+  return {
+    passthrough: data.passthrough,
+    dirTypes: data.dirTypes,
+    pageTypes: namePageTypes(data.pageTypes, "pandoc"),
+    schemas: data.schemas,
+    componentHandlers: nameComponentHandlers(data.componentHandlers, "content"),
+    islands: nameIslands(data.islands, "content"),
+    generatedArtifacts: data.generatedArtifacts,
+    filters: registryFiles(data.filters, "content"),
   };
-  if (data.passthrough !== undefined) {
-    content.passthrough = data.passthrough;
-  }
-  if (data.dirTypes !== undefined) {
-    content.dirTypes = data.dirTypes;
-  }
-  if (data.pageTypes !== undefined) {
-    content.pageTypes = namePageTypes(data.pageTypes, "pandoc");
-  }
-  if (data.schemas !== undefined) {
-    content.schemas = data.schemas;
-  }
-  if (data.componentHandlers !== undefined) {
-    content.componentHandlers = nameComponentHandlers(data.componentHandlers, "content");
-  }
-  if (data.islands !== undefined) {
-    content.islands = nameIslands(data.islands, "content");
-  }
-  if (data.generatedArtifacts !== undefined) {
-    content.generatedArtifacts = data.generatedArtifacts;
-  }
-  if (data.filters !== undefined) {
-    content.filters = registryFiles(data.filters, "content");
-  }
-  return content;
 }
 
 function parseToml(raw: string, file: string, label: string): unknown {
