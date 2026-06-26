@@ -1,6 +1,7 @@
 import { basename, dirname, join } from "node:path";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { build as viteBuild } from "vite";
+import { resolveIslandEntry } from "./island-path.ts";
 import type { IslandEntry } from "./types.ts";
 
 /**
@@ -13,10 +14,7 @@ export async function buildIsland(
   stagingDir: string,
   roots: { contentDir: string; pandocDir: string },
 ): Promise<string> {
-  let entry =
-    island.source === "content"
-      ? join(roots.contentDir, island.entry)
-      : join(roots.pandocDir, "..", island.entry);
+  let entry = resolveIslandEntry(island, roots);
   let outDir = join(stagingDir, dirname(island.output));
   await viteBuild({
     configFile: false,
