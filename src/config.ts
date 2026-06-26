@@ -388,8 +388,8 @@ function registryFile(path: string, source: RegistrySource | undefined): Registr
 
 function registryPath(file: RegistryFile, contentDir: string, pandocDir: string): string {
   let base = file.source === "content" ? contentDir : pandocDir;
-  // Islands are resolved by resolveIslandEntry, not here; this handles templates,
-  // defaults, and filters only.
+  // Islands are resolved by resolveIslandEntry, not here; this handles page
+  // templates, defaults, filters, and component-handler modules.
   if (file.source !== "content" && file.path.endsWith(".html") && !file.path.includes("/")) {
     return join(base, "templates", file.path);
   }
