@@ -21,25 +21,23 @@ export interface PandocConfigStatus {
   /**
    * Drift of the current pandoc-config against the site's known-good:
    * - null when there is nothing to compare (no version or no known-good);
-   * - { aheadBy: n } n>0 — pandoc-config advanced n commits past known-good;
-   * - { aheadBy: 0 } — current is exactly the known-good;
-   * - { aheadBy: -1 } — current is not a descendant of known-good (diverged/older).
+   * - aheadBy n>0 — pandoc-config advanced n commits past known-good;
+   * - aheadBy zero — current is exactly the known-good;
+   * - aheadBy -1 — current is not a descendant of known-good (diverged/older).
+   *   A git failure during the count yields null, never a false zero.
    */
   drift: { aheadBy: number } | null;
 }
 
-async function git(cwd: string, args: string[]): Promise<{ ok: boolean; out: string; err: string }> {
-  let proc = Bun.spawn(["git", "-C", cwd, ...args], { stdout: "pipe", stderr: "pipe" });
-  // Drain BOTH streams: leaving stderr unconsumed can deadlock on a full pipe
-  // buffer, and discarding it would lose the real git diagnostic. A missing git
-  // binary or bad cwd makes Bun.spawn throw, which propagates (fail loud) rather
-  // than being swallowed into a generic result.
-  let [out, err] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ]);
+async function git(cwd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
+  // stderr inherits the parent's, so git's own diagnostics ("fatal: not a git
+  // repository", "permission denied", …) are preserved and visible — never
+  // piped-and-discarded. A missing git binary or bad cwd makes Bun.spawn throw,
+  // which propagates (fail loud) rather than being swallowed into a result.
+  let proc = Bun.spawn(["git", "-C", cwd, ...args], { stdout: "pipe", stderr: "inherit" });
+  let out = await new Response(proc.stdout).text();
   let code = await proc.exited;
-  return { ok: code === 0, out: out.trim(), err: err.trim() };
+  return { ok: code === 0, out: out.trim() };
 }
 
 /** Committed per-site marker recording the pandoc-config version the site was last verified against. */
@@ -51,12 +49,9 @@ export function knownGoodMarkerPath(contentDir: string): string {
 export async function resolvePandocConfigVersion(pandocHome: string): Promise<string | null> {
   let described = await git(pandocHome, ["describe", "--tags", "--always", "--dirty"]);
   if (!described.ok) {
-    // A non-git pandocHome is the expected domain case; surface git's own
-    // diagnostic so a real failure (corrupt repo, permissions) is not hidden
-    // behind the generic "provenance unavailable" message.
-    if (described.err !== "") {
-      process.stderr.write(`pandoc-config: cannot resolve version in ${pandocHome}: ${described.err}\n`);
-    }
+    // describe exits non-zero when pandocHome is not a git repo — the expected
+    // domain case. git's own stderr (inherited) explains any real failure
+    // (corrupt repo, permissions) directly, so nothing is hidden here.
     return null;
   }
   return described.out;
