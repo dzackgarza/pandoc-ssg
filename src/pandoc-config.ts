@@ -28,11 +28,18 @@ export interface PandocConfigStatus {
   drift: { aheadBy: number } | null;
 }
 
-async function git(cwd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
+async function git(cwd: string, args: string[]): Promise<{ ok: boolean; out: string; err: string }> {
   let proc = Bun.spawn(["git", "-C", cwd, ...args], { stdout: "pipe", stderr: "pipe" });
-  let out = await new Response(proc.stdout).text();
+  // Drain BOTH streams: leaving stderr unconsumed can deadlock on a full pipe
+  // buffer, and discarding it would lose the real git diagnostic. A missing git
+  // binary or bad cwd makes Bun.spawn throw, which propagates (fail loud) rather
+  // than being swallowed into a generic result.
+  let [out, err] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   let code = await proc.exited;
-  return { ok: code === 0, out: out.trim() };
+  return { ok: code === 0, out: out.trim(), err: err.trim() };
 }
 
 /** Committed per-site marker recording the pandoc-config version the site was last verified against. */
@@ -44,6 +51,12 @@ export function knownGoodMarkerPath(contentDir: string): string {
 export async function resolvePandocConfigVersion(pandocHome: string): Promise<string | null> {
   let described = await git(pandocHome, ["describe", "--tags", "--always", "--dirty"]);
   if (!described.ok) {
+    // A non-git pandocHome is the expected domain case; surface git's own
+    // diagnostic so a real failure (corrupt repo, permissions) is not hidden
+    // behind the generic "provenance unavailable" message.
+    if (described.err !== "") {
+      process.stderr.write(`pandoc-config: cannot resolve version in ${pandocHome}: ${described.err}\n`);
+    }
     return null;
   }
   return described.out;
@@ -79,7 +92,9 @@ async function driftAgainst(pandocHome: string, knownGood: string): Promise<{ ah
   }
   let count = await git(pandocHome, ["rev-list", "--count", `${kg.out}..HEAD`]);
   if (!count.ok) {
-    return { aheadBy: 0 };
+    // Drift indeterminate — do NOT report aheadBy:0, which would falsely read as
+    // "exactly up to date" when the count simply could not be computed.
+    return null;
   }
   return { aheadBy: Number(count.out) };
 }

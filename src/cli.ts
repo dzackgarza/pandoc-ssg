@@ -163,6 +163,11 @@ async function reportPandocConfig(contentDir: string): Promise<void> {
 
 /** `pandoc-config [print|bump]`: inspect or advance the site's known-good pandoc-config stamp. */
 async function runPandocConfig(sub: string | undefined, flags: Map<string, string>): Promise<number> {
+  if (sub !== undefined && sub !== "bump" && sub !== "print") {
+    return await Promise.reject(
+      new BuildError("config", [], `unknown pandoc-config subcommand: ${sub} (expected: print, bump)`),
+    );
+  }
   let contentDir = flagOr(flags, "content", "content");
   let appConfig = await loadAppConfig();
   let status = await pandocConfigStatus(appConfig.pandocHome, contentDir);
