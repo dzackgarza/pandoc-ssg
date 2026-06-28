@@ -124,23 +124,74 @@ let macroMapShape = z.record(
   z.union([z.string(), z.tuple([z.string(), z.number()])]),
 );
 
+type DataSourceMap = Record<string, Record<string, unknown>>;
+
+interface LoadedDataSources {
+  values: DataSourceMap;
+  dependencies: Record<string, ManifestDependency[]>;
+}
+
 /**
- * Load content/_data/items.yaml: the data backing data-driven components
- * (e.g. feature-row card collections). Missing file → no items. The shape is
- * intentionally open (component filters own their own field contracts); this
- * only guarantees a top-level mapping of collection-name → value.
+ * Load registry-declared data sources from content/_data/<source>.yaml and
+ * content/_data/<source>/*.yaml. The generator owns only this plumbing;
+ * filters and templates own the meaning and shape of the resulting values.
  */
-async function loadItems(contentDir: string): Promise<Record<string, unknown>> {
-  let itemsPath = join(contentDir, "_data", "items.yaml");
-  if (!(await Bun.file(itemsPath).exists())) {
-    return {};
+async function loadDataSources(
+  contentDir: string,
+  sourceNames: Iterable<string>,
+): Promise<LoadedDataSources> {
+  let values: DataSourceMap = {};
+  let dependencies: Record<string, ManifestDependency[]> = {};
+  await Promise.all([...sourceNames].sort().map(async (sourceName) => {
+    let loaded = await loadDataSource(contentDir, sourceName);
+    values[sourceName] = loaded.value;
+    dependencies[sourceName] = loaded.dependencies;
+  }));
+  return { values, dependencies };
+}
+
+async function loadDataSource(
+  contentDir: string,
+  sourceName: string,
+): Promise<{ value: Record<string, unknown>; dependencies: ManifestDependency[] }> {
+  let value: Record<string, unknown> = {};
+  let dependencies: ManifestDependency[] = [];
+  let sourceFile = join(contentDir, "_data", `${sourceName}.yaml`);
+  if (await Bun.file(sourceFile).exists()) {
+    mergeDataMapping(value, await readDataMapping(sourceFile, [`_data/${sourceName}.yaml`]));
+    dependencies.push(dependency("content-data", `_data/${sourceName}.yaml`, "content"));
   }
-  let raw = await readFile(itemsPath, "utf8");
+
+  let sourceDir = join(contentDir, "_data", sourceName);
+  if (await Bun.file(sourceDir).exists()) {
+    let rels = (await walkRel(sourceDir)).filter((rel) => rel.endsWith(".yaml")).sort();
+    await Promise.all(rels.map(async (rel) => {
+      let path = join(sourceDir, rel);
+      let sourceRel = `_data/${sourceName}/${rel}`;
+      mergeDataMapping(value, await readDataMapping(path, [sourceRel]));
+      dependencies.push(dependency("content-data", sourceRel, "content"));
+    }));
+  }
+
+  return { value, dependencies: sortedDependencies(dependencies) };
+}
+
+async function readDataMapping(path: string, rels: string[]): Promise<Record<string, unknown>> {
+  let raw = await readFile(path, "utf8");
   let parsed = z.record(z.string(), z.unknown()).safeParse(YAML.parse(raw));
   if (!parsed.success) {
-    throw new BuildError("config", ["_data/items.yaml"], parsed.error.message);
+    throw new BuildError("config", rels, parsed.error.message);
   }
   return parsed.data;
+}
+
+function mergeDataMapping(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (let [key, value] of Object.entries(source)) {
+    if (Object.hasOwn(target, key)) {
+      throw new BuildError("config", ["_data"], `duplicate data key '${key}'`);
+    }
+    target[key] = value;
+  }
 }
 
 /**
@@ -204,7 +255,7 @@ interface ManifestDependencyContext {
   pandocDir: string;
   siteConfigDependencies: ManifestDependency[];
   navDependency?: ManifestDependency;
-  itemsDependency?: ManifestDependency;
+  dataDependencies: Record<string, ManifestDependency[]>;
   macroManifestDependency: ManifestDependency;
   siteFilters: SiteConfig["filters"];
 }
@@ -224,7 +275,8 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let generated: GeneratedEntry[] = [];
   let nav = await loadNavigation(contentDir);
   let appConfig = await loadAppConfig();
-  let dependencyContext = await manifestDependencyContext(contentDir, pandocDir, appConfig.mathjaxMacroManifest, config);
+  let dataSources = await loadDataSources(contentDir, requiredDataSources(config));
+  let dependencyContext = await manifestDependencyContext(contentDir, pandocDir, appConfig.mathjaxMacroManifest, config, dataSources);
   let manifest: Manifest = {
     schemaVersion: 2,
     routes: plan.pages.map((page) => routeWithDependencies(page, dependencyContext)),
@@ -232,13 +284,13 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     generated,
   };
   let mathMacros = await generateMathMacros(appConfig.mathjaxMacroManifest, pandocDir);
-  let items = await loadItems(contentDir);
   let postCtx = buildPostContext(plan.blogPosts);
+  let itemsData = dataSources.values.items;
   let rendered = await renderPlannedPages(plan.pages, {
     pandocDir,
     nav,
     mathMacros,
-    items,
+    items: itemsData === undefined ? {} : itemsData,
     contentDir,
     pandocHome: appConfig.pandocHome,
     postCtx,
@@ -258,7 +310,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   await emitIslandArtifacts(staging, islandUsage, config.islands, { contentDir, pandocDir }, {
     blogPosts: plan.blogPosts,
     rendered,
-    items,
+    dataSources: dataSources.values,
     generated,
     dependencies: dependencyContext,
   });
@@ -316,6 +368,7 @@ async function manifestDependencyContext(
   pandocDir: string,
   macroManifestPath: string,
   config: SiteConfig,
+  dataSources: LoadedDataSources,
 ): Promise<ManifestDependencyContext> {
   let siteConfigDependencies = [
     dependency("site-config", "registry.toml", "pandoc"),
@@ -326,18 +379,25 @@ async function manifestDependencyContext(
   let navDependency = (await Bun.file(join(contentDir, "_data", "navigation.toml")).exists())
     ? dependency("navigation", "_data/navigation.toml", "content")
     : undefined;
-  let itemsDependency = (await Bun.file(join(contentDir, "_data", "items.yaml")).exists())
-    ? dependency("items-data", "_data/items.yaml", "content")
-    : undefined;
   return {
     contentDir,
     pandocDir,
     siteConfigDependencies: sortedDependencies(siteConfigDependencies),
     navDependency,
-    itemsDependency,
+    dataDependencies: dataSources.dependencies,
     macroManifestDependency: dependency("macro-manifest", macroManifestPath, "absolute"),
     siteFilters: config.filters,
   };
+}
+
+function requiredDataSources(config: SiteConfig): Set<string> {
+  let names = new Set<string>(["items"]);
+  Object.values(config.islands).forEach((island) => {
+    if (island.dataSource && island.dataSource !== "blog-posts") {
+      names.add(island.dataSource);
+    }
+  });
+  return names;
 }
 
 function routeWithDependencies(page: PlannedPage, context: ManifestDependencyContext): RouteEntry {
@@ -351,7 +411,7 @@ function routeWithDependencies(page: PlannedPage, context: ManifestDependencyCon
       ...registryDependencies("filter", page.pageType.filters ?? []),
       ...context.siteConfigDependencies,
       ...(context.navDependency ? [context.navDependency] : []),
-      ...(context.itemsDependency ? [context.itemsDependency] : []),
+      ...(context.dataDependencies.items === undefined ? [] : context.dataDependencies.items),
       context.macroManifestDependency,
     ]),
   };
@@ -534,7 +594,7 @@ async function emitIslandArtifacts(
   data: {
     blogPosts: Omit<PostMeta, "excerpt">[];
     rendered: Map<string, string>;
-    items: Record<string, unknown>;
+    dataSources: DataSourceMap;
     generated: GeneratedEntry[];
     dependencies: ManifestDependencyContext;
   },
@@ -565,7 +625,7 @@ async function emitIslandData(
   data: {
     blogPosts: Omit<PostMeta, "excerpt">[];
     rendered: Map<string, string>;
-    items: Record<string, unknown>;
+    dataSources: DataSourceMap;
     generated: GeneratedEntry[];
     dependencies: ManifestDependencyContext;
   },
@@ -587,19 +647,23 @@ async function emitIslandData(
     );
     return true;
   }
-  if (island.dataSource === "items") {
+  if (island.dataSource) {
     let keys = [...dataKeys].filter((key) => key !== "").sort();
     if (keys.length === 0) {
-      throw new BuildError("config", ["registry.toml"], `island ${name} needs an items data key`);
+      throw new BuildError("config", ["registry.toml"], `island ${name} needs a data key`);
     }
+    let sourceData = data.dataSources[island.dataSource];
+    let sourceDependencies = data.dependencies.dataDependencies[island.dataSource];
+    sourceData = sourceData === undefined ? {} : sourceData;
+    sourceDependencies = sourceDependencies === undefined ? [] : sourceDependencies;
     await Promise.all(keys.map(async (key) => {
-      let itemData = data.items[key];
+      let itemData = sourceData[key];
       if (typeof itemData === "undefined") {
-        throw new BuildError("config", ["_data/items.yaml"], `${name}: unknown items key '${key}'`);
+        throw new BuildError("config", ["_data"], `${name}: unknown ${island.dataSource} data key '${key}'`);
       }
       await writeGeneratedJson(staging, islandOutput(island.dataOutput!, key), itemData, data.generated, [
         ...data.dependencies.siteConfigDependencies,
-        dependency("items-data", "_data/items.yaml", "content", key),
+        ...sourceDependencies,
       ]);
       return true;
     }));

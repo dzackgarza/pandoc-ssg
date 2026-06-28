@@ -76,7 +76,7 @@ export interface IslandEntry {
   output: string;
   source?: RegistrySource;
   dataOutput?: string;
-  dataSource?: "blog-posts" | "items";
+  dataSource?: string;
   mount?: string;
 }
 
@@ -132,7 +132,7 @@ export type ManifestDependencyKind =
   | "defaults"
   | "filter"
   | "island-entry"
-  | "items-data"
+  | "content-data"
   | "macro-manifest"
   | "navigation"
   | "passthrough-source"

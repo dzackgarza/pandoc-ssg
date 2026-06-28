@@ -56,7 +56,7 @@ const islandShape = z
     output: z.string().min(1),
     source: z.enum(["pandoc", "content"]).optional(),
     dataOutput: z.string().min(1).optional(),
-    dataSource: z.enum(["blog-posts", "items"]).optional(),
+    dataSource: z.string().min(1).optional(),
     mount: z.string().min(1).optional(),
   })
   .strict();
