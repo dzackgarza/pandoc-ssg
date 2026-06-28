@@ -142,7 +142,7 @@ async function loadBundledRegistry(pandocDir: string): Promise<Omit<SiteConfig, 
     pageTypes: namePageTypes(parsed.data.pageTypes, "pandoc"),
     componentHandlers: nameComponentHandlers(parsed.data.componentHandlers, "pandoc"),
     islands: nameIslands(parsed.data.islands, "pandoc"),
-    filters: registryFiles(parsed.data.filters ?? [], "pandoc"),
+    filters: registryFiles(parsed.data.filters === undefined ? [] : parsed.data.filters, "pandoc"),
   };
 }
 
@@ -192,8 +192,11 @@ function namePageTypes(
       {
         ...value,
         name,
-        source: value.source ?? source,
-        filters: registryFiles(value.filters ?? [], value.source ?? source),
+        source: value.source === undefined ? source : value.source,
+        filters: registryFiles(
+          value.filters === undefined ? [] : value.filters,
+          value.source === undefined ? source : value.source,
+        ),
       },
     ]),
   );
@@ -252,7 +255,7 @@ function mergeContentConfig(
     componentHandlers: { ...bundled.componentHandlers, ...content.componentHandlers },
     islands: { ...bundled.islands, ...content.islands },
     generatedArtifacts: generatedArtifacts(bundled, content),
-    filters: [...(bundled.filters ?? []), ...content.filters],
+    filters: [...(bundled.filters === undefined ? [] : bundled.filters), ...content.filters],
   };
   return validateRegistry(merged, "_site.toml");
 }
@@ -329,7 +332,7 @@ async function validateRegistryFiles(
   Object.values(config.pageTypes).forEach((pageType) => {
     files.push(registryFile(pageType.defaults, pageType.source));
     files.push(registryFile(pageType.template, pageType.source));
-    files.push(...(pageType.filters ?? []));
+    files.push(...(pageType.filters === undefined ? [] : pageType.filters));
     return true;
   });
   Object.values(config.componentHandlers).forEach((handler) => {
@@ -338,7 +341,7 @@ async function validateRegistryFiles(
     }
     return true;
   });
-  files.push(...(config.filters ?? []));
+  files.push(...(config.filters === undefined ? [] : config.filters));
   for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
     let entry = files[fileIndex];
     if (!entry) {

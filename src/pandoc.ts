@@ -99,7 +99,10 @@ export async function renderPage(input: RenderInput): Promise<string> {
     input.contentRoot,
     input.pandocDir,
   );
-  let filters = [...(input.siteFilters ?? []), ...(input.pageType.filters ?? [])].flatMap((filter) => [
+  let filters = [
+    ...(input.siteFilters === undefined ? [] : input.siteFilters),
+    ...(input.pageType.filters === undefined ? [] : input.pageType.filters),
+  ].flatMap((filter) => [
     "--lua-filter",
     registryPath(filter, input.contentRoot, input.pandocDir),
   ]);

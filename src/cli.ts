@@ -383,7 +383,7 @@ function scaffoldFields(
   ctx: ScaffoldContext,
 ): Record<string, unknown> {
   let fields: Record<string, unknown> = {};
-  Object.entries(scaffold.fields ?? {}).forEach(([name, value]) => {
+  Object.entries(scaffold.fields === undefined ? {} : scaffold.fields).forEach(([name, value]) => {
     fields[name] = renderTemplate(value, ctx);
     return true;
   });
