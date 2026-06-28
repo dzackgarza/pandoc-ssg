@@ -11,7 +11,7 @@ export interface ClassifiedFile {
 export interface SiteConfig {
   /** content-relative directories copied verbatim with no compilation */
   passthrough: { path: string }[];
-  /** directory (content-relative prefix) → page type name inference (O8) */
+  /** content-relative directory prefix for page type name inference (O8) */
   dirTypes: { dir: string; type: string }[];
   /** page type registry resolved from the bundled registry plus content overrides */
   pageTypes: Record<string, PageType>;
