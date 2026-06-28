@@ -160,7 +160,7 @@ describe("O4 + O5: demo build content-mirror fidelity and rendering", () => {
     // presence proves the build ran the live extractor over the manifest rather
     // than reading a stored macro map.
     expect(html).toContain('"Ztest": "\\\\mathbb{Z}_{\\\\mathrm{test}}"');
-    // \DeclareMathOperator → \operatorname{...}; an arg-macro → [body, n] form.
+    // \DeclareMathOperator becomes \operatorname{...}; an arg-macro uses [body, n] form.
     expect(html).toContain('"Spectest": "\\\\operatorname{Spec}"');
     expect(html).toContain('"pair": ["\\\\langle #1, #2 \\\\rangle",2]');
   });
@@ -303,7 +303,7 @@ describe("O28: tikzcd blocks render to inline SVG (not dropped)", () => {
 
   test("O30: the env label is a real selectable element at the very start of the content", () => {
     // The fixture's definition holds loose-inline content (text + math + a
-    // diagram → pandoc emits Plain, no <p>). A CSS ::before label is
+    // diagram, so pandoc emits Plain, no <p>). A CSS ::before label is
     // non-selectable and lands before the first inline ELEMENT (the math span),
     // not the start. The label must be a real element injected at the start.
     expect(html).toContain('<span class="thmlabel">Definition 1.1.</span>');

@@ -3,8 +3,8 @@
 -- Expands placeholders such as
 --   ::: {.component type="feature-row" items="KEY"}
 --   :::
--- into HTML built from content/_data/items.yaml. The kernel serializes that
--- data to a JSON sidecar and passes its path via the `items_path` metadata
+-- into HTML built from content data. The kernel serializes that data to a JSON
+-- sidecar and passes its path via the `data_path` metadata
 -- field; this filter decodes it and renders the named component. An unknown
 -- component type or a missing data key aborts the build (pandoc exits nonzero).
 
@@ -13,7 +13,7 @@ local registry = { handlers = {}, islands = {}, contentRoot = "" }
 local module_cache = {}
 
 local function load_items(meta)
-  local path_meta = meta.items_path
+  local path_meta = meta.data_path
   if path_meta == nil then
     return
   end
@@ -23,11 +23,12 @@ local function load_items(meta)
   end
   local fh = io.open(path, "r")
   if fh == nil then
-    error("components: cannot open items sidecar at " .. path)
+    error("components: cannot open data sidecar at " .. path)
   end
   local raw = fh:read("a")
   fh:close()
-  items = pandoc.json.decode(raw)
+  local data = pandoc.json.decode(raw)
+  items = data.items or {}
 end
 
 local function load_components_registry(meta)

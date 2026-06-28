@@ -5,7 +5,7 @@ import type { ClassifiedFile, FileClass, SiteConfig } from "../types.ts";
 
 /**
  * Classify every scanned file into exactly one FileClass (O1):
- * - "reserved": any path whose first segment starts with "_"
+ * - "reserved": paths whose first segment starts with "_"
  * - "opaque":   inside a config-declared passthrough subtree (wins over page)
  * - "page":     a .md file whose YAML frontmatter has `site.page: true`
  * - "asset":    everything else, including non-opt-in markdown
