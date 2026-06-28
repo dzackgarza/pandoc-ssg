@@ -407,8 +407,14 @@ function routeWithDependencies(page: PlannedPage, context: ManifestDependencyCon
       dependency("source-page", page.relPath, "content"),
       registryDependency("template", { path: page.pageType.template, source: page.pageType.source }),
       registryDependency("defaults", { path: page.pageType.defaults, source: page.pageType.source }),
-      ...registryDependencies("filter", context.siteFilters ?? []),
-      ...registryDependencies("filter", page.pageType.filters ?? []),
+      ...registryDependencies(
+        "filter",
+        context.siteFilters === undefined || context.siteFilters === null ? [] : context.siteFilters,
+      ),
+      ...registryDependencies(
+        "filter",
+        page.pageType.filters === undefined || page.pageType.filters === null ? [] : page.pageType.filters,
+      ),
       ...context.siteConfigDependencies,
       ...(context.navDependency ? [context.navDependency] : []),
       ...(context.dataDependencies.items === undefined ? [] : context.dataDependencies.items),
@@ -520,7 +526,8 @@ function discoverIslandUsage(rendered: Map<string, string>): IslandUsage {
     root.querySelectorAll("[data-ssg-island]").forEach((mount) => {
       let island = mount.getAttribute("data-ssg-island");
       if (island) {
-        addIslandUsage(usage, island, mount.getAttribute("data-ssg-data-key") ?? "");
+        let dataKey = mount.getAttribute("data-ssg-data-key");
+        addIslandUsage(usage, island, dataKey === null || dataKey === undefined ? "" : dataKey);
       }
       return true;
     });
@@ -737,7 +744,10 @@ function dependency(
 }
 
 function registryDependency(kind: ManifestDependency["kind"], file: RegistryFile): ManifestDependency {
-  return dependency(kind, file.path, file.source ?? "pandoc");
+  if (file.source === undefined) {
+    throw new Error(`registry dependency missing source for ${kind}: ${file.path}`);
+  }
+  return dependency(kind, file.path, file.source);
 }
 
 function registryDependencies(
@@ -757,7 +767,7 @@ function sortedDependencies(dependencies: ManifestDependency[]): ManifestDepende
 }
 
 function dependencyKey(dep: ManifestDependency): string {
-  return [dep.kind, dep.origin, dep.path, dep.key ?? ""].join("\u0000");
+  return [dep.kind, dep.origin, dep.path, dep.key === undefined || dep.key === null ? "" : dep.key].join("\u0000");
 }
 
 function generatedEntryKey(entry: GeneratedEntry): string {
