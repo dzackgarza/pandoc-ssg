@@ -1,4 +1,5 @@
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import matter from "gray-matter";
 import { parse as parseHtml } from "node-html-parser";
@@ -138,16 +139,37 @@ interface LoadedDataSources {
  */
 async function loadDataSources(
   contentDir: string,
-  sourceNames: Iterable<string>,
 ): Promise<LoadedDataSources> {
   let values: DataSourceMap = {};
   let dependencies: Record<string, ManifestDependency[]> = {};
-  await Promise.all([...sourceNames].sort().map(async (sourceName) => {
+  let sourceNames = await discoverDataSourceNames(contentDir);
+  await Promise.all(sourceNames.map(async (sourceName) => {
     let loaded = await loadDataSource(contentDir, sourceName);
     values[sourceName] = loaded.value;
     dependencies[sourceName] = loaded.dependencies;
   }));
   return { values, dependencies };
+}
+
+async function discoverDataSourceNames(contentDir: string): Promise<string[]> {
+  let dataDir = join(contentDir, "_data");
+  if (!(await directoryExists(dataDir))) {
+    return [];
+  }
+  let names = new Set<string>();
+  let rels = await walkRel(dataDir);
+  rels.filter((rel) => rel.endsWith(".yaml")).forEach((rel) => {
+    let [head, ...tail] = rel.split("/");
+    if (!head) {
+      return;
+    }
+    if (tail.length === 0) {
+      names.add(head.replace(/\.yaml$/, ""));
+      return;
+    }
+    names.add(head);
+  });
+  return [...names].sort();
 }
 
 async function loadDataSource(
@@ -163,7 +185,7 @@ async function loadDataSource(
   }
 
   let sourceDir = join(contentDir, "_data", sourceName);
-  if (await Bun.file(sourceDir).exists()) {
+  if (await directoryExists(sourceDir)) {
     let rels = (await walkRel(sourceDir)).filter((rel) => rel.endsWith(".yaml")).sort();
     await Promise.all(rels.map(async (rel) => {
       let path = join(sourceDir, rel);
@@ -239,7 +261,7 @@ interface RenderInputs {
   pandocDir: string;
   nav: Awaited<ReturnType<typeof loadNavigation>>;
   mathMacros: Record<string, string | [string, number]>;
-  items: Record<string, unknown>;
+  dataSources: DataSourceMap;
   contentDir: string;
   pandocHome: string;
   postCtx: Map<string, Record<string, unknown>>;
@@ -275,7 +297,7 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let generated: GeneratedEntry[] = [];
   let nav = await loadNavigation(contentDir);
   let appConfig = await loadAppConfig();
-  let dataSources = await loadDataSources(contentDir, requiredDataSources(config));
+  let dataSources = await loadDataSources(contentDir);
   let dependencyContext = await manifestDependencyContext(contentDir, pandocDir, appConfig.mathjaxMacroManifest, config, dataSources);
   let manifest: Manifest = {
     schemaVersion: 2,
@@ -285,12 +307,11 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   };
   let mathMacros = await generateMathMacros(appConfig.mathjaxMacroManifest, pandocDir);
   let postCtx = buildPostContext(plan.blogPosts);
-  let itemsData = dataSources.values.items;
   let rendered = await renderPlannedPages(plan.pages, {
     pandocDir,
     nav,
     mathMacros,
-    items: itemsData === undefined ? {} : itemsData,
+    dataSources: dataSources.values,
     contentDir,
     pandocHome: appConfig.pandocHome,
     postCtx,
@@ -388,16 +409,6 @@ async function manifestDependencyContext(
     macroManifestDependency: dependency("macro-manifest", macroManifestPath, "absolute"),
     siteFilters: config.filters,
   };
-}
-
-function requiredDataSources(config: SiteConfig): Set<string> {
-  let names = new Set<string>(["items"]);
-  Object.values(config.islands).forEach((island) => {
-    if (island.dataSource && island.dataSource !== "blog-posts") {
-      names.add(island.dataSource);
-    }
-  });
-  return names;
 }
 
 function routeWithDependencies(page: PlannedPage, context: ManifestDependencyContext): RouteEntry {
@@ -500,7 +511,7 @@ async function renderPlannedPages(
       pageType: page.pageType,
       nav: inputs.nav,
       mathMacros: inputs.mathMacros,
-      items: inputs.items,
+      dataSources: inputs.dataSources,
       contentRoot: inputs.contentDir,
       pandocHome: inputs.pandocHome,
       siteFilters: inputs.siteFilters,
@@ -786,6 +797,13 @@ function requiredIndex<T>(items: T[], index: number, label: string): T {
 async function walkRel(root: string): Promise<string[]> {
   let glob = new Bun.Glob("**/*");
   return await Array.fromAsync(glob.scan({ cwd: root, dot: true, onlyFiles: true }));
+}
+
+async function directoryExists(path: string): Promise<boolean> {
+  if (!existsSync(path)) {
+    return false;
+  }
+  return (await stat(path)).isDirectory();
 }
 
 /** True for the file classes copied verbatim into dist ("asset" or "opaque"). */

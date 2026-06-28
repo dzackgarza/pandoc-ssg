@@ -27,7 +27,8 @@ local function load_items(meta)
   end
   local raw = fh:read("a")
   fh:close()
-  items = pandoc.json.decode(raw)
+  local data = pandoc.json.decode(raw)
+  items = data.items or {}
 end
 
 local function load_components_registry(meta)

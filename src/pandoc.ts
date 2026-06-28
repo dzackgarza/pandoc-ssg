@@ -20,8 +20,8 @@ export interface RenderInput {
    * [body, argCount] (MathJax 3 tex.macros form).
    */
   mathMacros: Record<string, string | [string, number]>;
-  /** data exposed to component filters; filters own the field contracts */
-  items: Record<string, unknown>;
+  /** data sources exposed to filters; filters own namespace and field contracts */
+  dataSources: Record<string, Record<string, unknown>>;
   /** registry-declared component handlers, passed to the Lua component dispatcher */
   componentHandlers: Record<string, ComponentHandler>;
   /** registry-declared island entries, passed to handlers that emit mounts */
@@ -126,9 +126,9 @@ export async function renderPage(input: RenderInput): Promise<string> {
   // plain filesystem path. Passing it through pandoc metadata directly would
   // let pandoc parse embedded markdown prematurely; the path string survives
   // metadata round-tripping intact, the JSON does not.
-  if (Object.keys(input.items).length > 0) {
+  if (Object.keys(input.dataSources).length > 0) {
     let dataFile = join(metaDir, "data.json");
-    await writeFile(dataFile, JSON.stringify(input.items), "utf8");
+    await writeFile(dataFile, JSON.stringify(input.dataSources), "utf8");
     metadata.data_path = dataFile;
   }
 
