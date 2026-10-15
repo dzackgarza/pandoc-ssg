@@ -56,7 +56,7 @@ const islandShape = z
     output: z.string().min(1),
     source: z.enum(["pandoc", "content"]).optional(),
     dataOutput: z.string().min(1).optional(),
-    dataSource: z.enum(["blog-posts", "items"]).optional(),
+    dataSource: z.string().min(1).optional(),
     mount: z.string().min(1).optional(),
   })
   .strict();
@@ -82,14 +82,14 @@ const bundledRegistryShape = z
 
 const contentConfigShape = z
   .object({
-    passthrough: z.array(z.object({ path: z.string() }).strict()).optional(),
-    dirTypes: z.array(dirTypeShape).optional(),
-    pageTypes: z.record(pageTypeShape).optional(),
-    schemas: z.record(schemaShape).optional(),
-    componentHandlers: z.record(componentHandlerShape).optional(),
-    islands: z.record(islandShape).optional(),
-    generatedArtifacts: z.array(generatedArtifactShape).optional(),
-    filters: z.array(z.string().min(1)).optional(),
+    passthrough: z.array(z.object({ path: z.string() }).strict()).default([]),
+    dirTypes: z.array(dirTypeShape).default([]),
+    pageTypes: z.record(pageTypeShape).default({}),
+    schemas: z.record(schemaShape).default({}),
+    componentHandlers: z.record(componentHandlerShape).default({}),
+    islands: z.record(islandShape).default({}),
+    generatedArtifacts: z.array(generatedArtifactShape).default([]),
+    filters: z.array(z.string().min(1)).default([]),
   })
   .strict();
 
@@ -142,7 +142,7 @@ async function loadBundledRegistry(pandocDir: string): Promise<Omit<SiteConfig, 
     pageTypes: namePageTypes(parsed.data.pageTypes, "pandoc"),
     componentHandlers: nameComponentHandlers(parsed.data.componentHandlers, "pandoc"),
     islands: nameIslands(parsed.data.islands, "pandoc"),
-    filters: registryFiles(parsed.data.filters ?? [], "pandoc"),
+    filters: registryFiles(parsed.data.filters === undefined ? [] : parsed.data.filters, "pandoc"),
   };
 }
 
@@ -156,41 +156,19 @@ function parseSiteConfig(raw: string): ContentConfigExtension {
 }
 
 function contentConfig(data: z.infer<typeof contentConfigShape>): ContentConfigExtension {
-  const content: ContentConfigExtension = {
-    passthrough: [],
-    dirTypes: [],
-    pageTypes: {},
-    schemas: {},
-    componentHandlers: {},
-    islands: {},
-    generatedArtifacts: [],
-    filters: [],
+  // Every field carries a schema-level default (.default), so the parsed data is
+  // total here — map straight through, applying the naming transforms. Empty
+  // record/array defaults pass through the transforms unchanged.
+  return {
+    passthrough: data.passthrough,
+    dirTypes: data.dirTypes,
+    pageTypes: namePageTypes(data.pageTypes, "pandoc"),
+    schemas: data.schemas,
+    componentHandlers: nameComponentHandlers(data.componentHandlers, "content"),
+    islands: nameIslands(data.islands, "content"),
+    generatedArtifacts: data.generatedArtifacts,
+    filters: registryFiles(data.filters, "content"),
   };
-  if (data.passthrough !== undefined) {
-    content.passthrough = data.passthrough;
-  }
-  if (data.dirTypes !== undefined) {
-    content.dirTypes = data.dirTypes;
-  }
-  if (data.pageTypes !== undefined) {
-    content.pageTypes = namePageTypes(data.pageTypes, "pandoc");
-  }
-  if (data.schemas !== undefined) {
-    content.schemas = data.schemas;
-  }
-  if (data.componentHandlers !== undefined) {
-    content.componentHandlers = nameComponentHandlers(data.componentHandlers, "content");
-  }
-  if (data.islands !== undefined) {
-    content.islands = nameIslands(data.islands, "content");
-  }
-  if (data.generatedArtifacts !== undefined) {
-    content.generatedArtifacts = data.generatedArtifacts;
-  }
-  if (data.filters !== undefined) {
-    content.filters = registryFiles(data.filters, "content");
-  }
-  return content;
 }
 
 function parseToml(raw: string, file: string, label: string): unknown {
@@ -214,8 +192,11 @@ function namePageTypes(
       {
         ...value,
         name,
-        source: value.source ?? source,
-        filters: registryFiles(value.filters ?? [], value.source ?? source),
+        source: value.source === undefined ? source : value.source,
+        filters: registryFiles(
+          value.filters === undefined ? [] : value.filters,
+          value.source === undefined ? source : value.source,
+        ),
       },
     ]),
   );
@@ -274,7 +255,7 @@ function mergeContentConfig(
     componentHandlers: { ...bundled.componentHandlers, ...content.componentHandlers },
     islands: { ...bundled.islands, ...content.islands },
     generatedArtifacts: generatedArtifacts(bundled, content),
-    filters: [...(bundled.filters ?? []), ...content.filters],
+    filters: [...(bundled.filters === undefined ? [] : bundled.filters), ...content.filters],
   };
   return validateRegistry(merged, "_site.toml");
 }
@@ -351,7 +332,7 @@ async function validateRegistryFiles(
   Object.values(config.pageTypes).forEach((pageType) => {
     files.push(registryFile(pageType.defaults, pageType.source));
     files.push(registryFile(pageType.template, pageType.source));
-    files.push(...(pageType.filters ?? []));
+    files.push(...(pageType.filters === undefined ? [] : pageType.filters));
     return true;
   });
   Object.values(config.componentHandlers).forEach((handler) => {
@@ -360,7 +341,7 @@ async function validateRegistryFiles(
     }
     return true;
   });
-  files.push(...(config.filters ?? []));
+  files.push(...(config.filters === undefined ? [] : config.filters));
   for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
     let entry = files[fileIndex];
     if (!entry) {

@@ -139,11 +139,8 @@ def _extract_opt_arg_count(raw: str, pos: int) -> tuple[int, int]:
     if pos < len(raw) and raw[pos] == "[":
         close = raw.find("]", pos)
         if close != -1:
-            try:
-                n = int(raw[pos + 1 : close])
-                return n, close + 1
-            except ValueError:
-                pass
+            n = int(raw[pos + 1 : close])
+            return n, close + 1
     return 0, pos
 
 

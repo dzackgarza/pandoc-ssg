@@ -4,10 +4,10 @@ import type { PassthroughEntry, RouteEntry } from "../types.ts";
 
 /**
  * Deterministic routing (O2):
- *   index.md            → "/"
- *   foo.md              → "/foo/"
- *   a/b/index.md        → "/a/b/"
- *   a/b/c.md            → "/a/b/c/"
+ *   index.md            maps to "/"
+ *   foo.md              maps to "/foo/"
+ *   a/b/index.md        maps to "/a/b/"
+ *   a/b/c.md            maps to "/a/b/c/"
  * A validated `site.route` override replaces the inferred URL. node:path/posix
  * owns splitting the dir from the extension-stripped name.
  */
@@ -22,16 +22,16 @@ export function routeForPage(relPath: string, routeOverride: string | false = fa
   return dir === "" ? `/${name}/` : `/${dir}/${name}/`;
 }
 
-/** "/" → "index.html"; "/a/b/" → "a/b/index.html" (outDir-relative). */
+/** "/" maps to "index.html"; "/a/b/" maps to "a/b/index.html" (outDir-relative). */
 export function outputPathForRoute(url: string): string {
   let inner = url.slice(1, -1);
   return inner === "" ? "index.html" : `${inner}/index.html`;
 }
 
 /**
- * Injectivity check (O2): any two entries (page routes or passthrough
- * copies) sharing one output path throw BuildError(kind="route-collision")
- * with both sources in `files`.
+ * Injectivity check (O2): page routes and passthrough copies must not share
+ * one output path. Collisions throw BuildError(kind="route-collision") with
+ * both sources in `files`.
  */
 export function assertNoCollisions(routes: RouteEntry[], passthrough: PassthroughEntry[]): boolean {
   let seen = new Map<string, string>();
