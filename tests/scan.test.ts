@@ -33,6 +33,7 @@ test("scanContent recurses into dotless deep directories and keeps POSIX separat
   expect(got).toEqual([
     "2026/spring/math2250/index.md",
     "2026/spring/math2250/mypic.jpg",
+    "_site.toml",
     "blog/first.md",
     "index.md",
   ]);

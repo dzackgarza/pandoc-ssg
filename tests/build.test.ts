@@ -3,7 +3,7 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
-import { loadAppConfig } from "../src/config.ts";
+import { loadAppConfig, loadSiteConfig } from "../src/config.ts";
 import { BuildError } from "../src/errors.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
@@ -286,17 +286,35 @@ describe("generator config (XDG) is required, never defaulted", () => {
   test("a missing ~/.config/pandoc-ssg/config.toml fails loudly with kind=config", async () => {
     const saved = process.env.XDG_CONFIG_HOME;
     const empty = await mkdtemp(join(tmpdir(), "ssg-noconfig-"));
-    process.env.XDG_CONFIG_HOME = empty;
-    // No fallback: macros/pandoc-tree are config, so an absent config is a build error.
-    const rejection = loadAppConfig();
-    await expect(rejection).rejects.toThrow(BuildError);
-    await expect(rejection).rejects.toMatchObject({ name: "BuildError", kind: "config" });
-    if (saved === undefined) {
-      delete process.env.XDG_CONFIG_HOME;
-    } else {
-      process.env.XDG_CONFIG_HOME = saved;
+    try {
+      process.env.XDG_CONFIG_HOME = empty;
+      // No fallback: macros/pandoc-tree are config, so an absent config is a build error.
+      const rejection = loadAppConfig();
+      await expect(rejection).rejects.toThrow(BuildError);
+      await expect(rejection).rejects.toMatchObject({ name: "BuildError", kind: "config" });
+    } finally {
+      if (saved === undefined) {
+        delete process.env.XDG_CONFIG_HOME;
+      } else {
+        process.env.XDG_CONFIG_HOME = saved;
+      }
+      await rm(empty, { recursive: true, force: true });
     }
-    await rm(empty, { recursive: true, force: true });
+  });
+});
+
+describe("content site config is required, never defaulted", () => {
+  test("a missing content/_site.toml fails loudly with kind=config", async () => {
+    const contentDir = await mkdtemp(join(tmpdir(), "ssg-missing-site-config-"));
+    try {
+      await expect(loadSiteConfig(contentDir, PANDOC_DIR)).rejects.toMatchObject({
+        name: "BuildError",
+        kind: "config",
+        files: ["_site.toml"],
+      });
+    } finally {
+      await rm(contentDir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -197,25 +197,21 @@ async function runCheck(flags: Map<string, string>): Promise<number> {
   let issues = await validateSite(opts.outDir, manifest);
   issues.forEach((issue) => {
     process.stderr.write(`page issue: ${issue.issue} (in ${issue.page})\n`);
-    return true;
   });
   let broken = await checkLinks(opts.outDir);
   broken.forEach((link) => {
     process.stderr.write(`broken link: ${link.target} (in ${link.sourcePage})\n`);
-    return true;
   });
   return issues.length + broken.length === 0 ? 0 : 1;
 }
 
 /** Write each verification finding to stderr. */
-function reportFindings(findings: Awaited<ReturnType<typeof verifySite>>): boolean {
+function reportFindings(findings: Awaited<ReturnType<typeof verifySite>>): void {
   findings.forEach((f) => {
     process.stderr.write(
       `verify: ${f.issue} on ${f.url}${f.detail === "" ? "" : ` — ${f.detail}`}\n`,
     );
-    return true;
   });
-  return true;
 }
 
 /**
@@ -305,7 +301,7 @@ async function runServe(flags: Map<string, string>): Promise<number> {
   let server = await startServer({ outDir, port });
   process.stdout.write(`serving ${outDir} at http://localhost:${server.port}/\n`);
   // Block until the process is terminated; the server keeps handling requests.
-  return await new Promise<number>((): boolean => true);
+  return await new Promise<number>(() => {});
 }
 
 interface ScaffoldContext {
@@ -385,7 +381,6 @@ function scaffoldFields(
   let fields: Record<string, unknown> = {};
   Object.entries(scaffold.fields ?? {}).forEach(([name, value]) => {
     fields[name] = renderTemplate(value, ctx);
-    return true;
   });
   return fields;
 }
@@ -400,6 +395,9 @@ function renderTemplate(template: string, ctx: ScaffoldContext): string {
 
 async function dispatch(argv: string[]): Promise<number> {
   let [subcommand, ...rest] = argv;
+  if (subcommand === undefined) {
+    throw new BuildError("config", [], "missing subcommand");
+  }
 
   if (subcommand === "build") {
     return await runBuild(parseFlags(rest).flags);
@@ -437,12 +435,10 @@ async function dispatch(argv: string[]): Promise<number> {
     return await runPandocConfig(sub, parseFlags(pcRest).flags);
   }
 
-  return await Promise.reject(
-    new BuildError("config", [], `unknown subcommand: ${String(subcommand)}`),
-  );
+  throw new BuildError("config", [], `unknown subcommand: ${subcommand}`);
 }
 
-export async function main(argv: string[]): Promise<number> {
+async function main(argv: string[]): Promise<number> {
   // Single boundary renderer: a thrown BuildError becomes a stderr report and a
   // nonzero return; any other exception propagates (crash) rather than being swallowed.
   let status = 0;

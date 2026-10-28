@@ -68,6 +68,16 @@ function dateToYmd(value: unknown): string {
   return String(value);
 }
 
+describe("CLI dispatch", () => {
+  test("running without a subcommand reports the missing command", async () => {
+    const r = await runCli([]);
+
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("missing subcommand");
+    expect(r.stderr).not.toContain("undefined");
+  });
+});
+
 describe("CLI build (O9)", () => {
   test("build on a valid site exits 0 and populates dist/index.html", async () => {
     const contentDir = await stageContent("valid-site");

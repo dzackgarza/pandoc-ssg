@@ -45,13 +45,13 @@ test("outputPathForRoute maps /a/b/ to a/b/index.html", () => {
 
 // O2: assertNoCollisions.
 
-test("assertNoCollisions does not throw on disjoint outputs", () => {
+test("assertNoCollisions accepts disjoint outputs", () => {
   const routes = [
     route("content/index.md", "/", "index.html"),
     route("content/about.md", "/about/", "about/index.html"),
   ];
   const pass = [passthrough("content/MakeMeAQual/index.html", "MakeMeAQual/index.html")];
-  expect(assertNoCollisions(routes, pass)).toBeTrue();
+  expect(() => assertNoCollisions(routes, pass)).not.toThrow();
 });
 
 test("assertNoCollisions throws route-collision naming both page sources on a page/page clash", async () => {

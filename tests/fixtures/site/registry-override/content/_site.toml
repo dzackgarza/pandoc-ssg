@@ -3,6 +3,7 @@ dir = "essays"
 type = "essay"
 
 [pageTypes.essay]
+source = "pandoc"
 schema = "essay.v1"
 template = "page.html"
 defaults = "defaults/page.yaml"

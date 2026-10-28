@@ -1,9 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import envPaths from "env-paths";
-import { parse } from "smol-toml";
 import { z } from "zod";
-import { BuildError } from "./errors.ts";
+import { BuildError, parseToml } from "./errors.ts";
 import { resolveIslandEntry } from "./island-path.ts";
 import type {
   ComponentHandler,
@@ -14,7 +13,9 @@ import type {
   SiteConfig,
 } from "./types.ts";
 
-const dirTypeShape = z.object({ dir: z.string(), type: z.string() }).strict();
+const pathShape = z.string().min(1);
+
+const dirTypeShape = z.object({ dir: pathShape, type: z.string().min(1) }).strict();
 const pageTypeShape = z
   .object({
     schema: z.string().min(1),
@@ -82,7 +83,7 @@ const bundledRegistryShape = z
 
 const contentConfigShape = z
   .object({
-    passthrough: z.array(z.object({ path: z.string() }).strict()).optional(),
+    passthrough: z.array(z.object({ path: pathShape }).strict()).optional(),
     dirTypes: z.array(dirTypeShape).optional(),
     pageTypes: z.record(pageTypeShape).optional(),
     schemas: z.record(schemaShape).optional(),
@@ -117,9 +118,7 @@ export async function loadSiteConfig(contentDir: string, pandocDir: string): Pro
   const bundled = await loadBundledRegistry(pandocDir);
   const configPath = join(contentDir, "_site.toml");
   if (!(await Bun.file(configPath).exists())) {
-    const config = validateRegistry({ ...bundled, passthrough: [] }, join(pandocDir, "registry.toml"));
-    await validateRegistryFiles(config, contentDir, pandocDir, join(pandocDir, "registry.toml"));
-    return config;
+    throw new BuildError("config", ["_site.toml"], `site config not found: ${configPath}`);
   }
   const raw = await readFile(configPath, "utf8");
   const config = mergeContentConfig(bundled, parseSiteConfig(raw));
@@ -132,7 +131,7 @@ async function loadBundledRegistry(pandocDir: string): Promise<Omit<SiteConfig, 
   if (!(await Bun.file(path).exists())) {
     throw new BuildError("config", [path], `bundled registry not found: ${path}`);
   }
-  const table = parseToml(await readFile(path, "utf8"), path, "bundled registry");
+  const table = parseToml(await readFile(path, "utf8"), "config", path, "bundled registry");
   const parsed = bundledRegistryShape.safeParse(table);
   if (!parsed.success) {
     throw new BuildError("config", [path], parsed.error.message);
@@ -147,7 +146,7 @@ async function loadBundledRegistry(pandocDir: string): Promise<Omit<SiteConfig, 
 }
 
 function parseSiteConfig(raw: string): ContentConfigExtension {
-  const table = parseToml(raw, "_site.toml", "_site.toml");
+  const table = parseToml(raw, "config", "_site.toml", "_site.toml");
   const parsed = contentConfigShape.safeParse(table);
   if (!parsed.success) {
     throw new BuildError("config", ["_site.toml"], parsed.error.message);
@@ -173,7 +172,7 @@ function contentConfig(data: z.infer<typeof contentConfigShape>): ContentConfigE
     content.dirTypes = data.dirTypes;
   }
   if (data.pageTypes !== undefined) {
-    content.pageTypes = namePageTypes(data.pageTypes, "pandoc");
+    content.pageTypes = namePageTypes(data.pageTypes, "content");
   }
   if (data.schemas !== undefined) {
     content.schemas = data.schemas;
@@ -191,17 +190,6 @@ function contentConfig(data: z.infer<typeof contentConfigShape>): ContentConfigE
     content.filters = registryFiles(data.filters, "content");
   }
   return content;
-}
-
-function parseToml(raw: string, file: string, label: string): unknown {
-  let table: unknown = {};
-  try {
-    table = parse(raw);
-  } catch (err) {
-    let detail = err instanceof Error ? err.message : String(err);
-    throw new BuildError("config", [file], `malformed ${label}: ${detail}`, err);
-  }
-  return table;
 }
 
 function namePageTypes(
@@ -293,11 +281,9 @@ function mergeDirTypes(
   const byDir = new Map<string, { dir: string; type: string }>();
   bundled.forEach((entry) => {
     byDir.set(entry.dir, entry);
-    return true;
   });
   content.forEach((entry) => {
     byDir.set(entry.dir, entry);
-    return true;
   });
   return [...byDir.values()];
 }
@@ -316,7 +302,6 @@ function validateRegistry(config: SiteConfig, file: string): SiteConfig {
       );
     }
     assertRenderableSchema(schema, pageType.schema, file);
-    return true;
   });
   config.dirTypes.forEach(({ dir, type }) => {
     if (typeof config.pageTypes[type] === "undefined") {
@@ -326,7 +311,6 @@ function validateRegistry(config: SiteConfig, file: string): SiteConfig {
         `dirTypes entry ${dir} references unknown page type ${type}`,
       );
     }
-    return true;
   });
   Object.entries(config.componentHandlers).forEach(([name, handler]) => {
     if (handler.island && typeof config.islands[handler.island] === "undefined") {
@@ -336,7 +320,6 @@ function validateRegistry(config: SiteConfig, file: string): SiteConfig {
         `component handler ${name} references unknown island ${handler.island}`,
       );
     }
-    return true;
   });
   return config;
 }
@@ -346,19 +329,17 @@ async function validateRegistryFiles(
   contentDir: string,
   pandocDir: string,
   file: string,
-): Promise<boolean> {
+): Promise<void> {
   let files: RegistryFile[] = [];
   Object.values(config.pageTypes).forEach((pageType) => {
     files.push(registryFile(pageType.defaults, pageType.source));
     files.push(registryFile(pageType.template, pageType.source));
     files.push(...(pageType.filters ?? []));
-    return true;
   });
   Object.values(config.componentHandlers).forEach((handler) => {
     if (handler.module) {
       files.push(handler.module);
     }
-    return true;
   });
   files.push(...(config.filters ?? []));
   for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
@@ -379,14 +360,13 @@ async function validateRegistryFiles(
       throw new BuildError("config", [file], `registry path not found: ${island.entry}`);
     }
   }
-  return true;
 }
 
 function registryFile(path: string, source: RegistrySource | undefined): RegistryFile {
   return { path, source };
 }
 
-function registryPath(file: RegistryFile, contentDir: string, pandocDir: string): string {
+export function registryPath(file: RegistryFile, contentDir: string, pandocDir: string): string {
   let base = file.source === "content" ? contentDir : pandocDir;
   // Islands are resolved by resolveIslandEntry, not here; this handles page
   // templates, defaults, filters, and component-handler modules.
@@ -400,7 +380,7 @@ function assertRenderableSchema(
   schema: SiteConfig["schemas"][string],
   schemaId: string,
   file: string,
-): boolean {
+): void {
   let hasTitle = false;
   schema.fields.forEach((field) => {
     if (field.name === "site") {
@@ -409,7 +389,6 @@ function assertRenderableSchema(
     if (field.name === "title" && field.type === "string" && field.required) {
       hasTitle = true;
     }
-    return true;
   });
   if (!hasTitle) {
     throw new BuildError(
@@ -418,7 +397,6 @@ function assertRenderableSchema(
       `schema ${schemaId} must declare required string field title`,
     );
   }
-  return true;
 }
 
 /**
@@ -432,8 +410,8 @@ export interface AppConfig {
 }
 
 const appConfigShape = z.object({
-  pandoc_home: z.string(),
-  mathjax_macro_manifest: z.string(),
+  pandoc_home: pathShape,
+  mathjax_macro_manifest: pathShape,
 });
 
 /**
@@ -457,7 +435,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
   if (!(await Bun.file(path).exists())) {
     throw new BuildError("config", [path], `generator config not found: ${path}`);
   }
-  const table = parseToml(await readFile(path, "utf8"), path, "generator config");
+  const table = parseToml(await readFile(path, "utf8"), "config", path, "generator config");
   const parsed = appConfigShape.safeParse(table);
   if (!parsed.success) {
     throw new BuildError("config", [path], parsed.error.message);

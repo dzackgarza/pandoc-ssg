@@ -2,7 +2,9 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import * as YAML from "yaml";
+import { registryPath } from "./config.ts";
 import { BuildError } from "./errors.ts";
+import { resolveIslandEntry } from "./island-path.ts";
 import type { ComponentHandler, IslandEntry, NavItem, PageType, RegistryFile } from "./types.ts";
 
 export interface RenderInput {
@@ -179,16 +181,6 @@ export async function renderPage(input: RenderInput): Promise<string> {
   return rendered;
 }
 
-function registryPath(file: RegistryFile, contentRoot: string, pandocDir: string): string {
-  if (file.source !== "content" && file.path.startsWith("islands/")) {
-    return join(pandocDir, "..", file.path);
-  }
-  if (file.source !== "content" && file.path.endsWith(".html") && !file.path.includes("/")) {
-    return join(pandocDir, "templates", file.path);
-  }
-  return join(file.source === "content" ? contentRoot : pandocDir, file.path);
-}
-
 function componentRegistry(input: RenderInput): Record<string, unknown> {
   return {
     contentRoot: resolve(input.contentRoot),
@@ -208,7 +200,7 @@ function componentRegistry(input: RenderInput): Record<string, unknown> {
       Object.entries(input.islands).map(([name, island]) => [
         name,
         {
-          entry: registryPath({ path: island.entry, source: island.source }, input.contentRoot, input.pandocDir),
+          entry: resolveIslandEntry(island, { contentDir: input.contentRoot, pandocDir: input.pandocDir }),
           output: island.output,
           dataOutput: island.dataOutput,
           dataSource: island.dataSource,

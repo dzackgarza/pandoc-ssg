@@ -1,3 +1,5 @@
+import { parse } from "smol-toml";
+
 export type BuildErrorKind =
   | "config"
   | "schema"
@@ -13,28 +15,33 @@ export type BuildErrorKind =
  * offending `files`, never on message text.
  */
 export class BuildError extends Error {
-  declare readonly kind: BuildErrorKind;
+  readonly kind: BuildErrorKind;
   /** content-relative paths of the offending source file(s) */
-  declare readonly files: string[];
+  readonly files: string[];
 
-  constructor(kind: BuildErrorKind, files: string[], message: string, cause: unknown | false = false) {
-    super(message);
-    return createBuildError(kind, files, message, cause);
+  constructor(kind: BuildErrorKind, files: string[], message: string, cause?: unknown) {
+    if (cause === undefined) {
+      super(message);
+    } else {
+      super(message, { cause });
+    }
+    this.name = "BuildError";
+    this.kind = kind;
+    this.files = files;
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
-function createBuildError(
+export function parseToml(
+  raw: string,
   kind: BuildErrorKind,
-  files: string[],
-  message: string,
-  cause: unknown | false,
-): BuildError {
-  let error = cause === false ? new Error(message) : new Error(message, { cause });
-  Object.setPrototypeOf(error, BuildError.prototype);
-  Object.defineProperties(error, {
-    name: { value: "BuildError", configurable: true },
-    kind: { value: kind, enumerable: true, configurable: true },
-    files: { value: files, enumerable: true, configurable: true },
-  });
-  return error as BuildError;
+  file: string,
+  label: string,
+): unknown {
+  try {
+    return parse(raw);
+  } catch (err) {
+    let detail = err instanceof Error ? err.message : String(err);
+    throw new BuildError(kind, [file], `malformed ${label}: ${detail}`, err);
+  }
 }
