@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
 import type { Manifest } from "../src/types.ts";
+import { listOutputFiles } from "./files.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -41,6 +42,15 @@ describe("O18: theme assets are emitted and linked", () => {
   test("records the emitted theme stylesheet in the manifest with kind 'theme'", () => {
     const theme = manifest.generated.filter((g) => g.kind === "theme").map((g) => g.output);
     expect(theme).toContain("assets/theme/site.css");
+  });
+
+  test("every source theme asset appears in the generated manifest", async () => {
+    const sourceFiles = await listOutputFiles(join(PANDOC_DIR, "assets"));
+    const outputs = manifest.generated
+      .filter((g) => g.kind === "theme")
+      .map((g) => g.output)
+      .sort();
+    expect(outputs).toEqual(sourceFiles.map((file) => `assets/${file}`));
   });
 
   test("theme manifest entries point back to their source assets", () => {

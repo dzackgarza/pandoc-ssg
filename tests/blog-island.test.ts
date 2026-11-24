@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chromium } from "playwright";
 import type { Browser, Page } from "playwright";
+import { chromium } from "playwright";
 import { build } from "../src/build.ts";
 import { type RunningServer, startServer } from "../src/serve.ts";
 import type { Manifest } from "../src/types.ts";
+import { listOutputFiles } from "./files.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -21,21 +22,6 @@ interface PostMeta {
   tags: string[];
   categories: string[];
   excerpt: string;
-}
-
-/** All file paths (POSIX, dir-relative) under `root`, recursively. */
-async function walk(root: string, prefix = ""): Promise<string[]> {
-  const out: string[] = [];
-  const entries = await readdir(root, { withFileTypes: true });
-  for (const e of entries) {
-    const rel = prefix ? `${prefix}/${e.name}` : e.name;
-    if (e.isDirectory()) {
-      out.push(...(await walk(join(root, e.name), rel)));
-    } else {
-      out.push(rel);
-    }
-  }
-  return out;
 }
 
 /**
@@ -117,7 +103,7 @@ describe("O16: blog-index island build output", () => {
   });
 
   test("bijection: dist == manifest.json ∪ routes ∪ passthrough ∪ generated", async () => {
-    const onDisk = (await walk(outDir)).sort();
+    const onDisk = await listOutputFiles(outDir);
     const expected = [
       "site-manifest.json",
       ...manifest.routes.map((r) => r.output),
