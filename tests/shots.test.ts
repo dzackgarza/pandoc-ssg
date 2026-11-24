@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type RunningServer, startServer } from "../src/serve.ts";
-import type { Manifest } from "../src/types.ts";
 import { type ShotResult, screenshotSite, shotName } from "../src/shots.ts";
+import type { Manifest } from "../src/types.ts";
 
 function page(body: string): string {
   return [
@@ -45,6 +46,53 @@ describe("O29: full-page screenshot capture", () => {
     expect(shotName("/about/")).toBe("about");
     expect(shotName("/blog/first-post/")).toBe("blog-first-post");
   });
+
+  test("finishes each capture before navigating to the next route", async () => {
+    let shotsDir = await mkdtemp(join(tmpdir(), "ssg-shots-sequential-"));
+    let keys = ["h", "g", "f", "e", "d", "c", "b", "a"];
+    let visited: string[] = [];
+    let overlapping: string[] = [];
+    let server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(request) {
+        let route = new URL(request.url).pathname;
+        let key = route.slice(1, -1);
+        if (!keys.includes(key)) {
+          return new Response("Not found", { status: 404 });
+        }
+        if (visited.some((previous) => !existsSync(join(shotsDir, `${previous}.png`)))) {
+          overlapping.push(key);
+        }
+        visited.push(key);
+        // Keep navigation pending long enough for an unbounded batch to overlap.
+        await Bun.sleep(500);
+        return new Response(page(`<h1>${key}</h1>`), {
+          headers: { "Content-Type": "text/html" },
+        });
+      },
+    });
+    try {
+      let results = await screenshotSite({
+        baseUrl: `http://127.0.0.1:${server.port}`,
+        manifest: manifestFor(keys),
+        outDir: shotsDir,
+        timeoutMs: 20000,
+      });
+      expect(overlapping).toEqual([]);
+      expect(visited).toEqual(keys);
+      expect(results.map((result) => result.url)).toEqual(
+        [...keys].sort().map((key) => `/${key}/`),
+      );
+      for (let result of results) {
+        let bytes = await readFile(result.file);
+        expect(bytes.subarray(0, 8).equals(PNG_MAGIC)).toBe(true);
+      }
+    } finally {
+      server.stop(true);
+      await rm(shotsDir, { recursive: true, force: true });
+    }
+  }, 60000);
 
   describe("screenshotSite over a served tree", () => {
     let outDir: string;
