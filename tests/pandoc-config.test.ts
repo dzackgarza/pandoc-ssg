@@ -28,8 +28,13 @@ async function git(cwd: string, args: string[]): Promise<string> {
       GIT_COMMITTER_EMAIL: "t@t",
     },
   });
-  const out = await new Response(proc.stdout).text();
-  await proc.exited;
+  const [out, err] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  if ((await proc.exited) !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${err}`);
+  }
   return out.trim();
 }
 
@@ -109,4 +114,106 @@ describe("pandoc-config provenance + drift", () => {
     expect(written).toBe(knownGoodMarkerPath(content));
     expect((await pandocConfigStatus(home, content)).drift).toEqual({ aheadBy: 0 });
   });
+});
+
+/** Run the real CLI with an isolated generator configuration and Git checkout. */
+async function cliFixture() {
+  const home = await setupPandocHome();
+  const content = await tempContent();
+  const xdg = await mkdtemp(join(tmpdir(), "pandoc-config-xdg-"));
+  temps.push(xdg);
+  const config = join(xdg, "pandoc-ssg");
+  await mkdir(config);
+  await writeFile(
+    join(config, "config.toml"),
+    `pandoc_home = "${home}"\nmathjax_macro_manifest = "${join(home, "f.txt")}"\n`,
+  );
+  const marker = knownGoodMarkerPath(content);
+  await writeKnownGood(content, "v1.0.0");
+  await commit(home, "two");
+  return { home, content, xdg, marker };
+}
+
+async function runPandocConfigCli(sub: string, content: string, xdg: string) {
+  const proc = Bun.spawn(
+    [
+      process.execPath,
+      join(import.meta.dir, "../src/cli.ts"),
+      "pandoc-config",
+      sub,
+      "--content",
+      content,
+    ],
+    {
+      env: { ...process.env, XDG_CONFIG_HOME: xdg },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  return { stdout, stderr, exitCode: await proc.exited };
+}
+
+describe("pandoc-config bump CLI", () => {
+  test.each(["unstaged", "staged", "untracked"])(
+    "refuses %s changes and preserves the previous marker byte-for-byte",
+    async (kind) => {
+      const { home, content, xdg, marker } = await cliFixture();
+      const previous = await Bun.file(marker).text();
+      if (kind === "untracked") {
+        await writeFile(join(home, "extra.lua"), "-- uncommitted filter");
+        // Even a repository configured to hide untracked files must reject them.
+        await git(home, ["config", "status.showUntrackedFiles", "no"]);
+      } else {
+        await writeFile(join(home, "f.txt"), "uncommitted render input");
+        if (kind === "staged") {
+          await git(home, ["add", "f.txt"]);
+        }
+      }
+      const result = await runPandocConfigCli("bump", content, xdg);
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain("commit");
+      expect(await Bun.file(marker).text()).toBe(previous);
+    },
+  );
+
+  test.each(["non-repository", "unborn HEAD"])(
+    "refuses a %s and preserves the marker",
+    async (kind) => {
+      const { home, content, xdg, marker } = await cliFixture();
+      const previous = await Bun.file(marker).text();
+      await rm(join(home, ".git"), { recursive: true });
+      if (kind === "unborn HEAD") {
+        await rm(join(home, "f.txt"));
+        await git(home, ["init", "-q", "-b", "main"]);
+      }
+      const result = await runPandocConfigCli("bump", content, xdg);
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain("cannot bump known-good");
+      expect(await Bun.file(marker).text()).toBe(previous);
+    },
+  );
+
+  test.each(["v1.0.0", "v1.0.0-dirty"])(
+    "a clean bump replaces %s with a resolvable HEAD version which print can read",
+    async (previous) => {
+      const { home, content, xdg, marker } = await cliFixture();
+      await writeKnownGood(content, previous);
+      const expected = await git(home, ["describe", "--tags", "--always"]);
+      const result = await runPandocConfigCli("bump", content, xdg);
+      expect(result.exitCode).toBe(0);
+      expect(await Bun.file(marker).text()).toBe(`${expected}\n`);
+      expect(await git(home, ["rev-parse", `${expected}^{commit}`])).toBe(
+        await git(home, ["rev-parse", "HEAD"]),
+      );
+      const printed = await runPandocConfigCli("print", content, xdg);
+      expect(printed.exitCode).toBe(0);
+      expect(printed.stderr).toBe("");
+      expect(printed.stdout).toContain(`known-good:            ${expected}`);
+      expect((await pandocConfigStatus(home, content)).drift).toEqual({ aheadBy: 0 });
+    },
+  );
 });

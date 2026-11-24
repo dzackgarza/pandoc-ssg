@@ -61,12 +61,20 @@ pandoc-ssg verify [--content DIR] [--pandoc DIR] [--out DIR]   # build, then bro
 pandoc-ssg serve  [--out DIR] [--port N]
 pandoc-ssg deploy DIR [--content DIR] [--pandoc DIR] [--out DIR]  # build, then rsync -a --delete into DIR
 pandoc-ssg new post "Title" [--content DIR]
+pandoc-ssg pandoc-config [print|bump] [--content DIR]
 ```
 
 Defaults: `--content ./content`, `--out ./dist`, and `--pandoc` resolves to the design layer bundled with this package.
 A content repo may override `--pandoc` to supply its own templates/filters/defaults.
 The MathJax macro manifest and the pandoc tree are read from the static config (see Requirements), not flags.
 `deploy` browser-verifies the built tree and refuses to publish if any page has a rendering defect.
+
+`pandoc-config print` reports the current shared pandoc-config version and the site's
+last verified version. After verifying rendering against a committed pandoc-config
+checkout, use `pandoc-config bump` to update the site's `pandoc-config.known-good`
+marker. The bump refuses staged, unstaged, or untracked (non-ignored) changes in
+that checkout, leaves the existing marker unchanged, and asks you to commit or
+remove the changes first. Ordinary builds still use the live checkout.
 
 ## Theme ownership
 
