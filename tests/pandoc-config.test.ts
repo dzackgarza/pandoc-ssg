@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -215,5 +215,118 @@ describe("pandoc-config bump CLI", () => {
       expect(printed.stdout).toContain(`known-good:            ${expected}`);
       expect((await pandocConfigStatus(home, content)).drift).toEqual({ aheadBy: 0 });
     },
+  );
+});
+
+async function buildFixture(change: "none" | "config" | "tracked" | "untracked") {
+  const { home, content, xdg, marker } = await cliFixture();
+  const configPath = join(xdg, "pandoc-ssg", "config.toml");
+  const manifest = join(import.meta.dir, "fixtures", "macros", "manifest.txt");
+  const other = await setupPandocHome();
+  await git(other, ["tag", "-d", "v1.0.0"]);
+  await git(other, ["tag", "other-version"]);
+  const replacement = `pandoc_home = "${other}"\nmathjax_macro_manifest = "${manifest}"\n`;
+  const writeLua = (path: string, value: string) =>
+    `local f = assert(io.open(${JSON.stringify(path)}, "w"))
+f:write(${JSON.stringify(value)})
+f:close()`;
+  const effect =
+    change === "config"
+      ? writeLua(configPath, replacement)
+      : change === "tracked" || change === "untracked"
+        ? writeLua(join(home, change === "tracked" ? "f.txt" : "untracked.txt"), "changed during rendering")
+        : "";
+  await mkdir(join(home, "filters"));
+  await writeFile(
+    join(home, "filters", "convert_amsthm_envs.lua"),
+    `function Pandoc(doc)
+${effect}
+table.insert(doc.blocks, pandoc.Para{pandoc.Str("RenderedFromFirstCheckout")})
+return doc
+end`,
+  );
+  await writeFile(join(home, "filters", "tikzcd.lua"), "return {}\n");
+  await git(home, ["add", "filters"]);
+  await git(home, ["commit", "-m", "rendering filters"]);
+  await git(home, ["tag", "first-version"]);
+  if (change === "tracked" || change === "untracked") {
+    // An already-dirty checkout must not hide a second modification.
+    await writeFile(join(home, change === "tracked" ? "f.txt" : "untracked.txt"), "changed before rendering");
+  }
+  await writeKnownGood(content, "v1.0.0");
+  await writeFile(configPath, `pandoc_home = "${home}"\nmathjax_macro_manifest = "${manifest}"\n`);
+  await copyFile(
+    join(import.meta.dir, "fixtures", "cli", "valid-site", "content", "_site.toml"),
+    join(content, "_site.toml"),
+  );
+  await copyFile(
+    join(import.meta.dir, "fixtures", "cli", "valid-site", "content", "index.md"),
+    join(content, "index.md"),
+  );
+  return { home, content, xdg, marker, configPath, replacement, out: join(content, "..", "dist") };
+}
+
+async function runBuildCli(fixture: Awaited<ReturnType<typeof buildFixture>>) {
+  const proc = Bun.spawn(
+    [
+      process.execPath,
+      join(import.meta.dir, "../src/cli.ts"),
+      "build",
+      "--content",
+      fixture.content,
+      "--out",
+      fixture.out,
+    ],
+    {
+      env: { ...process.env, XDG_CONFIG_HOME: fixture.xdg },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  return { stdout, stderr, exitCode: await proc.exited };
+}
+
+describe("build CLI provenance", () => {
+  test.each(["none", "config"] as const)(
+    "reports the checkout that supplied the actual Pandoc filters (change: %s)",
+    async (change) => {
+      const fixture = await buildFixture(change);
+      const result = await runBuildCli(fixture);
+      if (result.exitCode !== 0) throw new Error(result.stderr);
+      expect(result.exitCode).toBe(0);
+      expect(await Bun.file(join(fixture.out, "index.html")).text()).toContain(
+        "RenderedFromFirstCheckout",
+      );
+      expect(result.stdout).toContain("pandoc-config: built against first-version");
+      expect(result.stdout).not.toContain("other-version");
+      expect(result.stderr).toContain("advanced 2 commit(s)");
+      if (change === "config") {
+        expect(await Bun.file(fixture.configPath).text()).toBe(fixture.replacement);
+      }
+    },
+    30000,
+  );
+
+  test.each(["tracked", "untracked"] as const)(
+    "warns rather than certifying a checkout whose %s input changed during rendering",
+    async (change) => {
+      const fixture = await buildFixture(change);
+      const result = await runBuildCli(fixture);
+      if (result.exitCode !== 0) throw new Error(result.stderr);
+      expect(result.exitCode).toBe(0);
+      expect(await Bun.file(join(fixture.out, "index.html")).text()).toContain(
+        "RenderedFromFirstCheckout",
+      );
+      expect(
+        await Bun.file(join(fixture.home, change === "tracked" ? "f.txt" : "untracked.txt")).text(),
+      ).toBe("changed during rendering");
+      expect(result.stdout).not.toContain("built against");
+      expect(result.stderr).toContain("pandocHome changed during the build");
+    },
+    30000,
   );
 });
