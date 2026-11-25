@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { BuildError } from "./errors.ts";
 
 /**
  * Provenance + drift tracking for the central pandoc machinery.
@@ -57,6 +58,44 @@ export async function resolvePandocConfigVersion(pandocHome: string): Promise<st
   return described.out;
 }
 
+/**
+ * Resolve a version suitable for a known-good marker, not merely a build's
+ * provenance. A dirty worktree cannot certify the committed render inputs.
+ */
+export async function resolveCleanPandocConfigVersion(pandocHome: string): Promise<string> {
+  let status = await git(pandocHome, [
+    "status",
+    "--porcelain=v1",
+    "--untracked-files=all",
+    "--ignore-submodules=none",
+  ]);
+  if (!status.ok) {
+    throw new BuildError(
+      "config",
+      [],
+      "cannot bump known-good: unable to inspect pandocHome Git status",
+    );
+  }
+  if (status.out !== "") {
+    throw new BuildError(
+      "config",
+      [],
+      "cannot bump known-good: pandocHome has uncommitted changes; commit or remove them first",
+    );
+  }
+  // Unlike build provenance, this describes a committed object explicitly;
+  // Git must not append a synthetic "-dirty" suffix to the marker.
+  let described = await git(pandocHome, ["describe", "--tags", "--always", "HEAD"]);
+  if (!described.ok) {
+    throw new BuildError(
+      "config",
+      [],
+      "cannot bump known-good: pandocHome has no resolvable Git version",
+    );
+  }
+  return described.out;
+}
+
 async function readKnownGood(contentDir: string): Promise<string | null> {
   let marker = Bun.file(knownGoodMarkerPath(contentDir));
   if (!(await marker.exists())) {
@@ -76,7 +115,10 @@ export async function writeKnownGood(contentDir: string, version: string): Promi
   return path;
 }
 
-async function driftAgainst(pandocHome: string, knownGood: string): Promise<{ aheadBy: number } | null> {
+async function driftAgainst(
+  pandocHome: string,
+  knownGood: string,
+): Promise<{ aheadBy: number } | null> {
   let kg = await git(pandocHome, ["rev-parse", `${knownGood}^{commit}`]);
   if (!kg.ok) {
     return null;

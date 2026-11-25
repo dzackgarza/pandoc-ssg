@@ -35,13 +35,17 @@ import { join } from "node:path";
 import matter from "gray-matter";
 import { build } from "./build.ts";
 import { loadAppConfig, loadSiteConfig } from "./config.ts";
+import { validatePageMeta } from "./content/schemas.ts";
 import { deploySite } from "./deploy.ts";
 import { BuildError } from "./errors.ts";
-import { pandocConfigStatus, writeKnownGood } from "./pandoc-config.ts";
-import { checkLinks, checkServedLinks } from "./site/links.ts";
-import { validatePageMeta } from "./content/schemas.ts";
+import {
+  pandocConfigStatus,
+  resolveCleanPandocConfigVersion,
+  writeKnownGood,
+} from "./pandoc-config.ts";
 import { startServer } from "./serve.ts";
 import { screenshotSite } from "./shots.ts";
+import { checkLinks, checkServedLinks } from "./site/links.ts";
 import { validateSite } from "./site/validate.ts";
 import type { PageScaffold, PageType, SiteConfig } from "./types.ts";
 import { type VerifyFinding, verifySite } from "./verify.ts";
@@ -142,7 +146,9 @@ async function reportPandocConfig(contentDir: string): Promise<void> {
   let appConfig = await loadAppConfig();
   let status = await pandocConfigStatus(appConfig.pandocHome, contentDir);
   if (status.version === null) {
-    process.stderr.write("pandoc-config: provenance unavailable — pandocHome is not a git checkout\n");
+    process.stderr.write(
+      "pandoc-config: provenance unavailable — pandocHome is not a git checkout\n",
+    );
     return;
   }
   process.stdout.write(`pandoc-config: built against ${status.version}\n`);
@@ -162,31 +168,38 @@ async function reportPandocConfig(contentDir: string): Promise<void> {
 }
 
 /** `pandoc-config [print|bump]`: inspect or advance the site's known-good pandoc-config stamp. */
-async function runPandocConfig(sub: string | undefined, flags: Map<string, string>): Promise<number> {
+async function runPandocConfig(
+  sub: string | undefined,
+  flags: Map<string, string>,
+): Promise<number> {
   if (sub !== undefined && sub !== "bump" && sub !== "print") {
     return await Promise.reject(
-      new BuildError("config", [], `unknown pandoc-config subcommand: ${sub} (expected: print, bump)`),
+      new BuildError(
+        "config",
+        [],
+        `unknown pandoc-config subcommand: ${sub} (expected: print, bump)`,
+      ),
     );
   }
   let contentDir = flagOr(flags, "content", "content");
   let appConfig = await loadAppConfig();
-  let status = await pandocConfigStatus(appConfig.pandocHome, contentDir);
   if (sub === "bump") {
-    if (status.version === null) {
-      return await Promise.reject(
-        new BuildError("config", [], "cannot bump known-good: pandocHome is not a git checkout"),
-      );
-    }
-    let path = await writeKnownGood(contentDir, status.version);
-    process.stdout.write(`known-good set to ${status.version} (${path})\n`);
+    let version = await resolveCleanPandocConfigVersion(appConfig.pandocHome);
+    let path = await writeKnownGood(contentDir, version);
+    process.stdout.write(`known-good set to ${version} (${path})\n`);
     return 0;
   }
+  let status = await pandocConfigStatus(appConfig.pandocHome, contentDir);
   process.stdout.write(
     `pandoc-config version: ${status.version === null ? "unavailable" : status.version}\n`,
   );
-  process.stdout.write(`known-good:            ${status.knownGood === null ? "(unset)" : status.knownGood}\n`);
+  process.stdout.write(
+    `known-good:            ${status.knownGood === null ? "(unset)" : status.knownGood}\n`,
+  );
   if (status.drift !== null && status.drift.aheadBy > 0) {
-    process.stdout.write(`drift:                 ahead by ${status.drift.aheadBy} commit(s) — re-verify and bump\n`);
+    process.stdout.write(
+      `drift:                 ahead by ${status.drift.aheadBy} commit(s) — re-verify and bump\n`,
+    );
   }
   return 0;
 }
@@ -374,10 +387,7 @@ function requiredScaffold(pageType: PageType, requestedType: string): PageScaffo
   throw new BuildError("scaffold", [], `page type has no scaffold: ${requestedType}`);
 }
 
-function scaffoldFields(
-  scaffold: PageScaffold,
-  ctx: ScaffoldContext,
-): Record<string, unknown> {
+function scaffoldFields(scaffold: PageScaffold, ctx: ScaffoldContext): Record<string, unknown> {
   let fields: Record<string, unknown> = {};
   Object.entries(scaffold.fields ?? {}).forEach(([name, value]) => {
     fields[name] = renderTemplate(value, ctx);
