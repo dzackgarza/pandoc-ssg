@@ -10,6 +10,7 @@ import { classifyFiles } from "./content/classify.ts";
 import { resolvePageType, validatePageMeta } from "./content/schemas.ts";
 import { BuildError } from "./errors.ts";
 import { buildIsland } from "./islands.ts";
+import { pandocConfigInputState, pandocConfigStatus } from "./pandoc-config.ts";
 import { renderPage } from "./pandoc.ts";
 import { loadNavigation } from "./site/nav.ts";
 import { assertNoCollisions, outputPathForRoute, routeForPage } from "./site/routes.ts";
@@ -227,6 +228,19 @@ type PreviousOutput =
  * until the staged tree is ready to become active.
  */
 export async function build(opts: BuildOptions): Promise<Manifest> {
+  return (await buildResult(opts, false)).manifest;
+}
+
+/** Use the same validated build and observe provenance at its actual input boundary. */
+export async function buildWithPandocConfig(opts: BuildOptions) {
+  const result = await buildResult(opts, true);
+  if (result.status === null) {
+    throw new Error("missing pandoc-config observation");
+  }
+  return { status: result.status, changed: result.changed };
+}
+
+async function buildResult(opts: BuildOptions, observePandocConfig: boolean) {
   let { contentDir, pandocDir, outDir } = opts;
   let config = await loadSiteConfig(contentDir, pandocDir);
   let relPaths = await scanFiles(contentDir);
@@ -234,6 +248,11 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
   let plan = await planBuild(contentDir, classified, config);
   let nav = await loadNavigation(contentDir);
   let appConfig = await loadAppConfig();
+  const status = observePandocConfig
+    ? await pandocConfigStatus(appConfig.pandocHome, contentDir)
+    : null;
+  const before =
+    status?.version != null ? await pandocConfigInputState(appConfig.pandocHome) : null;
   let dependencyContext = await manifestDependencyContext(contentDir, pandocDir, appConfig.mathjaxMacroManifest, config);
   let routes = plan.pages.map((page) => routeWithDependencies(page, dependencyContext));
   let passthrough = plan.passthrough.map((entry) => passthroughWithDependencies(entry));
@@ -279,8 +298,17 @@ export async function build(opts: BuildOptions): Promise<Manifest> {
     };
 
     await writeFile(join(staging, "site-manifest.json"), JSON.stringify(manifest), "utf8");
+    const after =
+      status?.version != null ? await pandocConfigInputState(appConfig.pandocHome) : null;
+    const changed =
+      status?.version != null &&
+      (before === null ||
+        after === null ||
+        before.version !== status.version ||
+        before.version !== after.version ||
+        before.fingerprint !== after.fingerprint);
     await replaceOutputTree(staging, outDir);
-    return manifest;
+    return { manifest, status, changed };
   } finally {
     await rm(staging, { recursive: true, force: true });
   }

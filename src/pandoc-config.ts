@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { lstat, readFile, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { BuildError } from "./errors.ts";
 
@@ -30,7 +32,7 @@ export interface PandocConfigStatus {
   drift: { aheadBy: number } | null;
 }
 
-async function git(cwd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
+async function git(cwd: string, args: string[], raw = false): Promise<{ ok: boolean; out: string }> {
   // stderr inherits the parent's, so git's own diagnostics ("fatal: not a git
   // repository", "permission denied", …) are preserved and visible — never
   // piped-and-discarded. A missing git binary or bad cwd makes Bun.spawn throw,
@@ -38,7 +40,7 @@ async function git(cwd: string, args: string[]): Promise<{ ok: boolean; out: str
   let proc = Bun.spawn(["git", "-C", cwd, ...args], { stdout: "pipe", stderr: "inherit" });
   let out = await new Response(proc.stdout).text();
   let code = await proc.exited;
-  return { ok: code === 0, out: out.trim() };
+  return { ok: code === 0, out: raw ? out : out.trim() };
 }
 
 /** Committed per-site marker recording the pandoc-config version the site was last verified against. */
@@ -148,4 +150,48 @@ export async function pandocConfigStatus(
     drift = await driftAgainst(pandocHome, knownGood);
   }
   return { version, knownGood, drift };
+}
+
+/** Observe the Git checkout at either end of rendering, including already-dirty
+ * tracked files and untracked files. This is a change detector, not a lock:
+ * floating builds still use the live tree rather than a pinned checkout.
+ */
+export async function pandocConfigInputState(
+  pandocHome: string,
+): Promise<{ version: string; fingerprint: string } | null> {
+  const version = await resolvePandocConfigVersion(pandocHome);
+  if (version === null) {
+    return null;
+  }
+  const [head, diff, status, untracked] = await Promise.all([
+    git(pandocHome, ["rev-parse", "HEAD"]),
+    git(pandocHome, ["diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--"], true),
+    git(
+      pandocHome,
+      ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"],
+      true,
+    ),
+    git(pandocHome, ["ls-files", "--others", "--exclude-standard", "-z"], true),
+  ]);
+  if (!head.ok || !diff.ok || !status.ok || !untracked.ok) {
+    return null;
+  }
+  const hash = createHash("sha256");
+  hash.update(JSON.stringify([head.out, diff.out, status.out]));
+  try {
+    for (const name of untracked.out.split("\0").filter(Boolean)) {
+      const path = join(pandocHome, name);
+      const stat = await lstat(path);
+      if (!stat.isSymbolicLink() && !stat.isFile()) {
+        return null;
+      }
+      const content = stat.isSymbolicLink() ? await readlink(path) : await readFile(path);
+      hash.update(JSON.stringify([name, stat.mode, createHash("sha256").update(content).digest("hex")]));
+    }
+  } catch (error) {
+    // The tree may change or become unreadable while being inspected.
+    process.stderr.write(`pandoc-config: cannot inspect untracked inputs: ${String(error)}\n`);
+    return null;
+  }
+  return { version, fingerprint: hash.digest("hex") };
 }

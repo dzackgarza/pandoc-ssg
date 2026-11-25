@@ -33,12 +33,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import matter from "gray-matter";
-import { build } from "./build.ts";
+import { build, buildWithPandocConfig } from "./build.ts";
 import { loadAppConfig, loadSiteConfig } from "./config.ts";
 import { validatePageMeta } from "./content/schemas.ts";
 import { deploySite } from "./deploy.ts";
 import { BuildError } from "./errors.ts";
 import {
+  type PandocConfigStatus,
   pandocConfigStatus,
   resolveCleanPandocConfigVersion,
   writeKnownGood,
@@ -132,8 +133,14 @@ function slugify(title: string): string {
 
 async function runBuild(flags: Map<string, string>): Promise<number> {
   let opts = buildOpts(flags);
-  await build(opts);
-  await reportPandocConfig(opts.contentDir);
+  const { status, changed } = await buildWithPandocConfig(opts);
+  if (changed) {
+    process.stderr.write(
+      "WARNING: pandocHome changed during the build or could not be inspected; provenance unavailable. Re-verify rendering.\n",
+    );
+    return 0;
+  }
+  reportPandocConfig(status);
   return 0;
 }
 
@@ -142,9 +149,7 @@ async function runBuild(flags: Map<string, string>): Promise<number> {
  * version has advanced past what this site was last verified against. Never blocks the build:
  * the warning prompts re-verification + `pandoc-config bump`, it does not pin or fail.
  */
-async function reportPandocConfig(contentDir: string): Promise<void> {
-  let appConfig = await loadAppConfig();
-  let status = await pandocConfigStatus(appConfig.pandocHome, contentDir);
+function reportPandocConfig(status: PandocConfigStatus): void {
   if (status.version === null) {
     process.stderr.write(
       "pandoc-config: provenance unavailable — pandocHome is not a git checkout\n",
