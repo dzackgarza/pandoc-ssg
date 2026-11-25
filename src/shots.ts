@@ -1,8 +1,8 @@
-import type { Manifest } from "./types.ts";
-import { chromium } from "playwright";
-import type { Browser } from "playwright";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import type { Browser } from "playwright";
+import { chromium } from "playwright";
+import type { Manifest } from "./types.ts";
 
 export interface ShotResult {
   /** the manifest route url that was captured */
@@ -47,9 +47,11 @@ export async function screenshotSite(opts: ShotOptions): Promise<ShotResult[]> {
   let browser = await chromium.launch({ headless: true });
   let results: ShotResult[] = [];
   try {
-    results = await Promise.all(
-      opts.manifest.routes.map((route) => shotPage(browser, opts, route.url)),
-    );
+    // Each browser.newPage() creates its own context. Finish and close one
+    // before opening the next so live pages do not grow with the route count.
+    for (const route of opts.manifest.routes) {
+      results.push(await shotPage(browser, opts, route.url));
+    }
   } finally {
     await browser.close();
   }
@@ -57,7 +59,11 @@ export async function screenshotSite(opts: ShotOptions): Promise<ShotResult[]> {
   return results;
 }
 
-async function shotPage(browser: Browser, opts: ShotOptions, routeUrl: string): Promise<ShotResult> {
+async function shotPage(
+  browser: Browser,
+  opts: ShotOptions,
+  routeUrl: string,
+): Promise<ShotResult> {
   let url = `${opts.baseUrl}${routeUrl}`;
   let file = join(opts.outDir, `${shotName(routeUrl)}.png`);
   let page = await browser.newPage();
