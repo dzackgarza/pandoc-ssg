@@ -5,15 +5,15 @@ import { parse as parseHtml } from "node-html-parser";
 import type { Tags } from "yaml";
 import * as YAML from "yaml";
 import { z } from "zod";
-import { classifyFiles } from "./content/classify.ts";
 import { loadAppConfig, loadSiteConfig } from "./config.ts";
+import { classifyFiles } from "./content/classify.ts";
+import { resolvePageType, validatePageMeta } from "./content/schemas.ts";
 import { BuildError } from "./errors.ts";
 import { buildIsland } from "./islands.ts";
-import { loadNavigation } from "./site/nav.ts";
 import { renderPage } from "./pandoc.ts";
+import { loadNavigation } from "./site/nav.ts";
 import { assertNoCollisions, outputPathForRoute, routeForPage } from "./site/routes.ts";
-import { scanContent } from "./site/scan.ts";
-import { resolvePageType, validatePageMeta } from "./content/schemas.ts";
+import { scanFiles } from "./site/scan.ts";
 import type {
   BuildOptions,
   ClassifiedFile,
@@ -229,7 +229,7 @@ type PreviousOutput =
 export async function build(opts: BuildOptions): Promise<Manifest> {
   let { contentDir, pandocDir, outDir } = opts;
   let config = await loadSiteConfig(contentDir, pandocDir);
-  let relPaths = await scanContent(contentDir);
+  let relPaths = await scanFiles(contentDir);
   let classified = await classifyFiles(contentDir, relPaths, config);
   let plan = await planBuild(contentDir, classified, config);
   let nav = await loadNavigation(contentDir);
@@ -509,7 +509,7 @@ async function emitThemeAssets(
   pandocDir: string,
   staging: string,
 ): Promise<GeneratedEntry[]> {
-  let themeAssetRels = (await walkRel(join(pandocDir, "assets"))).sort();
+  let themeAssetRels = await scanFiles(join(pandocDir, "assets"));
   return await Promise.all(themeAssetRels.map(async (rel): Promise<GeneratedEntry> => {
     let src = join(pandocDir, "assets", rel);
     let output = `assets/${rel}`;
@@ -715,12 +715,6 @@ function requiredIndex<T>(items: T[], index: number, label: string): T {
     throw new Error(`${label} missing at index ${index}`);
   }
   return item;
-}
-
-/** POSIX paths of every file under `root`, recursively (relative to `root`). */
-async function walkRel(root: string): Promise<string[]> {
-  let glob = new Bun.Glob("**/*");
-  return await Array.fromAsync(glob.scan({ cwd: root, dot: true, onlyFiles: true }));
 }
 
 /** True for the file classes copied verbatim into dist ("asset" or "opaque"). */

@@ -1,28 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
 import type { Manifest, ManifestDependency, RouteEntry } from "../src/types.ts";
+import { listOutputFiles } from "./files.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
 const DEMO_CONTENT = join(FIXTURES, "demo", "content");
-
-/** All file paths (POSIX, dir-relative) under `root`, recursively. */
-async function walk(root: string, prefix = ""): Promise<string[]> {
-  const out: string[] = [];
-  const entries = await readdir(root, { withFileTypes: true });
-  for (const e of entries) {
-    const rel = prefix ? `${prefix}/${e.name}` : e.name;
-    if (e.isDirectory()) {
-      out.push(...(await walk(join(root, e.name), rel)));
-    } else {
-      out.push(rel);
-    }
-  }
-  return out;
-}
 
 function sortRoutes(routes: RouteEntry[]): RouteEntry[] {
   return [...routes].sort((a, b) => a.source.localeCompare(b.source));
@@ -154,7 +140,7 @@ describe("O6: manifest is the single contract", () => {
   });
 
   test("bijection: dist contents == {manifest} ∪ routes ∪ passthrough ∪ generated", async () => {
-    const onDisk = (await walk(outDir)).sort();
+    const onDisk = await listOutputFiles(outDir);
 
     const expected = [
       "site-manifest.json",
