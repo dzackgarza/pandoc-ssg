@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
-import { BuildError } from "../src/errors.ts";
+import { expectBuildError } from "./expect-build-error.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -13,17 +13,6 @@ function freshOutDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "ssg-out-"));
 }
 
-async function expectBuildError(promise: Promise<unknown>, kind: string): Promise<void> {
-  await expect(promise).rejects.toThrow(BuildError);
-  await expect(promise).rejects.toMatchObject({ name: "BuildError", kind });
-}
-
-/**
- * Component filter (data-backed fenced-div components). The `/writing/` page's
- * feature rows are the motivating case: a `::: {.component type="feature-row"
- * items="X"}` div must expand to a card grid built from _data/items.yaml,
- * with each card's markdown excerpt rendered to HTML.
- */
 describe("component filter: feature-row expands from _data/items.yaml", () => {
   let html: string;
   let outDir: string;
@@ -40,7 +29,6 @@ describe("component filter: feature-row expands from _data/items.yaml", () => {
 
   test("emits a feature-row container, not an empty component div", () => {
     expect(html).toContain('class="feature-row"');
-    // the placeholder div must have been consumed, not passed through verbatim
     expect(html).not.toContain('type="feature-row"');
   });
 
@@ -52,7 +40,6 @@ describe("component filter: feature-row expands from _data/items.yaml", () => {
   });
 
   test("card excerpt is rendered as markdown, not emitted verbatim", () => {
-    // *Prof X, Fall 2020* must become emphasis, and the [PDF](url) a real link
     expect(html).toContain("<em>Prof X, Fall 2020</em>");
     expect(html).toContain('href="https://example.com/a.pdf"');
     expect(html).not.toContain("*Prof X, Fall 2020*");
@@ -79,7 +66,6 @@ describe("component filter: media-gallery renders a static media grid from _data
 
   test("emits a media-gallery container, not an empty component div", () => {
     expect(html).toContain('class="media-gallery"');
-    // the placeholder div must have been consumed, not passed through verbatim
     expect(html).not.toContain('type="media-gallery"');
   });
 
@@ -106,7 +92,6 @@ describe("component filter: media-gallery renders a static media grid from _data
 
   test("item tags are carried as a data attribute, not as an interactive filter", () => {
     expect(html).toContain('data-tags="hand-drawn topology"');
-    // static component: no island bundle is referenced (no client-side filter)
     expect(html).not.toContain("assets/islands");
   });
 
@@ -119,7 +104,7 @@ describe("component filter: a media-gallery item with an unknown type fails the 
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badMedia = join(FIXTURES, "components", "bad-media");
-    await expectBuildError(build({ contentDir: badMedia, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badMedia, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -140,7 +125,6 @@ describe("component filter: link-group renders a curated external link list", ()
 
   test("emits a link-group section, not an empty component div", () => {
     expect(html).toContain('class="link-group"');
-    // the placeholder div must have been consumed, not passed through verbatim
     expect(html).not.toContain('type="link-group"');
   });
 
@@ -169,7 +153,7 @@ describe("component filter: a link-group with an unknown items key fails the bui
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badLinks = join(FIXTURES, "components", "bad-linkgroup");
-    await expectBuildError(build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -178,7 +162,7 @@ describe("component filter: a link-group link with no href fails the build", () 
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badLinks = join(FIXTURES, "components", "bad-linkgroup-nohref");
-    await expectBuildError(build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badLinks, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -199,14 +183,12 @@ describe("component filter: timeline expands to a dated list from _data/items.ya
 
   test("emits a timeline container, not an empty component div", () => {
     expect(html).toContain('class="timeline"');
-    // the placeholder div must have been consumed, not passed through verbatim
     expect(html).not.toContain('type="timeline"');
   });
 
   test("renders one entry per data item in authored (not re-sorted) order", () => {
     const entries = html.split('class="timeline__entry"').length - 1;
     expect(entries).toBe(2);
-    // demo-timeline lists Fall 2024 before Spring 2024; order is preserved
     expect(html.indexOf("Fall 2024")).toBeLessThan(html.indexOf("Spring 2024"));
   });
 
@@ -225,7 +207,6 @@ describe("component filter: timeline expands to a dated list from _data/items.ya
   });
 
   test("an entry without a detail still renders its title and no broken empty link", () => {
-    // the second entry (Spring 2024) has no detail field
     expect(html).toContain("<em>Number Theory</em>");
     expect(html).not.toContain('href=""');
   });
@@ -235,7 +216,7 @@ describe("component filter: a timeline with an unknown items key fails the build
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badTimeline = join(FIXTURES, "components", "bad-timeline");
-    await expectBuildError(build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -244,7 +225,7 @@ describe("component filter: a timeline entry with no date fails the build", () =
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badTimeline = join(FIXTURES, "components", "bad-timeline-nodate");
-    await expectBuildError(build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badTimeline, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -265,7 +246,6 @@ describe("component filter: papers expands to a bibliographic list from _data/it
 
   test("emits a papers list, not an empty component div", () => {
     expect(html).toContain('class="papers"');
-    // the placeholder div must have been consumed, not passed through verbatim
     expect(html).not.toContain('type="papers"');
   });
 
@@ -282,7 +262,6 @@ describe("component filter: papers expands to a bibliographic list from _data/it
 
   test("meta line joins present fields with a middot in authors·year·venue order", () => {
     expect(html).toContain("Alexeev, Engel, Garza, Schaffler · 2025 · Nagoya Math. J. 259");
-    // absent fields must not produce empty or doubled separators
     expect(html).not.toContain(" ·  · ");
   });
 
@@ -299,12 +278,10 @@ describe("component filter: papers expands to a bibliographic list from _data/it
     expect(html).toContain('class="abstract-toggle"');
     expect(html).toContain("<details");
     expect(html).toContain("<summary");
-    // abstract markdown is rendered, not emitted verbatim
     expect(html).toContain("<em>stable pair</em>");
   });
 
   test("a paper with no abstract emits no details element", () => {
-    // only the first paper has an abstract; the second must not add a <details>
     const details = html.split("<details").length - 1;
     expect(details).toBe(1);
   });
@@ -314,7 +291,7 @@ describe("component filter: a papers list with an unknown items key fails the bu
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badPapers = join(FIXTURES, "components", "bad-papers");
-    await expectBuildError(build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -323,7 +300,7 @@ describe("component filter: a paper entry with no title fails the build", () => 
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badPapers = join(FIXTURES, "components", "bad-papers-notitle");
-    await expectBuildError(build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badPapers, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -345,7 +322,6 @@ describe("component filter: video embeds a provider iframe", () => {
   test("expands to a youtube embed iframe carrying the video id", () => {
     expect(html).toContain('src="https://www.youtube.com/embed/zRPa-VAvl6Q"');
     expect(html).toContain("<iframe");
-    // the placeholder div must have been consumed, not passed through verbatim
     expect(html).not.toContain('type="video"');
   });
 
@@ -358,7 +334,7 @@ describe("component filter: an unknown video provider fails the build", () => {
   test("rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badVideo = join(FIXTURES, "components", "bad-video");
-    await expectBuildError(build({ contentDir: badVideo, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badVideo, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });
@@ -367,7 +343,7 @@ describe("component filter: unknown component type fails the build", () => {
   test("an unregistered component type rejects with BuildError kind=pandoc", async () => {
     const outDir = await freshOutDir();
     const badContent = join(FIXTURES, "components", "bad-content");
-    await expectBuildError(build({ contentDir: badContent, pandocDir: PANDOC_DIR, outDir }), "pandoc");
+    await expectBuildError(build({ contentDir: badContent, pandocDir: PANDOC_DIR, outDir }), { kind: "pandoc" });
     await rm(outDir, { recursive: true, force: true });
   });
 });

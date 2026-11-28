@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { resolvePageType, validatePageMeta } from "../src/content/schemas.ts";
-import { BuildError } from "../src/errors.ts";
+import { expectBuildError } from "./expect-build-error.ts";
 import type { SiteConfig } from "../src/types.ts";
 
 const TEST_SCHEMAS: SiteConfig["schemas"] = {
@@ -44,13 +44,6 @@ function configWith(dirTypes: SiteConfig["dirTypes"]): SiteConfig {
   return { ...TEST_CONFIG, dirTypes };
 }
 
-async function expectBuildError(action: () => unknown, expected: { kind: string; files?: string[] }): Promise<void> {
-  const rejection = Promise.resolve().then(action);
-  await expect(rejection).rejects.toThrow(BuildError);
-  await expect(rejection).rejects.toMatchObject({ name: "BuildError", ...expected });
-}
-
-// O3: validatePageMeta — page.v1.
 
 test("validatePageMeta accepts a minimal page.v1 and returns the typed meta", () => {
   const meta = validatePageMeta(
@@ -91,7 +84,6 @@ test("validatePageMeta rejects an unknown schema id with a schema error", async 
   );
 });
 
-// O3: validatePageMeta — blog-post.v1.
 
 test("validatePageMeta accepts a blog-post.v1 with ISO date and string tags", () => {
   const meta = validatePageMeta(
@@ -136,7 +128,6 @@ test("validatePageMeta rejects blog-post.v1 missing the required date", async ()
   );
 });
 
-// O3: validatePageMeta — site.route shape.
 
 test("validatePageMeta accepts a site.route equal to the root", () => {
   const meta = validatePageMeta(
@@ -184,7 +175,6 @@ test("validatePageMeta rejects a site.route missing its trailing slash", async (
   );
 });
 
-// O8: resolvePageType.
 
 test("resolvePageType infers blog-post for a mapped directory with no explicit type", () => {
   const t = resolvePageType(

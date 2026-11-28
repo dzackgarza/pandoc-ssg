@@ -102,6 +102,10 @@ A Markdown file is compiled only if its frontmatter opts in with `site.page: tru
 The build writes `dist/site-manifest.json` as the single contract every downstream tool consumes.
 Manifest schema v2 records deterministic dependency metadata on routes, passthrough copies, and generated artifacts so downstream tools can tell which source page, registry file, template/defaults/filter, data key, theme asset, macro manifest, or island entry produced each output.
 
+Registry path resolution and manifest provenance serve different consumers.
+Registry loading assigns the declaring source (bundled `pandoc` or site `content`) unless an entry explicitly overrides it. At runtime, `registryPath` in `src/config.ts` resolves page templates, defaults, filters and component modules against that source's root; a bundled bare HTML template name also receives the `templates/` prefix. Islands use `resolveIslandEntry` because non-content island paths are relative to the project root beside the Pandoc bundle.
+By contrast, `registryDependency` in `src/build.ts` records the registry's authored path and source, not the resolved machine-specific path. For example, a bundled template `page.html` resolves to `<pandocDir>/templates/page.html` but is recorded as `{ kind: "template", path: "page.html", origin: "pandoc" }`. A site-owned template `_templates/essay.html` resolves under the content root and keeps that path with origin `content`. Reusing the runtime resolver for manifest paths would change the portable manifest contract.
+
 ## Components and transclusion
 
 Fenced-div components expand from `_data/items.yaml`:
@@ -127,6 +131,10 @@ Interactive islands are also registry entries.
 
 ```
 bun install
-bun test          # 164 tests, real pandoc + Playwright, no mocks
+bun run test      # complete suite, real Pandoc + Playwright; root lcov.info
 bun run types     # tsc --noEmit
 ```
+
+`tests/run.sh` discovers the top-level `tests/*.test.ts` files. Kernel tests run together with LCOV coverage at the repository root; the existing browser, CLI and screenshot suites run in separate Bun processes. New top-level tests join the coverage group automatically; only suites requiring process isolation need to be named in the runner. Any failed test invocation fails the command. For targeted development, `bun test tests/<suite>.test.ts` runs a single suite.
+
+The test preload uses the committed macro manifest with the real `~/.pandoc` toolchain, under a temporary `XDG_CONFIG_HOME`. CLI tests explicitly pass the preloaded environment to subprocesses so they use that fixture even when Bun does not inherit variables assigned after startup.

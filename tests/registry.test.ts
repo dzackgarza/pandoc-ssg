@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../src/build.ts";
-import { BuildError } from "../src/errors.ts";
+import { expectBuildError } from "./expect-build-error.ts";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "site");
 const PANDOC_DIR = join(import.meta.dir, "..", "pandoc");
@@ -14,14 +14,6 @@ async function tempDir(prefix: string): Promise<string> {
   const dir: string = await mkdtemp(join(tmpdir(), prefix));
   createdDirs.push(dir);
   return dir;
-}
-
-async function expectBuildError(
-  promise: Promise<unknown>,
-  expected: { kind: string; files: string[] },
-): Promise<void> {
-  await expect(promise).rejects.toThrow(BuildError);
-  await expect(promise).rejects.toMatchObject({ name: "BuildError", ...expected });
 }
 
 afterEach(async () => {
@@ -74,6 +66,16 @@ describe("C1: registry foundation", () => {
     expect(html).toContain('data-template="essay"');
     expect(html).toContain('<p class="subtitle">Custom template and filter</p>');
     expect(html).toContain('<p class="registry-filter">filtered-by-content</p>');
+    const route = manifest.routes.find((entry) => entry.source === "essays/sample.md");
+    expect(route?.dependencies).toContainEqual({
+      kind: "template", path: "_templates/essay.html", origin: "content",
+    });
+    expect(route?.dependencies).toContainEqual({
+      kind: "defaults", path: "_defaults/essay.yaml", origin: "content",
+    });
+    expect(route?.dependencies).toContainEqual({
+      kind: "filter", path: "_filters/essay.lua", origin: "content",
+    });
   });
 
   test("malformed content registry page types fail before rendering", async () => {
