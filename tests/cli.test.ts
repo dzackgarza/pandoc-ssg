@@ -1,8 +1,3 @@
-/**
- * RED spec for the CLI (O9). Invokes `bun src/cli.ts <args>` as a real
- * subprocess and asserts exit codes / scaffolded files / dist outputs.
- * No mocks, no try/catch, no assertions on error-message prose.
- */
 import { describe, expect, test } from "bun:test";
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -23,6 +18,7 @@ interface RunResult {
 async function runCli(args: string[]): Promise<RunResult> {
   const proc = Bun.spawn(["bun", CLI, ...args], {
     cwd: REPO,
+    env: { ...process.env },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -34,12 +30,10 @@ async function runCli(args: string[]): Promise<RunResult> {
   return { exitCode, stdout, stderr };
 }
 
-/** Fresh temp directory unique to each test. */
 function freshTmp(label: string): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), `pandoc-ssg-${label}-`));
 }
 
-/** Copy a committed fixture's content/ tree into a fresh temp content dir. */
 async function stageContent(fixtureName: string): Promise<string> {
   const dst = path.join(await freshTmp(fixtureName), "content");
   await fs.cp(path.join(FIXTURES, fixtureName, "content"), dst, {
@@ -48,7 +42,6 @@ async function stageContent(fixtureName: string): Promise<string> {
   return dst;
 }
 
-/** Today's date as YYYY-MM-DD in local time (matches scaffold prefix). */
 function todayPrefix(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -57,7 +50,6 @@ function todayPrefix(): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Normalize a frontmatter date value (Date or string) to YYYY-MM-DD. */
 function dateToYmd(value: unknown): string {
   if (value instanceof Date) {
     const y = value.getUTCFullYear();
@@ -111,7 +103,6 @@ describe("CLI build (O9)", () => {
     ]);
 
     expect(r.exitCode).not.toBe(0);
-    // Offending content-relative path is structured contract data (O3).
     expect(r.stderr).toContain(path.join("blog", "bad.md"));
   });
 });
@@ -210,8 +201,6 @@ describe("CLI check (O12)", () => {
     ]);
 
     expect(r.exitCode).not.toBe(0);
-    // The broken target is structured contract data (O12); lychee reports the
-    // resolved path with the trailing slash normalized off.
     expect(r.stdout + r.stderr).toContain("/missing/page");
   });
 
@@ -248,11 +237,11 @@ describe("CLI serve (O13)", () => {
 
     const proc = Bun.spawn(["bun", CLI, "serve", "--out", outDir, "--port", "0"], {
       cwd: REPO,
+      env: { ...process.env },
       stdout: "pipe",
       stderr: "pipe",
     });
 
-    // The server announces "http://localhost:<port>/" on stdout once bound.
     const reader = proc.stdout.getReader();
     const decoder = new TextDecoder();
     let banner = "";
@@ -297,9 +286,7 @@ describe("CLI deploy gate (O15)", () => {
     ]);
 
     expect(r.exitCode).not.toBe(0);
-    // The page leaks un-migrated Liquid; verify reports it (structured contract).
     expect(r.stderr).toContain("unresolved-markup");
-    // The gate aborted before publishing: nothing reached the live target.
     expect(await Bun.file(path.join(target, "index.html")).exists()).toBe(false);
   });
 });

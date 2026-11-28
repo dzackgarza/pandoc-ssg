@@ -1,8 +1,3 @@
-// Test preload: point the generator's XDG config at a hermetic fixture before
-// any test runs. Macros come from the committed fixture manifest (stable, not the
-// live ~/.pandoc set which changes frequently); pandoc_home stays the real
-// ~/.pandoc so the tikzcd LaTeX toolchain (filter + template + styles) resolves.
-// Subprocess CLI tests inherit XDG_CONFIG_HOME from this process's env.
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
